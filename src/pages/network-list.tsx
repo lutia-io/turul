@@ -72,7 +72,7 @@ function EntityCard({
   return (
     <Link
       to={to}
-      className="group flex min-h-[88px] items-center gap-3.5 rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
+      className="group flex min-h-[88px] min-w-0 items-center gap-3.5 overflow-hidden rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
     >
       <div
         className={cn(
@@ -84,11 +84,17 @@ function EntityCard({
         <Icon className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className="truncate font-medium">{name}</p>
-          {status ? <StatusBadge status={status} /> : null}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="min-w-0 truncate font-medium">{name}</p>
+          {status ? (
+            <span className="shrink-0">
+              <StatusBadge status={status} />
+            </span>
+          ) : null}
         </div>
-        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+        <p className="wrap-break-word text-sm text-muted-foreground sm:truncate">
+          {subtitle}
+        </p>
       </div>
     </Link>
   )
@@ -122,7 +128,7 @@ function SchemaCard({ schema }: { schema: Schema }) {
 
 function NetworkSection({ network }: { network: Network }) {
   return (
-    <section className="flex flex-col gap-5 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
+    <section className="flex min-w-0 flex-col gap-5 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -196,7 +202,7 @@ function NetworkSection({ network }: { network: Network }) {
         <h3 className="text-sm font-medium text-muted-foreground">
           Organizations
         </h3>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {network.organizations.map((organization) => (
             <OrganizationCard key={organization.id} organization={organization} />
           ))}
@@ -205,7 +211,7 @@ function NetworkSection({ network }: { network: Network }) {
 
       <div className="flex flex-col gap-3">
         <h3 className="text-sm font-medium text-muted-foreground">Schemas</h3>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {network.schemas.map((schema) => (
             <SchemaCard key={schema.id} schema={schema} />
           ))}
@@ -239,7 +245,7 @@ export default function NetworkList() {
   }, [sort])
 
   return (
-    <div className="flex flex-1 flex-col gap-6 bg-muted/40 p-4 sm:p-6">
+    <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">All Networks</h1>

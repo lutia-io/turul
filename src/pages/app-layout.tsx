@@ -23,7 +23,7 @@ export default function AppLayout() {
             height: "calc(100svh - var(--app-header-height))",
           }}
         />
-        <SidebarInset>
+        <SidebarInset className="min-w-0 overflow-x-hidden">
           <Outlet />
         </SidebarInset>
       </div>

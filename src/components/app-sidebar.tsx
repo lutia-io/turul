@@ -12,11 +12,8 @@ import {
 } from "@/components/ui/sidebar"
 import {
   Building2Icon,
-  FileJsonIcon,
   HomeIcon,
-  LayersIcon,
   ListIcon,
-  WorkflowIcon,
 } from "lucide-react"
 
 const data = {
@@ -47,42 +44,6 @@ const data = {
       url: "/app/networks",
       icon: (
         <ListIcon
-        />
-      ),
-      isActive: false,
-    },
-    {
-      title: "Organizations",
-      url: "/app/organizations",
-      icon: (
-        <Building2Icon
-        />
-      ),
-      isActive: false,
-    },
-    {
-      title: "Schemas",
-      url: "/app/schemas",
-      icon: (
-        <FileJsonIcon
-        />
-      ),
-      isActive: false,
-    },
-    {
-      title: "Workflow Definitions",
-      url: "/app/workflow-definitions",
-      icon: (
-        <WorkflowIcon
-        />
-      ),
-      isActive: false,
-    },
-    {
-      title: "Pipeline Definitions",
-      url: "/app/pipeline-definitions",
-      icon: (
-        <LayersIcon
         />
       ),
       isActive: false,
