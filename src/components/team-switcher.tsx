@@ -18,7 +18,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+
+export type SwitcherKind = "network" | "organization"
 
 export type SwitcherItem = {
   id: string
@@ -27,13 +30,20 @@ export type SwitcherItem = {
   plan: string
 }
 
+const kindCopy: Record<SwitcherKind, { singular: string; plural: string }> = {
+  network: { singular: "Network", plural: "Networks" },
+  organization: { singular: "Organization", plural: "Organizations" },
+}
+
 export function TeamSwitcher({
+  kind,
   teams,
   activeId,
   onSelect,
-  label = "Organizations",
-  addLabel = "Add organization",
+  label,
+  addLabel,
 }: {
+  kind: SwitcherKind
   teams: SwitcherItem[]
   activeId?: string
   onSelect?: (team: SwitcherItem) => void
@@ -46,6 +56,9 @@ export function TeamSwitcher({
   )
   const selectedId = activeId ?? uncontrolledId
   const activeTeam = teams.find((team) => team.id === selectedId) ?? teams[0]
+  const copy = kindCopy[kind]
+  const menuLabel = label ?? copy.plural
+  const actionLabel = addLabel === undefined ? `Add ${copy.singular.toLowerCase()}` : addLabel
 
   if (!activeTeam) {
     return null
@@ -66,16 +79,26 @@ export function TeamSwitcher({
             render={
               <SidebarMenuButton
                 size="lg"
+                tooltip={`${copy.singular}: ${activeTeam.name}`}
                 className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
               />
             }
           >
-            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <div
+              className={cn(
+                "flex aspect-square size-8 items-center justify-center rounded-lg",
+                kind === "network"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "border bg-sidebar-accent text-sidebar-accent-foreground"
+              )}
+            >
               {activeTeam.logo}
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate text-xs text-muted-foreground">
+                {copy.singular}
+              </span>
               <span className="truncate font-medium">{activeTeam.name}</span>
-              <span className="truncate text-xs">{activeTeam.plan}</span>
             </div>
             <ChevronsUpDownIcon className="ml-auto" />
           </DropdownMenuTrigger>
@@ -87,7 +110,7 @@ export function TeamSwitcher({
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-xs text-muted-foreground">
-                {label}
+                {menuLabel}
               </DropdownMenuLabel>
               {teams.map((team, index) => (
                 <DropdownMenuItem
@@ -98,12 +121,19 @@ export function TeamSwitcher({
                   <div className="flex size-6 items-center justify-center rounded-md border">
                     {team.logo}
                   </div>
-                  {team.name}
+                  <div className="grid flex-1 text-left leading-tight">
+                    <span>{team.name}</span>
+                    {team.plan ? (
+                      <span className="text-xs text-muted-foreground">
+                        {team.plan}
+                      </span>
+                    ) : null}
+                  </div>
                   <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>
-            {addLabel ? (
+            {actionLabel ? (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
@@ -112,7 +142,7 @@ export function TeamSwitcher({
                       <PlusIcon className="size-4" />
                     </div>
                     <div className="font-medium text-muted-foreground">
-                      {addLabel}
+                      {actionLabel}
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>

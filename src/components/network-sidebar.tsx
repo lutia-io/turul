@@ -122,8 +122,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <TeamSwitcher
-          label="Networks"
-          addLabel="Add network"
+          kind="network"
           teams={networkItems}
           activeId={network?.id}
           onSelect={(item) => {
@@ -137,8 +136,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
           }}
         />
         <TeamSwitcher
-          label="Organizations"
-          addLabel="Add organization"
+          kind="organization"
           teams={organizationItems}
           activeId={organizationId ?? "all"}
           onSelect={(item) => {
