@@ -369,7 +369,7 @@ export default function Home() {
         name: schema.name,
         kind: "Schema",
         networkName: network.name,
-        to: `/app/schemas/${schema.id}`,
+        to: `/app/networks/${network.id}/schemas/${schema.id}`,
         color: schema.color,
         icon: FileJsonIcon,
       })),
@@ -380,7 +380,7 @@ export default function Home() {
         name: workflowDefinition.name,
         kind: "Workflow",
         networkName: network.name,
-        to: `/app/workflow-definitions/${workflowDefinition.id}`,
+        to: `/app/networks/${network.id}/workflow-definitions/${workflowDefinition.id}`,
         color: "teal" as const,
         icon: WorkflowIcon,
       })),
@@ -391,7 +391,7 @@ export default function Home() {
         name: pipelineDefinition.name,
         kind: "Pipeline",
         networkName: network.name,
-        to: `/app/pipeline-definitions/${pipelineDefinition.id}`,
+        to: `/app/networks/${network.id}/pipeline-definitions/${pipelineDefinition.id}`,
         color: "pink" as const,
         icon: LayersIcon,
       })),
@@ -399,179 +399,179 @@ export default function Home() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 bg-muted/40 p-4 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {greeting}, {userName}
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              {currentNetwork.name} is your active network.{" "}
-              {organizationList.length} organizations and {schemaList.length}{" "}
-              schemas are in play
-              {draftCount > 0
-                ? `, with ${draftCount} draft${draftCount === 1 ? "" : "s"} waiting on review.`
-                : "."}
-            </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {greeting}, {userName}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            {currentNetwork.name} is your active network.{" "}
+            {organizationList.length} organizations and {schemaList.length}{" "}
+            schemas are in play
+            {draftCount > 0
+              ? `, with ${draftCount} draft${draftCount === 1 ? "" : "s"} waiting on review.`
+              : "."}
+          </p>
+        </div>
+        <Button render={<Link to="/app/networks" />}>
+          <PlusIcon />
+          Create a network
+        </Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard
+          to="/app/networks"
+          label="Networks"
+          value={networkList.length}
+          live={networkCounts.live}
+          draft={networkCounts.draft}
+          liveLabel="active"
+          color="purple"
+          icon={ListIcon}
+        />
+        <StatCard
+          to={`/app/networks/${currentNetwork.id}`}
+          label="Organizations"
+          value={organizationList.length}
+          live={organizationCounts.live}
+          draft={organizationCounts.draft}
+          liveLabel="active"
+          color="orange"
+          icon={Building2Icon}
+        />
+        <StatCard
+          to={`/app/networks/${currentNetwork.id}/schemas`}
+          label="Schemas"
+          value={schemaList.length}
+          live={schemaCounts.live}
+          draft={schemaCounts.draft}
+          liveLabel="published"
+          color="blue"
+          icon={FileJsonIcon}
+        />
+        <StatCard
+          to={`/app/networks/${currentNetwork.id}/workflow-definitions`}
+          label="Workflows"
+          value={workflowDefinitionList.length}
+          live={workflowCounts.live}
+          draft={workflowCounts.draft}
+          liveLabel="published"
+          color="teal"
+          icon={WorkflowIcon}
+        />
+        <StatCard
+          to={`/app/networks/${currentNetwork.id}/pipeline-definitions`}
+          label="Pipelines"
+          value={pipelineDefinitionList.length}
+          live={pipelineCounts.live}
+          draft={pipelineCounts.draft}
+          liveLabel="published"
+          color="pink"
+          icon={LayersIcon}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="flex flex-col gap-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Your networks
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Open a network to inspect organizations, schemas, and
+                definitions.
+              </p>
+            </div>
+            <Link
+              to="/app/networks"
+              className="hidden shrink-0 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-flex sm:items-center sm:gap-1"
+            >
+              View all
+              <ArrowRightIcon className="size-3.5" />
+            </Link>
           </div>
-          <Button render={<Link to="/app/networks" />}>
-            <PlusIcon />
-            Create a network
-          </Button>
-        </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {networkList.map((network) => (
+              <NetworkCard key={network.id} network={network} />
+            ))}
+          </div>
+        </section>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            to="/app/networks"
-            label="Networks"
-            value={networkList.length}
-            live={networkCounts.live}
-            draft={networkCounts.draft}
-            liveLabel="active"
-            color="purple"
-            icon={ListIcon}
-          />
-          <StatCard
-            to="/app/organizations"
-            label="Organizations"
-            value={organizationList.length}
-            live={organizationCounts.live}
-            draft={organizationCounts.draft}
-            liveLabel="active"
-            color="orange"
-            icon={Building2Icon}
-          />
-          <StatCard
-            to="/app/schemas"
-            label="Schemas"
-            value={schemaList.length}
-            live={schemaCounts.live}
-            draft={schemaCounts.draft}
-            liveLabel="published"
-            color="blue"
-            icon={FileJsonIcon}
-          />
-          <StatCard
-            to="/app/workflow-definitions"
-            label="Workflows"
-            value={workflowDefinitionList.length}
-            live={workflowCounts.live}
-            draft={workflowCounts.draft}
-            liveLabel="published"
-            color="teal"
-            icon={WorkflowIcon}
-          />
-          <StatCard
-            to="/app/pipeline-definitions"
-            label="Pipelines"
-            value={pipelineDefinitionList.length}
-            live={pipelineCounts.live}
-            draft={pipelineCounts.draft}
-            liveLabel="published"
-            color="pink"
-            icon={LayersIcon}
-          />
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <aside className="flex flex-col gap-6">
           <section className="flex flex-col gap-3">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight">
-                  Your networks
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Open a network to inspect organizations, schemas, and
-                  definitions.
-                </p>
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Needs attention
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Draft definitions that are not yet published.
+              </p>
+            </div>
+            {attentionItems.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                {attentionItems.map((item) => (
+                  <AttentionCard
+                    key={item.id}
+                    to={item.to}
+                    name={item.name}
+                    kind={item.kind}
+                    networkName={item.networkName}
+                    color={item.color}
+                    icon={item.icon}
+                  />
+                ))}
               </div>
-              <Link
-                to="/app/networks"
-                className="hidden shrink-0 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-flex sm:items-center sm:gap-1"
-              >
-                View all
-                <ArrowRightIcon className="size-3.5" />
-              </Link>
-            </div>
-            <div className="grid gap-3 lg:grid-cols-2">
-              {networkList.map((network) => (
-                <NetworkCard key={network.id} network={network} />
-              ))}
-            </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nothing waiting on review.
+              </p>
+            )}
           </section>
 
-          <aside className="flex flex-col gap-6">
-            <section className="flex flex-col gap-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight">
-                  Needs attention
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Draft definitions that are not yet published.
-                </p>
-              </div>
-              {attentionItems.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {attentionItems.map((item) => (
-                    <AttentionCard
-                      key={item.id}
-                      to={item.to}
-                      name={item.name}
-                      kind={item.kind}
-                      networkName={item.networkName}
-                      color={item.color}
-                      icon={item.icon}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nothing waiting on review.
-                </p>
-              )}
-            </section>
-
-            <section className="flex flex-col gap-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight">
-                  Quick actions
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Jump into a common setup task.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <QuickActionCard
-                  to="/app/networks"
-                  label="Browse networks"
-                  description="Open partner ecosystems"
-                  color="purple"
-                  icon={ListIcon}
-                />
-                <QuickActionCard
-                  to="/app/organizations"
-                  label="View organizations"
-                  description="Members across networks"
-                  color="orange"
-                  icon={Building2Icon}
-                />
-                <QuickActionCard
-                  to="/app/schemas"
-                  label="Review schemas"
-                  description="Shared data contracts"
-                  color="blue"
-                  icon={FileJsonIcon}
-                />
-                <QuickActionCard
-                  to="/app/workflow-definitions"
-                  label="Open workflows"
-                  description="Orchestration definitions"
-                  color="teal"
-                  icon={WorkflowIcon}
-                />
-              </div>
-            </section>
-          </aside>
-        </div>
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Quick actions
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Jump into a common setup task.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <QuickActionCard
+                to="/app/networks"
+                label="Browse networks"
+                description="Open partner ecosystems"
+                color="purple"
+                icon={ListIcon}
+              />
+              <QuickActionCard
+                to={`/app/networks/${currentNetwork.id}`}
+                label="View organizations"
+                description="Members across networks"
+                color="orange"
+                icon={Building2Icon}
+              />
+              <QuickActionCard
+                to={`/app/networks/${currentNetwork.id}/schemas`}
+                label="Review schemas"
+                description="Shared data contracts"
+                color="blue"
+                icon={FileJsonIcon}
+              />
+              <QuickActionCard
+                to={`/app/networks/${currentNetwork.id}/workflow-definitions`}
+                label="Open workflows"
+                description="Orchestration definitions"
+                color="teal"
+                icon={WorkflowIcon}
+              />
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   )
 }

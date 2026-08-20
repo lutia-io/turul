@@ -1,14 +1,40 @@
-import { Route } from "react-router"
-import { Routes } from "react-router"
+import { Route, Routes } from "react-router"
 import {
   AppLayout,
   Landing,
+  NetworkLayout,
   NetworkList,
   NetworkDetail,
+  SchemaList,
+  SchemaDetail,
+  WorkflowDefinitionList,
+  WorkflowDefinitionDetail,
+  PipelineDefinitionList,
+  PipelineDefinitionDetail,
   Signup,
   Login,
   Home,
 } from "./pages"
+
+function networkWorkspaceRoutes() {
+  return (
+    <>
+      <Route index element={<NetworkDetail />} />
+      <Route path="schemas" element={<SchemaList />} />
+      <Route path="schemas/:schemaId" element={<SchemaDetail />} />
+      <Route path="workflow-definitions" element={<WorkflowDefinitionList />} />
+      <Route
+        path="workflow-definitions/:workflowDefinitionId"
+        element={<WorkflowDefinitionDetail />}
+      />
+      <Route path="pipeline-definitions" element={<PipelineDefinitionList />} />
+      <Route
+        path="pipeline-definitions/:pipelineDefinitionId"
+        element={<PipelineDefinitionDetail />}
+      />
+    </>
+  )
+}
 
 export function App() {
   return (
@@ -19,7 +45,12 @@ export function App() {
       <Route element={<AppLayout />}>
         <Route path="/app/home" element={<Home />} />
         <Route path="/app/networks" element={<NetworkList />} />
-        <Route path="/app/networks/:networkId" element={<NetworkDetail />} />
+      </Route>
+      <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
+        {networkWorkspaceRoutes()}
+        <Route path="organizations/:organizationId">
+          {networkWorkspaceRoutes()}
+        </Route>
       </Route>
     </Routes>
   )

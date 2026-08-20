@@ -1,11 +1,17 @@
-import type { CSSProperties } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import { Outlet } from "react-router"
 
 import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
-export default function AppLayout() {
+export function AppShell({
+  sidebar,
+  children,
+}: {
+  sidebar: ReactNode
+  children?: ReactNode
+}) {
   return (
     <SidebarProvider
       className="flex-col"
@@ -17,16 +23,20 @@ export default function AppLayout() {
     >
       <AppHeader />
       <div className="flex min-h-0 flex-1">
-        <AppSidebar
-          style={{
-            top: "var(--app-header-height)",
-            height: "calc(100svh - var(--app-header-height))",
-          }}
-        />
+        {sidebar}
         <SidebarInset className="min-w-0 overflow-x-hidden">
-          <Outlet />
+          {children ?? <Outlet />}
         </SidebarInset>
       </div>
     </SidebarProvider>
   )
+}
+
+export const appSidebarStyle = {
+  top: "var(--app-header-height)",
+  height: "calc(100svh - var(--app-header-height))",
+} as const
+
+export default function AppLayout() {
+  return <AppShell sidebar={<AppSidebar style={appSidebarStyle} />} />
 }

@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 
 import { networkList, type Network, type Organization } from "@/data/networks"
+import { networkWorkspacePath } from "@/lib/network-workspace"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -23,11 +24,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  getBadgeColor,
-  statusBadgeConfig,
-  type BadgeColor,
-} from "@/lib/badge"
+import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
 
 type SortKey = "name" | "organizations" | "schemas"
@@ -91,7 +88,7 @@ function EntityCard({
             </span>
           ) : null}
         </div>
-        <p className="wrap-break-word text-sm text-muted-foreground sm:truncate">
+        <p className="text-sm wrap-break-word text-muted-foreground sm:truncate">
           {subtitle}
         </p>
       </div>
@@ -99,10 +96,19 @@ function EntityCard({
   )
 }
 
-function OrganizationCard({ organization }: { organization: Organization }) {
+function OrganizationCard({
+  organization,
+  networkId,
+}: {
+  organization: Organization
+  networkId: string
+}) {
   return (
     <EntityCard
-      to={`/app/organizations/${organization.id}`}
+      to={networkWorkspacePath({
+        networkId,
+        organizationId: organization.id,
+      })}
       name={organization.name}
       status={organization.status}
       color={organization.color}
@@ -118,7 +124,9 @@ function NetworkSection({ network }: { network: Network }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">{network.name}</h2>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {network.name}
+            </h2>
             <StatusBadge status={network.status} />
             <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
               {network.industry}
@@ -137,8 +145,9 @@ function NetworkSection({ network }: { network: Network }) {
               {network.coverage}
             </span>
             <span>
-              {network.organizations.length} organizations · {network.schemas.length}{" "}
-              schemas · {network.workflowDefinitions.length} workflows ·{" "}
+              {network.organizations.length} organizations ·{" "}
+              {network.schemas.length} schemas ·{" "}
+              {network.workflowDefinitions.length} workflows ·{" "}
               {network.pipelineDefinitions.length} pipelines
             </span>
           </div>
@@ -171,12 +180,28 @@ function NetworkSection({ network }: { network: Network }) {
                   View network
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  render={<Link to={`/app/organizations`} />}
+                  render={
+                    <Link
+                      to={networkWorkspacePath({
+                        networkId: network.id,
+                        rest: "schemas",
+                      })}
+                    />
+                  }
                 >
-                  View organizations
-                </DropdownMenuItem>
-                <DropdownMenuItem render={<Link to={`/app/schemas`} />}>
                   View schemas
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  render={
+                    <Link
+                      to={networkWorkspacePath({
+                        networkId: network.id,
+                        rest: "workflow-definitions",
+                      })}
+                    />
+                  }
+                >
+                  View workflows
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -190,7 +215,11 @@ function NetworkSection({ network }: { network: Network }) {
         </h3>
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {network.organizations.map((organization) => (
-            <OrganizationCard key={organization.id} organization={organization} />
+            <OrganizationCard
+              key={organization.id}
+              organization={organization}
+              networkId={network.id}
+            />
           ))}
         </div>
       </div>
@@ -223,52 +252,58 @@ export default function NetworkList() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">All Networks</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Networks group organizations and the schemas they share. Open a
-              card to inspect a member, or view the full network.
-            </p>
-          </div>
-          <Button>
-            <PlusIcon />
-            Create a network
-          </Button>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            All Networks
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Networks group organizations and the schemas they share. Open a card
+            to inspect a member, or view the full network.
+          </p>
         </div>
+        <Button>
+          <PlusIcon />
+          Create a network
+        </Button>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-              Sorted by {sortLabels[sort].toLowerCase()}
-              <ChevronDownIcon />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuRadioGroup
-                value={sort}
-                onValueChange={(value) => {
-                  if (value === "name" || value === "organizations" || value === "schemas") {
-                    setSort(value)
-                  }
-                }}
-              >
-                <DropdownMenuRadioItem value="name">Name</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="organizations">
-                  Organization count
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="schemas">
-                  Schema count
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+            Sorted by {sortLabels[sort].toLowerCase()}
+            <ChevronDownIcon />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={sort}
+              onValueChange={(value) => {
+                if (
+                  value === "name" ||
+                  value === "organizations" ||
+                  value === "schemas"
+                ) {
+                  setSort(value)
+                }
+              }}
+            >
+              <DropdownMenuRadioItem value="name">Name</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="organizations">
+                Organization count
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="schemas">
+                Schema count
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
-        <div className="flex flex-col gap-6">
-          {sortedNetworks.map((network) => (
-            <NetworkSection key={network.id} network={network} />
-          ))}
-        </div>
+      <div className="flex flex-col gap-6">
+        {sortedNetworks.map((network) => (
+          <NetworkSection key={network.id} network={network} />
+        ))}
+      </div>
     </div>
   )
 }

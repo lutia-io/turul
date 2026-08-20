@@ -20,20 +20,44 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 
+export type SwitcherItem = {
+  id: string
+  name: string
+  logo: React.ReactNode
+  plan: string
+}
+
 export function TeamSwitcher({
   teams,
+  activeId,
+  onSelect,
+  label = "Organizations",
+  addLabel = "Add organization",
 }: {
-  teams: {
-    name: string
-    logo: React.ReactNode
-    plan: string
-  }[]
+  teams: SwitcherItem[]
+  activeId?: string
+  onSelect?: (team: SwitcherItem) => void
+  label?: string
+  addLabel?: string | null
 }) {
   const { isMobile } = useSidebar()
-  const [activeTeam, setActiveTeam] = React.useState(teams[0])
+  const [uncontrolledId, setUncontrolledId] = React.useState(
+    activeId ?? teams[0]?.id
+  )
+  const selectedId = activeId ?? uncontrolledId
+  const activeTeam = teams.find((team) => team.id === selectedId) ?? teams[0]
+
   if (!activeTeam) {
     return null
   }
+
+  function handleSelect(team: SwitcherItem) {
+    if (!activeId) {
+      setUncontrolledId(team.id)
+    }
+    onSelect?.(team)
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -63,12 +87,12 @@ export function TeamSwitcher({
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Organizations
+                {label}
               </DropdownMenuLabel>
               {teams.map((team, index) => (
                 <DropdownMenuItem
-                  key={team.name}
-                  onClick={() => setActiveTeam(team)}
+                  key={team.id}
+                  onClick={() => handleSelect(team)}
                   className="gap-2 p-2"
                 >
                   <div className="flex size-6 items-center justify-center rounded-md border">
@@ -79,17 +103,21 @@ export function TeamSwitcher({
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem className="gap-2 p-2">
-                <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                  <PlusIcon className="size-4" />
-                </div>
-                <div className="font-medium text-muted-foreground">
-                  Add organization
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
+            {addLabel ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem className="gap-2 p-2">
+                    <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                      <PlusIcon className="size-4" />
+                    </div>
+                    <div className="font-medium text-muted-foreground">
+                      {addLabel}
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

@@ -1,4 +1,5 @@
 export { default as AppLayout } from "./app-layout.tsx"
+export { default as NetworkLayout } from "./network-layout.tsx"
 export { default as Home } from "./home.tsx"
 export { default as Signup } from "./signup.tsx"
 export { default as Login } from "./login.tsx"
