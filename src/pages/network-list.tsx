@@ -9,11 +9,10 @@ import {
   MapPinIcon,
   PlusIcon,
   Settings2Icon,
-  Table2Icon,
   type LucideIcon,
 } from "lucide-react"
 
-import { networkList, type Network, type Organization, type Schema } from "@/data/networks"
+import { networkList, type Network, type Organization } from "@/data/networks"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -113,19 +112,6 @@ function OrganizationCard({ organization }: { organization: Organization }) {
   )
 }
 
-function SchemaCard({ schema }: { schema: Schema }) {
-  return (
-    <EntityCard
-      to={`/app/schemas/${schema.id}`}
-      name={schema.name}
-      status={schema.status}
-      color={schema.color}
-      icon={Table2Icon}
-      subtitle={`${schema.format} · v${schema.version} · ${schema.fields} fields`}
-    />
-  )
-}
-
 function NetworkSection({ network }: { network: Network }) {
   return (
     <section className="flex min-w-0 flex-col gap-5 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
@@ -205,15 +191,6 @@ function NetworkSection({ network }: { network: Network }) {
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {network.organizations.map((organization) => (
             <OrganizationCard key={organization.id} organization={organization} />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-medium text-muted-foreground">Schemas</h3>
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {network.schemas.map((schema) => (
-            <SchemaCard key={schema.id} schema={schema} />
           ))}
         </div>
       </div>
