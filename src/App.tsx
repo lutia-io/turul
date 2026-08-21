@@ -10,8 +10,16 @@ import {
   SchemaDetail,
   WorkflowDefinitionList,
   WorkflowDefinitionDetail,
+  WorkflowList,
+  WorkflowRunDetail,
   PipelineDefinitionList,
   PipelineDefinitionDetail,
+  PipelineList,
+  PipelineRunDetail,
+  RecordsPage,
+  RecordDetail,
+  FilesPage,
+  FileDetail,
   Signup,
   Login,
   Home,
@@ -33,6 +41,14 @@ function networkWorkspaceRoutes() {
         path="pipeline-definitions/:pipelineDefinitionId"
         element={<PipelineDefinitionDetail />}
       />
+      <Route path="workflows" element={<WorkflowList />} />
+      <Route path="workflows/:workflowRunId" element={<WorkflowRunDetail />} />
+      <Route path="pipelines" element={<PipelineList />} />
+      <Route path="pipelines/:pipelineRunId" element={<PipelineRunDetail />} />
+      <Route path="records" element={<RecordsPage />} />
+      <Route path="records/:recordId" element={<RecordDetail />} />
+      <Route path="files" element={<FilesPage />} />
+      <Route path="files/:fileId" element={<FileDetail />} />
     </>
   )
 }
@@ -47,6 +63,10 @@ export function App() {
         <Route path="/app/home" element={<Home />} />
         <Route path="/app/networks" element={<NetworkList />} />
         <Route path="/app/organizations" element={<OrganizationList />} />
+        <Route path="/app/records" element={<RecordsPage />} />
+        <Route path="/app/files" element={<FilesPage />} />
+        <Route path="/app/workflows" element={<WorkflowList />} />
+        <Route path="/app/pipelines" element={<PipelineList />} />
       </Route>
       <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
         {networkWorkspaceRoutes()}

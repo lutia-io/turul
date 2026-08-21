@@ -2,6 +2,7 @@ import { Link } from "react-router"
 import { ChevronRightIcon, LayersIcon } from "lucide-react"
 
 import { pipelineDefinitionList } from "@/data/networks"
+import { getPipelineStages, pipelineSourceLabel } from "@/lib/json-definition"
 import { useNetworkWorkspace } from "@/lib/network-workspace"
 import { Card, CardDescription, CardTitle } from "@/components/ui/card"
 
@@ -43,8 +44,8 @@ export default function PipelineDefinitionList() {
                 <CardTitle>{pipelineDefinition.name}</CardTitle>
                 <CardDescription>
                   {network
-                    ? `${pipelineDefinition.source} · v${pipelineDefinition.version} · ${pipelineDefinition.stages} stages`
-                    : `${itemNetwork.name} · ${pipelineDefinition.source} · v${pipelineDefinition.version}`}
+                    ? `${pipelineSourceLabel(pipelineDefinition.definition)} · ${getPipelineStages(pipelineDefinition.definition).length} stages`
+                    : `${itemNetwork.name} · ${pipelineSourceLabel(pipelineDefinition.definition)}`}
                 </CardDescription>
               </div>
               <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />

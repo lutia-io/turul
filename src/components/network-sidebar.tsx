@@ -1,14 +1,18 @@
 "use client"
 
 import type { ComponentProps } from "react"
-import { Link, useLocation, useNavigate } from "react-router"
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router"
 import {
+  ActivityIcon,
   ArrowLeftIcon,
   Building2Icon,
+  FileIcon,
   FileJsonIcon,
   GalleryVerticalEndIcon,
   LayersIcon,
   LayoutDashboardIcon,
+  PlayIcon,
+  TableIcon,
   WorkflowIcon,
 } from "lucide-react"
 
@@ -36,10 +40,20 @@ import {
 export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const [searchParams] = useSearchParams()
   const { isMobile, setOpenMobile } = useSidebar()
   const { network, organizationId } = useNetworkWorkspace()
   const parsed = parseNetworkPath(pathname)
   const rest = parsed?.rest ?? ""
+  const recordsUrl = network
+    ? networkWorkspacePath({
+        networkId: network.id,
+        organizationId,
+        rest: "records",
+      })
+    : "/app/records"
+  const recordsSchemaId =
+    searchParams.get("schema") ?? network?.schemas[0]?.id
 
   const networkItems = networkList.map((item) => ({
     id: item.id,
@@ -79,6 +93,53 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       icon: <LayoutDashboardIcon />,
       exact: true,
     },
+    {
+      title: "Records",
+      url: recordsUrl,
+      icon: <TableIcon />,
+      items:
+        network?.schemas.map((schema) => ({
+          title: schema.name,
+          url: `${recordsUrl}?schema=${schema.id}`,
+          isActive: rest === "records" && schema.id === recordsSchemaId,
+        })) ?? [],
+    },
+    {
+      title: "Files",
+      url: network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: "files",
+          })
+        : "/app/files",
+      icon: <FileIcon />,
+    },
+    {
+      title: "Workflows",
+      url: network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: "workflows",
+          })
+        : "/app/workflows",
+      icon: <PlayIcon />,
+    },
+    {
+      title: "Pipelines",
+      url: network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: "pipelines",
+          })
+        : "/app/pipelines",
+      icon: <ActivityIcon />,
+    },
+  ]
+
+  const definitionItems = [
     {
       title: "Schemas",
       url: network
@@ -157,7 +218,8 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain label="Workspace" items={navMain} />
+        <NavMain label="Operations" items={navMain} />
+        <NavMain label="Definitions" items={definitionItems} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>

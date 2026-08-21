@@ -1,0 +1,155 @@
+export type JsonValue =
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+
+export type JsonObject = { [key: string]: JsonValue }
+
+export type JsonSchemaProperty = {
+  name: string
+  type: string
+  required: boolean
+  description?: string
+  format?: string
+  enumValues?: string[]
+}
+
+export type DefinitionStep = {
+  id: string
+  type: string
+  name: string
+  order: number
+}
+
+function asObject(value: unknown): JsonObject | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonObject
+  }
+  return undefined
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value : undefined
+}
+
+function asStringArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  const values = value.filter(
+    (item): item is string => typeof item === "string"
+  )
+  return values.length > 0 ? values : undefined
+}
+
+export function stringifyDefinition(value: unknown) {
+  return JSON.stringify(value, null, 2)
+}
+
+export function definitionDescription(definition: JsonObject) {
+  return asString(definition.description)
+}
+
+export function jsonSchemaPropertyCount(definition: JsonObject) {
+  return getJsonSchemaProperties(definition).length
+}
+
+export function getJsonSchemaProperties(
+  definition: JsonObject
+): JsonSchemaProperty[] {
+  const properties = asObject(definition.properties)
+  const required = new Set(asStringArray(definition.required) ?? [])
+
+  if (!properties) {
+    return []
+  }
+
+  return Object.entries(properties).map(([name, spec]) => {
+    const property = asObject(spec)
+    const enumValues = asStringArray(property?.enum)
+
+    return {
+      name,
+      type: asString(property?.type) ?? "any",
+      required: required.has(name),
+      description: asString(property?.description),
+      format: asString(property?.format),
+      enumValues,
+    }
+  })
+}
+
+function getNamedSteps(value: unknown): DefinitionStep[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.flatMap((item, index) => {
+    const step = asObject(item)
+    const id = asString(step?.id)
+    const type = asString(step?.type)
+    const name = asString(step?.name)
+
+    if (!id || !type || !name) {
+      return []
+    }
+
+    return [
+      {
+        id,
+        type,
+        name,
+        order: typeof step?.order === "number" ? step.order : index + 1,
+      },
+    ]
+  })
+}
+
+export function getWorkflowSteps(definition: JsonObject) {
+  return getNamedSteps(definition.steps)
+}
+
+export function getPipelineStages(definition: JsonObject) {
+  return getNamedSteps(definition.stages)
+}
+
+export function workflowTriggerLabel(definition: JsonObject) {
+  const trigger = asObject(definition.trigger)
+  return (
+    asString(trigger?.event) ??
+    asString(trigger?.name) ??
+    asString(definition.trigger) ??
+    "Unspecified trigger"
+  )
+}
+
+export function pipelineSourceLabel(definition: JsonObject) {
+  const source = asObject(definition.source)
+  return (
+    asString(source?.name) ??
+    asString(source?.type) ??
+    asString(definition.source) ??
+    "Unspecified source"
+  )
+}
+
+export function isFileProperty(property: JsonSchemaProperty) {
+  return property.format === "file"
+}
+
+export function getRecordFileIds(
+  data: JsonObject,
+  properties: JsonSchemaProperty[]
+) {
+  return properties.flatMap((property) => {
+    if (!isFileProperty(property)) {
+      return []
+    }
+
+    const value = data[property.name]
+    return typeof value === "string" && value ? [value] : []
+  })
+}
+
+export function publicationStatus(active: boolean) {
+  return active ? "Published" : "Draft"
+}

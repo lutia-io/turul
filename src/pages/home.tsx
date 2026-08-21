@@ -2,12 +2,14 @@ import { Link } from "react-router"
 import {
   ArrowRightIcon,
   Building2Icon,
+  FileIcon,
   FileJsonIcon,
   GlobeIcon,
   LayersIcon,
   ListIcon,
   MapPinIcon,
   PlusIcon,
+  TableIcon,
   WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -20,6 +22,8 @@ import {
   workflowDefinitionList,
   type Network,
 } from "@/data/networks"
+import { files } from "@/data/files"
+import { records } from "@/data/records"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -30,6 +34,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
+import { pipelineRuns, workflowRuns } from "@/data/runs"
+import { publicationStatus } from "@/lib/json-definition"
 import { cn } from "@/lib/utils"
 
 const userName = "John"
@@ -74,6 +80,7 @@ function StatCard({
   live,
   draft,
   liveLabel,
+  draftLabel = "draft",
   color,
   icon: Icon,
 }: {
@@ -83,6 +90,7 @@ function StatCard({
   live: number
   draft: number
   liveLabel: string
+  draftLabel?: string
   color: BadgeColor
   icon: LucideIcon
 }) {
@@ -123,7 +131,7 @@ function StatCard({
         </div>
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           {live} {liveLabel}
-          {draft > 0 ? ` · ${draft} draft` : ""}
+          {draft > 0 ? ` · ${draft} ${draftLabel}` : ""}
         </p>
       </div>
     </Link>
@@ -349,21 +357,35 @@ export default function Home() {
     organizationList,
     ({ organization }) => organization.status
   )
-  const schemaCounts = countByStatus(schemaList, ({ schema }) => schema.status)
+  const schemaCounts = countByStatus(schemaList, ({ schema }) =>
+    publicationStatus(schema.active)
+  )
   const workflowCounts = countByStatus(
     workflowDefinitionList,
-    ({ workflowDefinition }) => workflowDefinition.status
+    ({ workflowDefinition }) => publicationStatus(workflowDefinition.active)
   )
   const pipelineCounts = countByStatus(
     pipelineDefinitionList,
-    ({ pipelineDefinition }) => pipelineDefinition.status
+    ({ pipelineDefinition }) => publicationStatus(pipelineDefinition.active)
   )
+  const runningWorkflows = workflowRuns.filter(
+    (run) => run.status === "Running"
+  ).length
+  const queuedWorkflows = workflowRuns.filter(
+    (run) => run.status === "Queued"
+  ).length
+  const runningPipelines = pipelineRuns.filter(
+    (run) => run.status === "Running"
+  ).length
+  const queuedPipelines = pipelineRuns.filter(
+    (run) => run.status === "Queued"
+  ).length
   const draftCount =
     schemaCounts.draft + workflowCounts.draft + pipelineCounts.draft
 
   const attentionItems: AttentionItem[] = [
     ...schemaList
-      .filter(({ schema }) => schema.status === "Draft")
+      .filter(({ schema }) => !schema.active)
       .map(({ schema, network }) => ({
         id: schema.id,
         name: schema.name,
@@ -374,7 +396,7 @@ export default function Home() {
         icon: FileJsonIcon,
       })),
     ...workflowDefinitionList
-      .filter(({ workflowDefinition }) => workflowDefinition.status === "Draft")
+      .filter(({ workflowDefinition }) => !workflowDefinition.active)
       .map(({ workflowDefinition, network }) => ({
         id: workflowDefinition.id,
         name: workflowDefinition.name,
@@ -385,7 +407,7 @@ export default function Home() {
         icon: WorkflowIcon,
       })),
     ...pipelineDefinitionList
-      .filter(({ pipelineDefinition }) => pipelineDefinition.status === "Draft")
+      .filter(({ pipelineDefinition }) => !pipelineDefinition.active)
       .map(({ pipelineDefinition, network }) => ({
         id: pipelineDefinition.id,
         name: pipelineDefinition.name,
@@ -419,7 +441,7 @@ export default function Home() {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard
           to="/app/networks"
           label="Networks"
@@ -441,32 +463,44 @@ export default function Home() {
           icon={Building2Icon}
         />
         <StatCard
-          to={`/app/networks/${currentNetwork.id}/schemas`}
-          label="Schemas"
-          value={schemaList.length}
-          live={schemaCounts.live}
-          draft={schemaCounts.draft}
-          liveLabel="published"
+          to="/app/records"
+          label="Records"
+          value={records.length}
+          live={records.length}
+          draft={0}
+          liveLabel="rows"
           color="blue"
-          icon={FileJsonIcon}
+          icon={TableIcon}
         />
         <StatCard
-          to={`/app/networks/${currentNetwork.id}/workflow-definitions`}
+          to="/app/files"
+          label="Files"
+          value={files.length}
+          live={files.length}
+          draft={0}
+          liveLabel="uploaded"
+          color="orange"
+          icon={FileIcon}
+        />
+        <StatCard
+          to="/app/workflows"
           label="Workflows"
-          value={workflowDefinitionList.length}
-          live={workflowCounts.live}
-          draft={workflowCounts.draft}
-          liveLabel="published"
+          value={runningWorkflows + queuedWorkflows}
+          live={runningWorkflows}
+          draft={queuedWorkflows}
+          liveLabel="running"
+          draftLabel="queued"
           color="teal"
           icon={WorkflowIcon}
         />
         <StatCard
-          to={`/app/networks/${currentNetwork.id}/pipeline-definitions`}
+          to="/app/pipelines"
           label="Pipelines"
-          value={pipelineDefinitionList.length}
-          live={pipelineCounts.live}
-          draft={pipelineCounts.draft}
-          liveLabel="published"
+          value={runningPipelines + queuedPipelines}
+          live={runningPipelines}
+          draft={queuedPipelines}
+          liveLabel="running"
+          draftLabel="queued"
           color="pink"
           icon={LayersIcon}
         />
@@ -555,16 +589,16 @@ export default function Home() {
                 icon={Building2Icon}
               />
               <QuickActionCard
-                to={`/app/networks/${currentNetwork.id}/schemas`}
-                label="Review schemas"
-                description="Shared data contracts"
+                to="/app/records"
+                label="Open records"
+                description="Schema-backed data tables"
                 color="blue"
-                icon={FileJsonIcon}
+                icon={TableIcon}
               />
               <QuickActionCard
-                to={`/app/networks/${currentNetwork.id}/workflow-definitions`}
+                to="/app/workflows"
                 label="Open workflows"
-                description="Orchestration definitions"
+                description="Live executions in flight"
                 color="teal"
                 icon={WorkflowIcon}
               />

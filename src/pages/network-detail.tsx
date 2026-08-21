@@ -15,6 +15,13 @@ import {
   useNetworkWorkspace,
 } from "@/lib/network-workspace"
 import {
+  getPipelineStages,
+  jsonSchemaPropertyCount,
+  pipelineSourceLabel,
+  getWorkflowSteps,
+  workflowTriggerLabel,
+} from "@/lib/json-definition"
+import {
   Card,
   CardDescription,
   CardHeader,
@@ -151,8 +158,8 @@ export default function NetworkDetail() {
                   <div className="min-w-0 flex-1">
                     <CardTitle>{schema.name}</CardTitle>
                     <CardDescription>
-                      {schema.format} · v{schema.version} · {schema.fields}{" "}
-                      fields
+                      {schema.slug} ·{" "}
+                      {jsonSchemaPropertyCount(schema.definition)} properties
                     </CardDescription>
                   </div>
                   <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -181,8 +188,8 @@ export default function NetworkDetail() {
                   <div className="min-w-0 flex-1">
                     <CardTitle>{workflowDefinition.name}</CardTitle>
                     <CardDescription>
-                      {workflowDefinition.trigger} · v
-                      {workflowDefinition.version} · {workflowDefinition.steps}{" "}
+                      {workflowTriggerLabel(workflowDefinition.definition)} ·{" "}
+                      {getWorkflowSteps(workflowDefinition.definition).length}{" "}
                       steps
                     </CardDescription>
                   </div>
@@ -212,8 +219,8 @@ export default function NetworkDetail() {
                   <div className="min-w-0 flex-1">
                     <CardTitle>{pipelineDefinition.name}</CardTitle>
                     <CardDescription>
-                      {pipelineDefinition.source} · v
-                      {pipelineDefinition.version} · {pipelineDefinition.stages}{" "}
+                      {pipelineSourceLabel(pipelineDefinition.definition)} ·{" "}
+                      {getPipelineStages(pipelineDefinition.definition).length}{" "}
                       stages
                     </CardDescription>
                   </div>

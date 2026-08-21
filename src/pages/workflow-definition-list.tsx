@@ -2,6 +2,7 @@ import { Link } from "react-router"
 import { ChevronRightIcon, WorkflowIcon } from "lucide-react"
 
 import { workflowDefinitionList } from "@/data/networks"
+import { getWorkflowSteps, workflowTriggerLabel } from "@/lib/json-definition"
 import { useNetworkWorkspace } from "@/lib/network-workspace"
 import { Card, CardDescription, CardTitle } from "@/components/ui/card"
 
@@ -43,8 +44,8 @@ export default function WorkflowDefinitionList() {
                 <CardTitle>{workflowDefinition.name}</CardTitle>
                 <CardDescription>
                   {network
-                    ? `${workflowDefinition.trigger} · v${workflowDefinition.version} · ${workflowDefinition.steps} steps`
-                    : `${itemNetwork.name} · ${workflowDefinition.trigger} · v${workflowDefinition.version}`}
+                    ? `${workflowTriggerLabel(workflowDefinition.definition)} · ${getWorkflowSteps(workflowDefinition.definition).length} steps`
+                    : `${itemNetwork.name} · ${workflowTriggerLabel(workflowDefinition.definition)}`}
                 </CardDescription>
               </div>
               <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />

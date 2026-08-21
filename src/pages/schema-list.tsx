@@ -2,6 +2,7 @@ import { Link } from "react-router"
 import { ChevronRightIcon, FileJsonIcon } from "lucide-react"
 
 import { schemaList } from "@/data/networks"
+import { jsonSchemaPropertyCount } from "@/lib/json-definition"
 import { useNetworkWorkspace } from "@/lib/network-workspace"
 import { Card, CardDescription, CardTitle } from "@/components/ui/card"
 
@@ -40,8 +41,8 @@ export default function SchemaList() {
                 <CardTitle>{schema.name}</CardTitle>
                 <CardDescription>
                   {network
-                    ? `${schema.format} · v${schema.version} · ${schema.fields} fields`
-                    : `${itemNetwork.name} · ${schema.format} · v${schema.version}`}
+                    ? `${schema.slug} · ${jsonSchemaPropertyCount(schema.definition)} properties`
+                    : `${itemNetwork.name} · ${schema.slug}`}
                 </CardDescription>
               </div>
               <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />

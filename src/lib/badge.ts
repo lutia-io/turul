@@ -1,6 +1,10 @@
 import {
   BadgeCheckIcon,
   CircleDashedIcon,
+  CircleXIcon,
+  ClockIcon,
+  LoaderCircleIcon,
+  PauseIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -66,6 +70,11 @@ export const statusBadgeConfig: Record<
   Active: { icon: BadgeCheckIcon, color: "green" },
   Published: { icon: BadgeCheckIcon, color: "green" },
   Draft: { icon: CircleDashedIcon, color: "yellow" },
+  Running: { icon: LoaderCircleIcon, color: "cyan" },
+  Queued: { icon: ClockIcon, color: "yellow" },
+  Succeeded: { icon: BadgeCheckIcon, color: "green" },
+  Failed: { icon: CircleXIcon, color: "red" },
+  Paused: { icon: PauseIcon, color: "gray" },
 }
 
 export function getBadgeColor(color: BadgeColor | string | undefined) {

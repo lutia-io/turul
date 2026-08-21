@@ -1,4 +1,10 @@
 import type { BadgeColor } from "@/lib/badge"
+import type { JsonObject } from "@/lib/json-definition"
+import {
+  definePipeline,
+  defineSchema,
+  defineWorkflow,
+} from "@/data/define-records"
 
 export type Organization = {
   id: string
@@ -14,32 +20,30 @@ export type Organization = {
 export type Schema = {
   id: string
   name: string
-  version: string
-  format: string
-  description: string
-  status: string
-  fields: number
+  slug: string
+  active: boolean
+  internal: boolean
+  definition: JsonObject
   color: BadgeColor
 }
 
 export type WorkflowDefinition = {
   id: string
   name: string
-  version: string
-  trigger: string
-  description: string
-  status: string
-  steps: number
+  slug: string
+  active: boolean
+  internal: boolean
+  schemaId: string
+  definition: JsonObject
 }
 
 export type PipelineDefinition = {
   id: string
   name: string
-  version: string
-  source: string
-  description: string
-  status: string
-  stages: number
+  slug: string
+  active: boolean
+  internal: boolean
+  definition: JsonObject
 }
 
 export type Network = {
@@ -128,141 +132,278 @@ export const networks: Record<string, Network> = {
       },
     ],
     schemas: [
-      {
+      defineSchema({
         id: "dhl-shipment-manifest",
         name: "Shipment Manifest",
-        version: "2.1",
-        format: "JSON Schema",
+        slug: "shipment-manifest",
+        color: "purple",
         description:
           "Canonical shipment manifest used by DHL network partners for hub handoffs, customs, and last-mile dispatch.",
-        status: "Published",
-        fields: 48,
-        color: "purple",
-      },
-      {
+        properties: {
+          shipmentId: {
+            type: "string",
+            description: "Network-unique shipment identifier",
+          },
+          originHub: { type: "string", description: "Origin hub code" },
+          destinationHub: {
+            type: "string",
+            description: "Destination hub code",
+          },
+          pieces: {
+            type: "integer",
+            description: "Number of pieces in the consignment",
+          },
+          weightKg: {
+            type: "number",
+            description: "Total chargeable weight in kilograms",
+          },
+          incoterms: {
+            type: "string",
+            enum: ["DAP", "DDP", "EXW", "FOB"],
+            description: "Shipping terms",
+          },
+          readyAt: {
+            type: "string",
+            format: "date-time",
+            description: "When the shipment is ready for pickup",
+          },
+        },
+      }),
+      defineSchema({
         id: "dhl-tracking-event",
         name: "Tracking Event",
-        version: "1.4",
-        format: "JSON Schema",
+        slug: "tracking-event",
+        color: "blue",
+        internal: true,
         description:
           "Scan and milestone events published as parcels move through DHL carriers, warehouses, and last-mile partners.",
-        status: "Published",
-        fields: 22,
-        color: "blue",
-      },
-      {
+        properties: {
+          eventId: { type: "string", description: "Unique scan event id" },
+          shipmentId: {
+            type: "string",
+            description: "Related shipment identifier",
+          },
+          facilityCode: {
+            type: "string",
+            description: "Facility or vehicle code that produced the scan",
+          },
+          milestone: {
+            type: "string",
+            enum: [
+              "picked_up",
+              "in_transit",
+              "at_hub",
+              "out_for_delivery",
+              "delivered",
+            ],
+            description: "Normalized tracking milestone",
+          },
+          scannedAt: {
+            type: "string",
+            format: "date-time",
+            description: "When the event was captured",
+          },
+        },
+      }),
+      defineSchema({
         id: "dhl-customs-declaration",
         name: "Customs Declaration",
-        version: "3.0",
-        format: "XML",
+        slug: "customs-declaration",
+        color: "cyan",
         description:
           "Cross-border customs declaration payload shared with APAC and EMEA brokerage partners.",
-        status: "Published",
-        fields: 61,
-        color: "cyan",
-      },
-      {
+        properties: {
+          declarationId: {
+            type: "string",
+            description: "Brokerage declaration identifier",
+          },
+          shipmentId: {
+            type: "string",
+            description: "Related shipment identifier",
+          },
+          originCountry: {
+            type: "string",
+            description: "ISO 3166-1 origin country",
+          },
+          destinationCountry: {
+            type: "string",
+            description: "ISO 3166-1 destination country",
+          },
+          declaredValue: {
+            type: "number",
+            description: "Total declared value",
+          },
+          currency: { type: "string", description: "ISO 4217 currency code" },
+          hsCodes: {
+            type: "array",
+            items: { type: "string" },
+            description: "Harmonized system codes on the declaration",
+          },
+          documentFileId: {
+            type: "string",
+            format: "file",
+            description: "Uploaded customs document",
+          },
+        },
+        required: [
+          "declarationId",
+          "shipmentId",
+          "originCountry",
+          "destinationCountry",
+        ],
+      }),
+      defineSchema({
         id: "dhl-last-mile-delivery",
         name: "Last-mile Delivery",
-        version: "1.2",
-        format: "JSON Schema",
+        slug: "last-mile-delivery",
+        color: "gray",
+        active: false,
         description:
           "Proof-of-delivery, exception, and recipient capture records used by regional last-mile operators.",
-        status: "Draft",
-        fields: 18,
-        color: "gray",
-      },
+        properties: {
+          deliveryId: { type: "string", description: "Last-mile stop id" },
+          shipmentId: {
+            type: "string",
+            description: "Related shipment identifier",
+          },
+          recipientName: {
+            type: "string",
+            description: "Name captured at delivery",
+          },
+          status: {
+            type: "string",
+            enum: ["delivered", "attempted", "refused", "returned"],
+            description: "Delivery outcome",
+          },
+          signatureCaptured: {
+            type: "boolean",
+            description: "Whether a signature was collected",
+          },
+          completedAt: {
+            type: "string",
+            format: "date-time",
+            description: "When the stop was closed",
+          },
+          proofFileId: {
+            type: "string",
+            format: "file",
+            description: "Proof-of-delivery image or PDF",
+          },
+        },
+      }),
     ],
     workflowDefinitions: [
-      {
+      defineWorkflow({
         id: "dhl-customs-clearance",
         name: "Customs Clearance",
-        version: "3.0",
-        trigger: "Shipment manifest received",
-        description:
-          "Orchestrates brokerage review, declaration submission, and hold release for cross-border DHL shipments.",
-        status: "Published",
-        steps: 7,
-      },
-      {
+        slug: "customs-clearance",
+        schemaId: "dhl-customs-declaration",
+        trigger: { type: "event", event: "shipment.manifest.received" },
+        steps: [
+          { id: "validate", type: "validate", name: "Validate declaration" },
+          { id: "broker-review", type: "task", name: "Brokerage review" },
+          { id: "submit", type: "http", name: "Submit to customs" },
+          { id: "hold-check", type: "gateway", name: "Check hold status" },
+          { id: "release", type: "transform", name: "Release shipment" },
+        ],
+      }),
+      defineWorkflow({
         id: "dhl-hub-sort",
         name: "Hub Sort & Dispatch",
-        version: "2.2",
-        trigger: "Inbound scan at hub",
-        description:
-          "Routes parcels through DHL hub sortation and dispatches them to the next carrier or last-mile partner.",
-        status: "Published",
-        steps: 5,
-      },
-      {
+        slug: "hub-sort-dispatch",
+        schemaId: "dhl-shipment-manifest",
+        trigger: { type: "event", event: "scan.at_hub" },
+        steps: [
+          { id: "identify", type: "validate", name: "Identify shipment" },
+          { id: "sort", type: "transform", name: "Assign sort lane" },
+          { id: "dispatch", type: "http", name: "Dispatch to next hop" },
+          { id: "notify", type: "notify", name: "Publish tracking event" },
+        ],
+      }),
+      defineWorkflow({
         id: "dhl-last-mile",
         name: "Last-mile Delivery",
-        version: "1.5",
-        trigger: "Out for delivery",
-        description:
-          "Coordinates last-mile assignment, recipient capture, and proof-of-delivery across DHL regional operators.",
-        status: "Published",
-        steps: 6,
-      },
-      {
+        slug: "last-mile-delivery",
+        schemaId: "dhl-last-mile-delivery",
+        trigger: { type: "event", event: "shipment.out_for_delivery" },
+        steps: [
+          { id: "assign", type: "task", name: "Assign courier" },
+          { id: "route", type: "transform", name: "Build stop list" },
+          { id: "capture", type: "http", name: "Capture proof of delivery" },
+          { id: "close", type: "transform", name: "Close delivery stop" },
+        ],
+      }),
+      defineWorkflow({
         id: "dhl-exception-recovery",
         name: "Exception Recovery",
-        version: "0.9",
-        trigger: "Delivery exception raised",
-        description:
-          "Handles failed attempts, address corrections, and reattempts before returning to the originating hub.",
-        status: "Draft",
-        steps: 4,
-      },
+        slug: "exception-recovery",
+        schemaId: "dhl-tracking-event",
+        active: false,
+        trigger: { type: "event", event: "delivery.exception.raised" },
+        steps: [
+          { id: "classify", type: "transform", name: "Classify exception" },
+          { id: "correct", type: "task", name: "Correct address" },
+          { id: "reattempt", type: "http", name: "Schedule reattempt" },
+        ],
+      }),
     ],
     pipelineDefinitions: [
-      {
+      definePipeline({
         id: "dhl-manifest-ingest",
         name: "Manifest Ingest",
-        version: "2.0",
-        source: "Partner API",
-        description:
-          "Ingests shipment manifests from DHL network partners, validates against schema, and publishes them for customs and hub workflows.",
-        status: "Published",
-        stages: 5,
-      },
-      {
+        slug: "manifest-ingest",
+        source: { type: "api", name: "Partner API" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull manifests" },
+          { id: "validate", type: "validate", name: "Validate against schema" },
+          { id: "normalize", type: "transform", name: "Normalize partners" },
+          { id: "publish", type: "publish", name: "Publish to workflows" },
+        ],
+      }),
+      definePipeline({
         id: "dhl-tracking-stream",
         name: "Tracking Event Stream",
-        version: "1.8",
-        source: "Scan events",
-        description:
-          "Normalizes scan and milestone events from carriers, warehouses, and last-mile partners into a single tracking stream.",
-        status: "Published",
-        stages: 4,
-      },
-      {
+        slug: "tracking-event-stream",
+        source: { type: "stream", name: "Scan events" },
+        stages: [
+          { id: "ingest", type: "extract", name: "Ingest scans" },
+          { id: "normalize", type: "transform", name: "Normalize milestones" },
+          { id: "dedupe", type: "transform", name: "Dedupe event ids" },
+          { id: "publish", type: "publish", name: "Publish tracking stream" },
+        ],
+      }),
+      definePipeline({
         id: "dhl-customs-transform",
         name: "Customs Transform",
-        version: "3.1",
-        source: "XML declarations",
-        description:
-          "Transforms cross-border customs declarations into the DHL canonical payload used by brokerage partners.",
-        status: "Published",
-        stages: 6,
-      },
-      {
+        slug: "customs-transform",
+        source: { type: "file", name: "XML declarations" },
+        stages: [
+          { id: "parse", type: "extract", name: "Parse XML" },
+          { id: "map", type: "transform", name: "Map to canonical schema" },
+          { id: "validate", type: "validate", name: "Validate declaration" },
+          { id: "publish", type: "publish", name: "Hand off to brokerage" },
+        ],
+      }),
+      definePipeline({
         id: "dhl-partner-edi-sync",
         name: "Partner EDI Sync",
-        version: "0.4",
-        source: "EDI mailbox",
-        description:
-          "Bidirectional EDI sync for regional partners that have not yet migrated to the JSON partner API.",
-        status: "Draft",
-        stages: 3,
-      },
+        slug: "partner-edi-sync",
+        active: false,
+        source: { type: "mailbox", name: "EDI mailbox" },
+        stages: [
+          { id: "fetch", type: "extract", name: "Fetch EDI documents" },
+          { id: "translate", type: "transform", name: "Translate to JSON" },
+          { id: "publish", type: "publish", name: "Sync partner records" },
+        ],
+      }),
     ],
   },
   fedex: {
     id: "fedex",
     name: "FedEx",
     summary: "Express delivery network",
-    description: "Express delivery network for time-critical freight and parcels.",
+    description:
+      "Express delivery network for time-critical freight and parcels.",
     industry: "Express Delivery",
     headquarters: "Memphis, United States",
     coverage: "220+ countries",
@@ -304,103 +445,173 @@ export const networks: Record<string, Network> = {
       },
     ],
     schemas: [
-      {
+      defineSchema({
         id: "fedex-air-waybill",
         name: "Air Waybill",
-        version: "4.0",
-        format: "EDI X12",
+        slug: "air-waybill",
+        color: "blue",
         description:
           "International air waybill schema used by FedEx Express for time-critical freight and parcel movements.",
-        status: "Published",
-        fields: 54,
-        color: "blue",
-      },
-      {
+        properties: {
+          waybillNumber: {
+            type: "string",
+            description: "Air waybill number",
+          },
+          originAirport: {
+            type: "string",
+            description: "IATA origin airport",
+          },
+          destinationAirport: {
+            type: "string",
+            description: "IATA destination airport",
+          },
+          serviceLevel: {
+            type: "string",
+            enum: ["priority", "standard", "economy"],
+            description: "Express service level",
+          },
+          pieces: { type: "integer", description: "Number of pieces" },
+          chargeableWeightKg: {
+            type: "number",
+            description: "Chargeable weight in kilograms",
+          },
+        },
+      }),
+      defineSchema({
         id: "fedex-ground-scan",
         name: "Ground Scan Event",
-        version: "2.0",
-        format: "JSON Schema",
+        slug: "ground-scan-event",
+        color: "teal",
         description:
           "Facility scan events for FedEx Ground pickup, sort, and delivery across North America.",
-        status: "Published",
-        fields: 16,
-        color: "teal",
-      },
-      {
+        properties: {
+          scanId: { type: "string", description: "Facility scan identifier" },
+          trackingNumber: {
+            type: "string",
+            description: "Ground tracking number",
+          },
+          facilityId: {
+            type: "string",
+            description: "Originating facility",
+          },
+          scanType: {
+            type: "string",
+            enum: ["pickup", "sort", "delivery"],
+            description: "Scan classification",
+          },
+          scannedAt: {
+            type: "string",
+            format: "date-time",
+            description: "When the scan occurred",
+          },
+        },
+      }),
+      defineSchema({
         id: "fedex-freight-bol",
         name: "Freight Bill of Lading",
-        version: "1.1",
-        format: "XML",
+        slug: "freight-bill-of-lading",
+        color: "red",
         description:
           "Less-than-truckload bill of lading exchanged with FedEx Freight terminals and shippers.",
-        status: "Published",
-        fields: 37,
-        color: "red",
-      },
+        properties: {
+          bolNumber: { type: "string", description: "Bill of lading number" },
+          shipperName: { type: "string", description: "Shipper legal name" },
+          consigneeName: {
+            type: "string",
+            description: "Consignee legal name",
+          },
+          freightClass: {
+            type: "string",
+            description: "NMFC freight class",
+          },
+          handlingUnits: {
+            type: "integer",
+            description: "Number of handling units",
+          },
+          weightLbs: {
+            type: "number",
+            description: "Total weight in pounds",
+          },
+          scanFileId: {
+            type: "string",
+            format: "file",
+            description: "Scanned bill of lading",
+          },
+        },
+      }),
     ],
     workflowDefinitions: [
-      {
+      defineWorkflow({
         id: "fedex-express-intake",
         name: "Express Air Intake",
-        version: "4.1",
-        trigger: "Air waybill created",
-        description:
-          "Validates time-critical FedEx Express shipments, books air capacity, and publishes tracking milestones.",
-        status: "Published",
-        steps: 6,
-      },
-      {
+        slug: "express-air-intake",
+        schemaId: "fedex-air-waybill",
+        trigger: { type: "event", event: "air_waybill.created" },
+        steps: [
+          { id: "validate", type: "validate", name: "Validate waybill" },
+          { id: "capacity", type: "task", name: "Book air capacity" },
+          { id: "milestone", type: "notify", name: "Publish first milestone" },
+        ],
+      }),
+      defineWorkflow({
         id: "fedex-ground-sort",
         name: "Ground Sort",
-        version: "2.0",
-        trigger: "Facility scan event",
-        description:
-          "Processes FedEx Ground pickup, sort, and delivery scans across North American facilities.",
-        status: "Published",
-        steps: 4,
-      },
-      {
+        slug: "ground-sort",
+        schemaId: "fedex-ground-scan",
+        trigger: { type: "event", event: "facility.scan" },
+        steps: [
+          { id: "accept", type: "validate", name: "Accept scan" },
+          { id: "sort", type: "transform", name: "Assign outbound door" },
+          { id: "publish", type: "notify", name: "Publish sort event" },
+        ],
+      }),
+      defineWorkflow({
         id: "fedex-freight-tender",
         name: "Freight Tender",
-        version: "1.3",
-        trigger: "Bill of lading received",
-        description:
-          "Tenders less-than-truckload freight to FedEx Freight terminals and tracks pickup through delivery.",
-        status: "Published",
-        steps: 8,
-      },
+        slug: "freight-tender",
+        schemaId: "fedex-freight-bol",
+        trigger: { type: "event", event: "bill_of_lading.received" },
+        steps: [
+          { id: "tender", type: "http", name: "Tender to terminal" },
+          { id: "pickup", type: "task", name: "Confirm pickup" },
+          { id: "track", type: "notify", name: "Track to delivery" },
+        ],
+      }),
     ],
     pipelineDefinitions: [
-      {
+      definePipeline({
         id: "fedex-waybill-ingest",
         name: "Air Waybill Ingest",
-        version: "4.0",
-        source: "EDI X12",
-        description:
-          "Ingests international air waybills from FedEx Express, validates them, and feeds the express intake workflow.",
-        status: "Published",
-        stages: 5,
-      },
-      {
+        slug: "air-waybill-ingest",
+        source: { type: "edi", name: "EDI X12" },
+        stages: [
+          { id: "extract", type: "extract", name: "Read X12 waybills" },
+          { id: "validate", type: "validate", name: "Validate waybill schema" },
+          { id: "publish", type: "publish", name: "Feed express intake" },
+        ],
+      }),
+      definePipeline({
         id: "fedex-ground-scan-stream",
         name: "Ground Scan Stream",
-        version: "2.1",
-        source: "Facility scans",
-        description:
-          "Streams pickup, sort, and delivery scans from FedEx Ground facilities into a unified event pipeline.",
-        status: "Published",
-        stages: 3,
-      },
-      {
+        slug: "ground-scan-stream",
+        source: { type: "stream", name: "Facility scans" },
+        stages: [
+          { id: "ingest", type: "extract", name: "Ingest facility scans" },
+          { id: "normalize", type: "transform", name: "Normalize scan types" },
+          { id: "publish", type: "publish", name: "Publish unified stream" },
+        ],
+      }),
+      definePipeline({
         id: "fedex-freight-bol-transform",
         name: "Freight BOL Transform",
-        version: "1.2",
-        source: "XML bills of lading",
-        description:
-          "Transforms less-than-truckload bills of lading into the canonical payload used by FedEx Freight terminals.",
-        status: "Published",
-        stages: 4,
-      },
+        slug: "freight-bol-transform",
+        source: { type: "file", name: "XML bills of lading" },
+        stages: [
+          { id: "parse", type: "extract", name: "Parse BOL XML" },
+          { id: "map", type: "transform", name: "Map to freight schema" },
+          { id: "publish", type: "publish", name: "Publish to terminals" },
+        ],
+      }),
     ],
   },
   cafe: {
@@ -461,124 +672,199 @@ export const networks: Record<string, Network> = {
       },
     ],
     schemas: [
-      {
+      defineSchema({
         id: "cafe-menu-item",
         name: "Menu Item",
-        version: "1.6",
-        format: "JSON Schema",
+        slug: "menu-item",
+        color: "orange",
         description:
           "Shared drink, pastry, and lunch items published to POS terminals across cafe locations.",
-        status: "Published",
-        fields: 24,
-        color: "orange",
-      },
-      {
+        properties: {
+          sku: { type: "string", description: "Menu SKU" },
+          name: { type: "string", description: "Display name" },
+          category: {
+            type: "string",
+            enum: ["drink", "pastry", "lunch"],
+            description: "Menu category",
+          },
+          priceCents: {
+            type: "integer",
+            description: "Base price in cents",
+          },
+          available: {
+            type: "boolean",
+            description: "Whether the item is currently sellable",
+          },
+        },
+      }),
+      defineSchema({
         id: "cafe-order-ticket",
         name: "Order Ticket",
-        version: "2.0",
-        format: "JSON Schema",
+        slug: "order-ticket",
+        color: "purple",
         description:
           "Barista tickets for in-shop, mobile, and kiosk orders including modifiers and pickup status.",
-        status: "Published",
-        fields: 31,
-        color: "purple",
-      },
-      {
+        properties: {
+          ticketId: { type: "string", description: "Order ticket id" },
+          locationId: {
+            type: "string",
+            description: "Cafe location that owns the ticket",
+          },
+          channel: {
+            type: "string",
+            enum: ["in_shop", "mobile", "kiosk"],
+            description: "Order channel",
+          },
+          itemSkus: {
+            type: "array",
+            items: { type: "string" },
+            description: "Ordered menu SKUs",
+          },
+          status: {
+            type: "string",
+            enum: ["queued", "in_progress", "ready", "picked_up"],
+            description: "Fulfillment status",
+          },
+        },
+      }),
+      defineSchema({
         id: "cafe-loyalty-transaction",
         name: "Loyalty Transaction",
-        version: "1.3",
-        format: "JSON Schema",
+        slug: "loyalty-transaction",
+        color: "pink",
         description:
           "Points earned, redeemed, and adjusted across cafe locations and partner apps.",
-        status: "Published",
-        fields: 18,
-        color: "pink",
-      },
-      {
+        properties: {
+          transactionId: {
+            type: "string",
+            description: "Loyalty transaction id",
+          },
+          memberId: { type: "string", description: "Loyalty member id" },
+          type: {
+            type: "string",
+            enum: ["earn", "redeem", "adjust"],
+            description: "Transaction type",
+          },
+          points: { type: "integer", description: "Points delta" },
+          locationId: {
+            type: "string",
+            description: "Location where the transaction occurred",
+          },
+        },
+      }),
+      defineSchema({
         id: "cafe-inventory-count",
         name: "Inventory Count",
-        version: "0.8",
-        format: "JSON Schema",
+        slug: "inventory-count",
+        color: "gray",
+        active: false,
+        internal: true,
         description:
           "Daily bean, milk, and pastry counts used to trigger restock from the roastery.",
-        status: "Draft",
-        fields: 15,
-        color: "gray",
-      },
+        properties: {
+          countId: { type: "string", description: "Daily count id" },
+          locationId: { type: "string", description: "Cafe location" },
+          sku: { type: "string", description: "Inventory SKU" },
+          onHand: { type: "number", description: "Units on hand" },
+          parLevel: { type: "number", description: "Restock par level" },
+          countedAt: {
+            type: "string",
+            format: "date-time",
+            description: "When the count was recorded",
+          },
+          countSheetFileId: {
+            type: "string",
+            format: "file",
+            description: "Uploaded count sheet",
+          },
+        },
+      }),
     ],
     workflowDefinitions: [
-      {
+      defineWorkflow({
         id: "cafe-opening-checklist",
         name: "Opening Checklist",
-        version: "1.4",
-        trigger: "Shop opens",
-        description:
-          "Walks each cafe through equipment checks, cash drawer setup, and first-batch pastry pull.",
-        status: "Published",
-        steps: 6,
-      },
-      {
+        slug: "opening-checklist",
+        schemaId: "cafe-menu-item",
+        trigger: { type: "schedule", event: "shop.opens" },
+        steps: [
+          { id: "equipment", type: "task", name: "Check equipment" },
+          { id: "drawer", type: "task", name: "Set cash drawer" },
+          { id: "pastry", type: "http", name: "Pull first pastry batch" },
+        ],
+      }),
+      defineWorkflow({
         id: "cafe-order-fulfillment",
         name: "Order Fulfillment",
-        version: "2.1",
-        trigger: "Order ticket created",
-        description:
-          "Routes tickets to bar and pastry, marks drinks ready, and notifies pickup or delivery.",
-        status: "Published",
-        steps: 5,
-      },
-      {
+        slug: "order-fulfillment",
+        schemaId: "cafe-order-ticket",
+        trigger: { type: "event", event: "order_ticket.created" },
+        steps: [
+          { id: "route", type: "transform", name: "Route to bar or pastry" },
+          { id: "prepare", type: "task", name: "Mark in progress" },
+          { id: "ready", type: "notify", name: "Notify pickup" },
+        ],
+      }),
+      defineWorkflow({
         id: "cafe-inventory-reorder",
         name: "Inventory Reorder",
-        version: "1.0",
-        trigger: "Low stock threshold",
-        description:
-          "Creates roastery restock requests when bean, milk, or pastry counts drop below par.",
-        status: "Published",
-        steps: 4,
-      },
-      {
+        slug: "inventory-reorder",
+        schemaId: "cafe-inventory-count",
+        trigger: { type: "event", event: "inventory.below_par" },
+        steps: [
+          { id: "detect", type: "validate", name: "Confirm low stock" },
+          { id: "request", type: "http", name: "Create roastery request" },
+        ],
+      }),
+      defineWorkflow({
         id: "cafe-loyalty-enroll",
         name: "Loyalty Enrollment",
-        version: "0.7",
-        trigger: "Guest opts in at POS",
-        description:
-          "Creates a loyalty profile, issues a welcome reward, and syncs the account to partner apps.",
-        status: "Draft",
-        steps: 3,
-      },
+        slug: "loyalty-enrollment",
+        schemaId: "cafe-loyalty-transaction",
+        active: false,
+        trigger: { type: "event", event: "guest.opted_in" },
+        steps: [
+          { id: "profile", type: "transform", name: "Create loyalty profile" },
+          { id: "reward", type: "http", name: "Issue welcome reward" },
+          { id: "sync", type: "notify", name: "Sync partner apps" },
+        ],
+      }),
     ],
     pipelineDefinitions: [
-      {
+      definePipeline({
         id: "cafe-pos-ingest",
         name: "POS Ingest",
-        version: "2.0",
-        source: "POS API",
-        description:
-          "Ingests order tickets from cafe POS terminals, validates menu items, and publishes them for fulfillment.",
-        status: "Published",
-        stages: 4,
-      },
-      {
+        slug: "pos-ingest",
+        source: { type: "api", name: "POS API" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull POS tickets" },
+          { id: "validate", type: "validate", name: "Validate menu items" },
+          { id: "publish", type: "publish", name: "Publish for fulfillment" },
+        ],
+      }),
+      definePipeline({
         id: "cafe-loyalty-sync",
         name: "Loyalty Sync",
-        version: "1.5",
-        source: "Loyalty app",
-        description:
-          "Syncs points, redemptions, and profile updates between cafe locations and the loyalty partner.",
-        status: "Published",
-        stages: 3,
-      },
-      {
+        slug: "loyalty-sync",
+        source: { type: "api", name: "Loyalty app" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull loyalty events" },
+          { id: "normalize", type: "transform", name: "Normalize points" },
+          { id: "publish", type: "publish", name: "Sync locations" },
+        ],
+      }),
+      definePipeline({
         id: "cafe-inventory-snapshot",
         name: "Inventory Snapshot",
-        version: "0.9",
-        source: "Shop counts",
-        description:
-          "Collects daily inventory counts and feeds the roastery reorder workflow.",
-        status: "Draft",
-        stages: 3,
-      },
+        slug: "inventory-snapshot",
+        active: false,
+        source: { type: "file", name: "Shop counts" },
+        stages: [
+          { id: "collect", type: "extract", name: "Collect daily counts" },
+          { id: "compare", type: "transform", name: "Compare to par" },
+          { id: "publish", type: "publish", name: "Feed reorder workflow" },
+        ],
+      }),
     ],
   },
   gym: {
@@ -639,113 +925,175 @@ export const networks: Record<string, Network> = {
       },
     ],
     schemas: [
-      {
+      defineSchema({
         id: "gym-membership",
         name: "Membership",
-        version: "3.2",
-        format: "JSON Schema",
+        slug: "membership",
+        color: "green",
         description:
           "Member profile, plan tier, and access entitlements used by clubs and the front desk.",
-        status: "Published",
-        fields: 29,
-        color: "green",
-      },
-      {
+        properties: {
+          memberId: { type: "string", description: "Member identifier" },
+          planTier: {
+            type: "string",
+            enum: ["basic", "plus", "unlimited"],
+            description: "Membership plan",
+          },
+          status: {
+            type: "string",
+            enum: ["active", "frozen", "lapsed"],
+            description: "Membership status",
+          },
+          homeClubId: { type: "string", description: "Home club location" },
+          startsOn: {
+            type: "string",
+            format: "date",
+            description: "Plan start date",
+          },
+          endsOn: {
+            type: "string",
+            format: "date",
+            description: "Plan end date",
+          },
+          waiverFileId: {
+            type: "string",
+            format: "file",
+            description: "Signed membership waiver",
+          },
+        },
+      }),
+      defineSchema({
         id: "gym-class-booking",
         name: "Class Booking",
-        version: "2.1",
-        format: "JSON Schema",
+        slug: "class-booking",
+        color: "blue",
         description:
           "Group class and personal training reservations with waitlist and cancellation windows.",
-        status: "Published",
-        fields: 21,
-        color: "blue",
-      },
-      {
+        properties: {
+          bookingId: { type: "string", description: "Reservation id" },
+          memberId: { type: "string", description: "Member identifier" },
+          classId: { type: "string", description: "Class or session id" },
+          waitlisted: {
+            type: "boolean",
+            description: "Whether the member is on the waitlist",
+          },
+          startsAt: {
+            type: "string",
+            format: "date-time",
+            description: "Class start time",
+          },
+        },
+      }),
+      defineSchema({
         id: "gym-check-in",
         name: "Check-in Event",
-        version: "1.7",
-        format: "JSON Schema",
+        slug: "check-in-event",
+        color: "teal",
+        internal: true,
         description:
           "Door and kiosk check-in events used to grant access and count class attendance.",
-        status: "Published",
-        fields: 14,
-        color: "teal",
-      },
+        properties: {
+          checkInId: { type: "string", description: "Check-in event id" },
+          memberId: { type: "string", description: "Member identifier" },
+          locationId: { type: "string", description: "Club or studio" },
+          source: {
+            type: "string",
+            enum: ["door", "kiosk", "staff"],
+            description: "How the check-in was captured",
+          },
+          checkedInAt: {
+            type: "string",
+            format: "date-time",
+            description: "When access was granted",
+          },
+        },
+      }),
     ],
     workflowDefinitions: [
-      {
+      defineWorkflow({
         id: "gym-member-onboarding",
         name: "Member Onboarding",
-        version: "3.0",
-        trigger: "Membership created",
-        description:
-          "Collects waiver, issues access credentials, and books the complimentary intro session.",
-        status: "Published",
-        steps: 7,
-      },
-      {
+        slug: "member-onboarding",
+        schemaId: "gym-membership",
+        trigger: { type: "event", event: "membership.created" },
+        steps: [
+          { id: "waiver", type: "task", name: "Collect waiver" },
+          { id: "credentials", type: "http", name: "Issue access credentials" },
+          { id: "intro", type: "notify", name: "Book intro session" },
+        ],
+      }),
+      defineWorkflow({
         id: "gym-class-check-in",
         name: "Class Check-in",
-        version: "2.0",
-        trigger: "Member arrives for class",
-        description:
-          "Validates the booking, records attendance, and promotes the next waitlisted member if needed.",
-        status: "Published",
-        steps: 4,
-      },
-      {
+        slug: "class-check-in",
+        schemaId: "gym-check-in",
+        trigger: { type: "event", event: "member.arrives_for_class" },
+        steps: [
+          { id: "validate", type: "validate", name: "Validate booking" },
+          { id: "attend", type: "transform", name: "Record attendance" },
+          { id: "promote", type: "http", name: "Promote waitlist" },
+        ],
+      }),
+      defineWorkflow({
         id: "gym-membership-renewal",
         name: "Membership Renewal",
-        version: "1.2",
-        trigger: "Plan expires in 14 days",
-        description:
-          "Sends renewal offers, processes payment, and extends access before the membership lapses.",
-        status: "Published",
-        steps: 5,
-      },
-      {
+        slug: "membership-renewal",
+        schemaId: "gym-membership",
+        trigger: { type: "schedule", event: "plan.expires_in_14_days" },
+        steps: [
+          { id: "offer", type: "notify", name: "Send renewal offer" },
+          { id: "payment", type: "http", name: "Process payment" },
+          { id: "extend", type: "transform", name: "Extend access" },
+        ],
+      }),
+      defineWorkflow({
         id: "gym-freeze-request",
         name: "Membership Freeze",
-        version: "0.6",
-        trigger: "Member requests freeze",
-        description:
-          "Reviews freeze eligibility, pauses billing, and schedules access restore on the return date.",
-        status: "Draft",
-        steps: 4,
-      },
+        slug: "membership-freeze",
+        schemaId: "gym-membership",
+        active: false,
+        trigger: { type: "event", event: "member.freeze_requested" },
+        steps: [
+          { id: "eligibility", type: "validate", name: "Review eligibility" },
+          { id: "pause", type: "http", name: "Pause billing" },
+          { id: "restore", type: "schedule", name: "Schedule access restore" },
+        ],
+      }),
     ],
     pipelineDefinitions: [
-      {
+      definePipeline({
         id: "gym-access-stream",
         name: "Access Control Stream",
-        version: "1.9",
-        source: "Door readers",
-        description:
-          "Streams check-in events from club doors and kiosks into attendance and access logs.",
-        status: "Published",
-        stages: 3,
-      },
-      {
+        slug: "access-control-stream",
+        source: { type: "stream", name: "Door readers" },
+        stages: [
+          { id: "ingest", type: "extract", name: "Ingest door events" },
+          { id: "authorize", type: "validate", name: "Authorize member" },
+          { id: "publish", type: "publish", name: "Write access log" },
+        ],
+      }),
+      definePipeline({
         id: "gym-booking-ingest",
         name: "Booking Ingest",
-        version: "2.2",
-        source: "Member app",
-        description:
-          "Ingests class and training bookings from the member app and publishes them to studio schedules.",
-        status: "Published",
-        stages: 4,
-      },
-      {
+        slug: "booking-ingest",
+        source: { type: "api", name: "Member app" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull bookings" },
+          { id: "validate", type: "validate", name: "Validate class capacity" },
+          { id: "publish", type: "publish", name: "Publish to schedules" },
+        ],
+      }),
+      definePipeline({
         id: "gym-billing-sync",
         name: "Billing Sync",
-        version: "1.1",
-        source: "Billing provider",
-        description:
-          "Syncs membership dues, session packs, and failed payments with the gym billing provider.",
-        status: "Published",
-        stages: 5,
-      },
+        slug: "billing-sync",
+        source: { type: "api", name: "Billing provider" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull dues and packs" },
+          { id: "reconcile", type: "transform", name: "Reconcile failures" },
+          { id: "publish", type: "publish", name: "Sync membership status" },
+        ],
+      }),
     ],
   },
   dentist: {
@@ -795,124 +1143,199 @@ export const networks: Record<string, Network> = {
       },
     ],
     schemas: [
-      {
+      defineSchema({
         id: "dentist-patient-record",
         name: "Patient Record",
-        version: "4.0",
-        format: "FHIR JSON",
+        slug: "patient-record",
+        color: "blue",
         description:
           "Patient demographics, history, and consent used by every office in the dental network.",
-        status: "Published",
-        fields: 52,
-        color: "blue",
-      },
-      {
+        properties: {
+          patientId: { type: "string", description: "Patient identifier" },
+          givenName: { type: "string", description: "Given name" },
+          familyName: { type: "string", description: "Family name" },
+          dateOfBirth: {
+            type: "string",
+            format: "date",
+            description: "Date of birth",
+          },
+          insuranceMemberId: {
+            type: "string",
+            description: "Payer member id",
+          },
+          consentOnFile: {
+            type: "boolean",
+            description: "Whether treatment consent is on file",
+          },
+          consentFileId: {
+            type: "string",
+            format: "file",
+            description: "Signed consent document",
+          },
+        },
+      }),
+      defineSchema({
         id: "dentist-appointment",
         name: "Appointment",
-        version: "2.3",
-        format: "JSON Schema",
+        slug: "appointment",
+        color: "cyan",
         description:
           "Chair-time bookings with provider, operatory, and reminder status across practices.",
-        status: "Published",
-        fields: 19,
-        color: "cyan",
-      },
-      {
+        properties: {
+          appointmentId: { type: "string", description: "Appointment id" },
+          patientId: { type: "string", description: "Patient identifier" },
+          providerId: { type: "string", description: "Treating provider" },
+          operatory: { type: "string", description: "Chair or operatory" },
+          startsAt: {
+            type: "string",
+            format: "date-time",
+            description: "Appointment start",
+          },
+          reminderStatus: {
+            type: "string",
+            enum: ["pending", "sent", "confirmed", "declined"],
+            description: "Reminder state",
+          },
+        },
+      }),
+      defineSchema({
         id: "dentist-treatment-plan",
         name: "Treatment Plan",
-        version: "1.5",
-        format: "JSON Schema",
+        slug: "treatment-plan",
+        color: "teal",
         description:
           "Proposed procedures, sequencing, and estimated cost shared with patients and specialists.",
-        status: "Published",
-        fields: 27,
-        color: "teal",
-      },
-      {
+        properties: {
+          planId: { type: "string", description: "Treatment plan id" },
+          patientId: { type: "string", description: "Patient identifier" },
+          procedureCodes: {
+            type: "array",
+            items: { type: "string" },
+            description: "CDT procedure codes",
+          },
+          estimatedCostCents: {
+            type: "integer",
+            description: "Estimated patient cost in cents",
+          },
+          status: {
+            type: "string",
+            enum: ["proposed", "accepted", "in_progress", "complete"],
+            description: "Plan status",
+          },
+          planFileId: {
+            type: "string",
+            format: "file",
+            description: "Treatment plan PDF",
+          },
+        },
+      }),
+      defineSchema({
         id: "dentist-insurance-claim",
         name: "Insurance Claim",
-        version: "3.1",
-        format: "X12 837",
+        slug: "insurance-claim",
+        color: "orange",
         description:
           "Dental insurance claims submitted to payers after treatment is completed.",
-        status: "Published",
-        fields: 44,
-        color: "orange",
-      },
+        properties: {
+          claimId: { type: "string", description: "Claim identifier" },
+          patientId: { type: "string", description: "Patient identifier" },
+          payerId: { type: "string", description: "Insurance payer" },
+          amountCents: {
+            type: "integer",
+            description: "Billed amount in cents",
+          },
+          status: {
+            type: "string",
+            enum: ["submitted", "paid", "denied", "pending"],
+            description: "Claim status",
+          },
+        },
+      }),
     ],
     workflowDefinitions: [
-      {
+      defineWorkflow({
         id: "dentist-patient-intake",
         name: "Patient Intake",
-        version: "2.4",
-        trigger: "New patient scheduled",
-        description:
-          "Collects history, insurance, and consent before the first visit at any practice.",
-        status: "Published",
-        steps: 6,
-      },
-      {
+        slug: "patient-intake",
+        schemaId: "dentist-patient-record",
+        trigger: { type: "event", event: "new_patient.scheduled" },
+        steps: [
+          { id: "history", type: "task", name: "Collect history" },
+          { id: "insurance", type: "http", name: "Verify insurance" },
+          { id: "consent", type: "task", name: "Capture consent" },
+        ],
+      }),
+      defineWorkflow({
         id: "dentist-appointment-reminders",
         name: "Appointment Reminders",
-        version: "1.8",
-        trigger: "Appointment in 48 hours",
-        description:
-          "Sends SMS and email reminders and offers reschedule links for unconfirmed visits.",
-        status: "Published",
-        steps: 4,
-      },
-      {
+        slug: "appointment-reminders",
+        schemaId: "dentist-appointment",
+        trigger: { type: "schedule", event: "appointment.in_48_hours" },
+        steps: [
+          { id: "send", type: "notify", name: "Send SMS and email" },
+          { id: "reschedule", type: "http", name: "Offer reschedule link" },
+        ],
+      }),
+      defineWorkflow({
         id: "dentist-insurance-preauth",
         name: "Insurance Pre-authorization",
-        version: "1.1",
-        trigger: "Treatment plan approved",
-        description:
-          "Submits pre-authorization for planned procedures and holds chair time until payer response.",
-        status: "Published",
-        steps: 5,
-      },
-      {
+        slug: "insurance-preauthorization",
+        schemaId: "dentist-treatment-plan",
+        trigger: { type: "event", event: "treatment_plan.approved" },
+        steps: [
+          { id: "submit", type: "http", name: "Submit pre-authorization" },
+          { id: "hold", type: "task", name: "Hold chair time" },
+          { id: "release", type: "gateway", name: "Wait for payer" },
+        ],
+      }),
+      defineWorkflow({
         id: "dentist-claim-follow-up",
         name: "Claim Follow-up",
-        version: "0.5",
-        trigger: "Claim unpaid after 30 days",
-        description:
-          "Reviews denied or delayed claims and resubmits with corrected coding or attachments.",
-        status: "Draft",
-        steps: 4,
-      },
+        slug: "claim-follow-up",
+        schemaId: "dentist-insurance-claim",
+        active: false,
+        trigger: { type: "schedule", event: "claim.unpaid_after_30_days" },
+        steps: [
+          { id: "review", type: "task", name: "Review denial" },
+          { id: "correct", type: "transform", name: "Correct coding" },
+          { id: "resubmit", type: "http", name: "Resubmit claim" },
+        ],
+      }),
     ],
     pipelineDefinitions: [
-      {
+      definePipeline({
         id: "dentist-ehr-ingest",
         name: "EHR Ingest",
-        version: "4.0",
-        source: "Practice EHR",
-        description:
-          "Ingests patient records and appointments from practice EHRs into the shared dental schemas.",
-        status: "Published",
-        stages: 5,
-      },
-      {
+        slug: "ehr-ingest",
+        source: { type: "api", name: "Practice EHR" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull patient records" },
+          { id: "validate", type: "validate", name: "Validate demographics" },
+          { id: "publish", type: "publish", name: "Publish shared schemas" },
+        ],
+      }),
+      definePipeline({
         id: "dentist-claims-submit",
         name: "Claims Submit",
-        version: "3.2",
-        source: "Completed treatment",
-        description:
-          "Transforms completed treatment into payer claims and tracks remittance against each visit.",
-        status: "Published",
-        stages: 6,
-      },
-      {
+        slug: "claims-submit",
+        source: { type: "api", name: "Completed treatment" },
+        stages: [
+          { id: "map", type: "transform", name: "Map treatment to claim" },
+          { id: "validate", type: "validate", name: "Validate claim schema" },
+          { id: "submit", type: "publish", name: "Submit to payer" },
+        ],
+      }),
+      definePipeline({
         id: "dentist-reminder-dispatch",
         name: "Reminder Dispatch",
-        version: "1.6",
-        source: "Appointment calendar",
-        description:
-          "Dispatches appointment reminders and records confirmations back to the practice calendar.",
-        status: "Published",
-        stages: 3,
-      },
+        slug: "reminder-dispatch",
+        source: { type: "api", name: "Appointment calendar" },
+        stages: [
+          { id: "select", type: "extract", name: "Select upcoming visits" },
+          { id: "dispatch", type: "publish", name: "Dispatch reminders" },
+          { id: "record", type: "transform", name: "Record confirmations" },
+        ],
+      }),
     ],
   },
 }

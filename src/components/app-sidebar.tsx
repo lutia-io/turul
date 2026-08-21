@@ -4,7 +4,15 @@ import * as React from "react"
 
 import { NavMain } from "@/components/nav-main"
 import { Sidebar, SidebarContent, SidebarRail } from "@/components/ui/sidebar"
-import { Building2Icon, HomeIcon, ListIcon } from "lucide-react"
+import {
+  Building2Icon,
+  FileIcon,
+  HomeIcon,
+  LayersIcon,
+  ListIcon,
+  TableIcon,
+  WorkflowIcon,
+} from "lucide-react"
 
 const navMain = [
   {
@@ -21,6 +29,26 @@ const navMain = [
     title: "Organizations",
     url: "/app/organizations",
     icon: <Building2Icon />,
+  },
+  {
+    title: "Records",
+    url: "/app/records",
+    icon: <TableIcon />,
+  },
+  {
+    title: "Files",
+    url: "/app/files",
+    icon: <FileIcon />,
+  },
+  {
+    title: "Workflows",
+    url: "/app/workflows",
+    icon: <WorkflowIcon />,
+  },
+  {
+    title: "Pipelines",
+    url: "/app/pipelines",
+    icon: <LayersIcon />,
   },
 ]
 

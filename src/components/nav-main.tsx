@@ -30,19 +30,38 @@ export function NavMain({
     items?: {
       title: string
       url: string
+      isActive?: boolean
     }[]
   }[]
   label?: string
 }) {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
 
   function isItemActive(url: string, exact?: boolean) {
-    if (exact) {
-      return pathname === url
+    const [urlPath, urlQuery] = url.split("?")
+    const pathMatches = exact
+      ? pathname === urlPath
+      : pathname === urlPath || pathname.startsWith(`${urlPath}/`)
+
+    if (!pathMatches) {
+      return false
     }
 
-    return pathname === url || pathname.startsWith(`${url}/`)
+    if (!urlQuery) {
+      return true
+    }
+
+    const currentParams = new URLSearchParams(search)
+    const urlParams = new URLSearchParams(urlQuery)
+
+    for (const [key, value] of urlParams) {
+      if (currentParams.get(key) !== value) {
+        return false
+      }
+    }
+
+    return true
   }
 
   function closeMobileSidebar() {
@@ -80,7 +99,9 @@ export function NavMain({
                   {item.items.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton
-                        isActive={isItemActive(subItem.url)}
+                        isActive={
+                          subItem.isActive ?? isItemActive(subItem.url)
+                        }
                         render={<Link to={subItem.url} />}
                         onClick={closeMobileSidebar}
                       >

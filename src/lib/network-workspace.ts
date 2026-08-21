@@ -52,6 +52,22 @@ export function networkSectionRest(rest: string) {
     return "pipeline-definitions"
   }
 
+  if (rest === "workflows" || rest.startsWith("workflows/")) {
+    return "workflows"
+  }
+
+  if (rest === "pipelines" || rest.startsWith("pipelines/")) {
+    return "pipelines"
+  }
+
+  if (rest === "records" || rest.startsWith("records/")) {
+    return "records"
+  }
+
+  if (rest === "files" || rest.startsWith("files/")) {
+    return "files"
+  }
+
   if (rest === "schemas" || rest.startsWith("schemas/")) {
     return "schemas"
   }

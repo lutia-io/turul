@@ -1,14 +1,19 @@
 import { Link, useParams } from "react-router"
-import { GalleryVerticalEndIcon, HashIcon, WorkflowIcon } from "lucide-react"
-
-import { getWorkflowDefinition } from "@/data/networks"
-import { useNetworkWorkspace } from "@/lib/network-workspace"
 import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  FileJsonIcon,
+  GalleryVerticalEndIcon,
+  HashIcon,
+  WorkflowIcon,
+} from "lucide-react"
+
+import {
+  DefinitionFlags,
+  DefinitionStepsList,
+  JsonDefinitionCard,
+} from "@/components/json-definition-card"
+import { getSchema, getWorkflowDefinition } from "@/data/networks"
+import { getWorkflowSteps, workflowTriggerLabel } from "@/lib/json-definition"
+import { useNetworkWorkspace } from "@/lib/network-workspace"
 
 export default function WorkflowDefinitionDetail() {
   const { workflowDefinitionId } = useParams()
@@ -22,81 +27,124 @@ export default function WorkflowDefinitionDetail() {
     ? result?.workflowDefinition
     : undefined
   const network = belongsToWorkspace ? result?.network : undefined
+  const schema = workflowDefinition
+    ? getSchema(workflowDefinition.schemaId)?.schema
+    : undefined
+  const steps = workflowDefinition
+    ? getWorkflowSteps(workflowDefinition.definition)
+    : []
+  const trigger = workflowDefinition
+    ? workflowTriggerLabel(workflowDefinition.definition)
+    : ""
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4">
+    <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
       {workflowDefinition && network ? (
         <>
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex items-start gap-3.5">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white">
               <WorkflowIcon className="size-5" />
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-semibold">
+                <h1 className="text-2xl font-semibold tracking-tight">
                   {workflowDefinition.name}
                 </h1>
-                <span
-                  className={
-                    workflowDefinition.status === "Published"
-                      ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400"
-                      : "rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
-                  }
-                >
-                  {workflowDefinition.status}
-                </span>
+                <DefinitionFlags
+                  active={workflowDefinition.active}
+                  internal={workflowDefinition.internal}
+                />
               </div>
-              <p className="text-sm text-muted-foreground">
-                {workflowDefinition.description}
+              <p className="font-mono text-xs text-muted-foreground">
+                {workflowDefinition.slug}
               </p>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Card size="sm">
-              <CardHeader>
-                <CardDescription className="flex items-center gap-1">
-                  <HashIcon className="size-3.5" />
-                  Steps
-                </CardDescription>
-                <CardTitle className="text-2xl">
-                  {workflowDefinition.steps}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card size="sm">
-              <CardHeader>
-                <CardDescription>Trigger</CardDescription>
-                <CardTitle>{workflowDefinition.trigger}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card size="sm">
-              <CardHeader>
-                <CardDescription>Version</CardDescription>
-                <CardTitle>v{workflowDefinition.version}</CardTitle>
-              </CardHeader>
-            </Card>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Network</h2>
-              <p className="text-sm text-muted-foreground">
-                This workflow definition is used by the {network.name} network.
+            <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
+              <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                <HashIcon className="size-3.5" />
+                Steps
+              </p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {steps.length}
               </p>
             </div>
-            <Link to={href()} className="block">
-              <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                  <GalleryVerticalEndIcon className="size-4" />
+            <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs sm:col-span-2">
+              <p className="text-sm text-muted-foreground">Trigger</p>
+              <p className="mt-1 truncate font-mono text-sm font-medium">
+                {trigger}
+              </p>
+            </div>
+          </div>
+
+          {schema ? (
+            <section className="flex min-w-0 flex-col gap-3">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">
+                  Schema
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  This workflow is bound to a schema row via schema_id.
+                </p>
+              </div>
+              <Link
+                to={href(`schemas/${schema.id}`)}
+                className="flex min-w-0 items-center gap-3.5 rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <FileJsonIcon className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <CardTitle>{network.name}</CardTitle>
-                  <CardDescription>{network.description}</CardDescription>
+                  <p className="truncate font-medium">{schema.name}</p>
+                  <p className="truncate font-mono text-xs text-muted-foreground">
+                    {schema.slug}
+                  </p>
                 </div>
-              </Card>
+              </Link>
+            </section>
+          ) : null}
+
+          <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">Steps</h2>
+              <p className="text-sm text-muted-foreground">
+                Ordered steps stored in the workflow JSONB definition.
+              </p>
+            </div>
+            <DefinitionStepsList
+              steps={steps}
+              emptyLabel="This workflow definition does not declare any steps."
+            />
+          </section>
+
+          <JsonDefinitionCard definition={workflowDefinition.definition} />
+
+          <section className="flex min-w-0 flex-col gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Network
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                This workflow definition belongs to the {network.name} network.
+              </p>
+            </div>
+            <Link
+              to={href()}
+              className="flex min-w-0 items-center gap-3.5 rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <GalleryVerticalEndIcon className="size-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{network.name}</p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {network.description}
+                </p>
+              </div>
             </Link>
-          </div>
+          </section>
         </>
       ) : (
         <div>
