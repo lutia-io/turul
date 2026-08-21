@@ -10,9 +10,26 @@ import {
 
 export default function NetworkLayout() {
   const { pathname } = useLocation()
-  const { network, requestedOrganizationId, organization } =
-    useNetworkWorkspace()
+  const {
+    network,
+    requestedOrganizationId,
+    organization,
+    isNetworkLoading,
+  } = useNetworkWorkspace()
   const parsed = parseNetworkPath(pathname)
+
+  if (isNetworkLoading) {
+    return (
+      <AppShell sidebar={<NetworkSidebar style={appSidebarStyle} />}>
+        <div className="flex flex-1 flex-col gap-2 p-4">
+          <h1 className="text-lg font-semibold">Loading network</h1>
+          <p className="text-sm text-muted-foreground">
+            Fetching this network from the server.
+          </p>
+        </div>
+      </AppShell>
+    )
+  }
 
   if (network && requestedOrganizationId && !organization) {
     return (

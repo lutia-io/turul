@@ -1,7 +1,6 @@
 import { useEffect, useId, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 
-import { ColorPicker } from "@/components/color-picker"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -12,21 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { createNetwork } from "@/data/networks"
-import { type BadgeColor } from "@/lib/badge"
-
-const emptyForm = {
-  name: "",
-  summary: "",
-  description: "",
-  industry: "",
-  headquarters: "",
-  coverage: "",
-  color: "purple" as BadgeColor,
-}
+import { getHumaErrorMessage } from "@/store/api"
+import { useCreateNetworkMutation } from "@/store/network-slice"
 
 export function CreateNetworkDialog({
   open,
@@ -37,23 +25,31 @@ export function CreateNetworkDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const [form, setForm] = useState(emptyForm)
+  const [name, setName] = useState("")
+  const [createNetwork, { isLoading, error, reset }] =
+    useCreateNetworkMutation()
 
   useEffect(() => {
     if (open) {
-      setForm(emptyForm)
+      setName("")
+      reset()
     }
-  }, [open])
+  }, [open, reset])
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim()) {
+    const trimmed = name.trim()
+    if (!trimmed) {
       return
     }
 
-    const network = createNetwork(form)
-    onOpenChange(false)
-    navigate(`/app/networks/${network.id}`)
+    try {
+      const network = await createNetwork({ name: trimmed }).unwrap()
+      onOpenChange(false)
+      navigate(`/app/networks/${network.id}`)
+    } catch {
+      // Error is rendered from the mutation state.
+    }
   }
 
   return (
@@ -68,115 +64,34 @@ export function CreateNetworkDialog({
         </DialogHeader>
         <form id={formId} onSubmit={handleSubmit} autoComplete="off">
           <FieldGroup>
-            <Field>
+            <Field data-invalid={error ? true : undefined}>
               <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
               <Input
                 id={`${formId}-name`}
-                value={form.name}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
+                value={name}
+                onChange={(event) => setName(event.target.value)}
                 placeholder="Acme Logistics"
                 autoFocus
                 required
+                disabled={isLoading}
+                aria-invalid={error ? true : undefined}
               />
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel htmlFor={`${formId}-industry`}>Industry</FieldLabel>
-                <Input
-                  id={`${formId}-industry`}
-                  value={form.industry}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      industry: event.target.value,
-                    }))
-                  }
-                  placeholder="Logistics & Supply Chain"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={`${formId}-coverage`}>Coverage</FieldLabel>
-                <Input
-                  id={`${formId}-coverage`}
-                  value={form.coverage}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      coverage: event.target.value,
-                    }))
-                  }
-                  placeholder="220+ countries"
-                />
-              </Field>
-            </div>
-            <Field>
-              <FieldLabel htmlFor={`${formId}-headquarters`}>
-                Headquarters
-              </FieldLabel>
-              <Input
-                id={`${formId}-headquarters`}
-                value={form.headquarters}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    headquarters: event.target.value,
-                  }))
-                }
-                placeholder="Bonn, Germany"
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${formId}-summary`}>Summary</FieldLabel>
-              <Input
-                id={`${formId}-summary`}
-                value={form.summary}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    summary: event.target.value,
-                  }))
-                }
-                placeholder="Global logistics network"
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${formId}-description`}>
-                Description
-              </FieldLabel>
-              <Textarea
-                id={`${formId}-description`}
-                value={form.description}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="What this network coordinates across partner organizations."
-              />
-            </Field>
-            <Field>
-              <FieldLabel>Color</FieldLabel>
-              <ColorPicker
-                value={form.color}
-                onChange={(color) =>
-                  setForm((current) => ({ ...current, color }))
-                }
-              />
-            </Field>
+            {error ? (
+              <FieldError>{getHumaErrorMessage(error)}</FieldError>
+            ) : null}
           </FieldGroup>
         </form>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
+          <DialogClose render={<Button variant="outline" disabled={isLoading} />}>
             Cancel
           </DialogClose>
-          <Button type="submit" form={formId} disabled={!form.name.trim()}>
-            Create network
+          <Button
+            type="submit"
+            form={formId}
+            disabled={isLoading || !name.trim()}
+          >
+            {isLoading ? "Creating..." : "Create network"}
           </Button>
         </DialogFooter>
       </DialogContent>

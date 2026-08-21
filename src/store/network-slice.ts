@@ -1,0 +1,64 @@
+import { api } from "@/store/api"
+
+export type ApiNetwork = {
+  id: string
+  name: string
+  slug: string
+  userId: string
+  createdAt: string
+  updatedAt: string
+  deletedAt?: string | null
+}
+
+export type CreateNetworkRequest = {
+  name: string
+}
+
+export type CreateNetworkResponse = {
+  id: string
+}
+
+const networkApi = api.injectEndpoints({
+  endpoints: (build) => ({
+    listNetworks: build.query<ApiNetwork[], void>({
+      query: () => "/network",
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: "Network" as const, id })),
+              { type: "Network", id: "LIST" },
+            ]
+          : [{ type: "Network", id: "LIST" }],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled
+          for (const network of data) {
+            dispatch(
+              api.util.upsertQueryData("getNetwork", network.id, network)
+            )
+          }
+        } catch {
+          // List failed; getNetwork cache stays unchanged.
+        }
+      },
+    }),
+    getNetwork: build.query<ApiNetwork, string>({
+      query: (id) => `/network/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Network", id }],
+    }),
+    createNetwork: build.mutation<CreateNetworkResponse, CreateNetworkRequest>({
+      query: (body) => ({
+        url: "/network",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "Network", id: "LIST" }],
+    }),
+  }),
+})
+
+export const {
+  useListNetworksQuery,
+  useGetNetworkQuery,
+  useCreateNetworkMutation,
+} = networkApi

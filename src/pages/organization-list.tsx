@@ -19,7 +19,7 @@ import {
   networkWorkspacePath,
   useWorkspaceVersion,
 } from "@/lib/network-workspace"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { useCreateEntity } from "@/components/create-entity"
 import {
   DropdownMenu,
@@ -151,14 +151,13 @@ function OrganizationSection({
             <PlusIcon />
             Create
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            render={<Link to={organizationHref} />}
+          <Link
+            to={organizationHref}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             <Settings2Icon />
             Settings
-          </Button>
+          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="outline" size="icon-sm" />}

@@ -18,7 +18,7 @@ import {
 
 import { useCreateEntity } from "@/components/create-entity"
 import { StatusBadge } from "@/components/json-definition-card"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { files } from "@/data/files"
 import { records } from "@/data/records"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
@@ -444,26 +444,44 @@ export default function NetworkDetail() {
                 {network.name}
               </h1>
               <StatusBadge status={network.status} />
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                {network.industry}
-              </span>
+              {network.industry ? (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {network.industry}
+                </span>
+              ) : network.summary ? (
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {network.summary}
+                </span>
+              ) : null}
             </div>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              {network.description}
-              {organization
-                ? ` Showing activity for ${organization.name}.`
-                : ""}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <MapPinIcon className="size-3.5" />
-                {network.headquarters}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <GlobeIcon className="size-3.5" />
-                {network.coverage}
-              </span>
-            </div>
+            {network.description ? (
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                {network.description}
+                {organization
+                  ? ` Showing activity for ${organization.name}.`
+                  : ""}
+              </p>
+            ) : organization ? (
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Showing activity for {organization.name}.
+              </p>
+            ) : null}
+            {(network.headquarters || network.coverage) && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                {network.headquarters ? (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPinIcon className="size-3.5" />
+                    {network.headquarters}
+                  </span>
+                ) : null}
+                {network.coverage ? (
+                  <span className="inline-flex items-center gap-1">
+                    <GlobeIcon className="size-3.5" />
+                    {network.coverage}
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
         </div>
         <Button onClick={() => openCreateOrganization(network.id)}>
@@ -795,14 +813,13 @@ function DefinitionColumn({
             <PlusIcon />
             <span className="sr-only">Add {title.toLowerCase()}</span>
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            render={<Link to={viewAll} />}
+          <Link
+            to={viewAll}
+            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
           >
             <ArrowRightIcon />
             <span className="sr-only">View all {title.toLowerCase()}</span>
-          </Button>
+          </Link>
         </div>
       </div>
       {preview.length > 0 ? (

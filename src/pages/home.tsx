@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 
 import {
-  networkList,
   organizationList,
   pipelineDefinitionList,
   schemaList,
@@ -37,8 +36,9 @@ import {
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { pipelineRuns, workflowRuns } from "@/data/runs"
 import { publicationStatus } from "@/lib/json-definition"
-import { useWorkspaceVersion } from "@/lib/network-workspace"
+import { useWorkspaceNetworks } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
+import { getHumaErrorMessage } from "@/store/api"
 
 const userName = "John"
 
@@ -186,9 +186,11 @@ function NetworkCard({ network }: { network: Network }) {
               <CardDescription className="mt-0.5">
                 {network.summary}
               </CardDescription>
-              <span className="mt-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                {network.industry}
-              </span>
+              {network.industry ? (
+                <span className="mt-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {network.industry}
+                </span>
+              ) : null}
             </div>
           </div>
         </CardHeader>
@@ -239,14 +241,18 @@ function NetworkCard({ network }: { network: Network }) {
         </CardContent>
         <CardFooter className="justify-between gap-3 text-sm text-muted-foreground">
           <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1">
-              <MapPinIcon className="size-3.5" />
-              {network.headquarters}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <GlobeIcon className="size-3.5" />
-              {network.coverage}
-            </span>
+            {network.headquarters ? (
+              <span className="inline-flex items-center gap-1">
+                <MapPinIcon className="size-3.5" />
+                {network.headquarters}
+              </span>
+            ) : null}
+            {network.coverage ? (
+              <span className="inline-flex items-center gap-1">
+                <GlobeIcon className="size-3.5" />
+                {network.coverage}
+              </span>
+            ) : null}
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 font-medium text-foreground">
             View
@@ -352,11 +358,16 @@ type AttentionItem = {
 }
 
 export default function Home() {
-  useWorkspaceVersion()
   const { openCreateNetwork } = useCreateEntity()
+  const {
+    networks,
+    isLoading: isNetworksLoading,
+    isError: isNetworksError,
+    error: networksError,
+  } = useWorkspaceNetworks()
   const greeting = greetingForHour(new Date().getHours())
-  const currentNetwork = networkList[0]
-  const networkCounts = countByStatus(networkList, (network) => network.status)
+  const currentNetwork = networks[0]
+  const networkCounts = countByStatus(networks, (network) => network.status)
   const organizationCounts = countByStatus(
     organizationList,
     ({ organization }) => organization.status
@@ -384,8 +395,6 @@ export default function Home() {
   const queuedPipelines = pipelineRuns.filter(
     (run) => run.status === "Queued"
   ).length
-  const draftCount =
-    schemaCounts.draft + workflowCounts.draft + pipelineCounts.draft
 
   const attentionItems: AttentionItem[] = [
     ...schemaList
@@ -431,12 +440,13 @@ export default function Home() {
             {greeting}, {userName}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {currentNetwork.name} is your active network.{" "}
-            {organizationList.length} organizations and {schemaList.length}{" "}
-            schemas are in play
-            {draftCount > 0
-              ? `, with ${draftCount} draft${draftCount === 1 ? "" : "s"} waiting on review.`
-              : "."}
+            {isNetworksLoading
+              ? "Loading your networks..."
+              : isNetworksError
+                ? getHumaErrorMessage(networksError, "Failed to load networks")
+                : currentNetwork
+                  ? `${currentNetwork.name} is your most recent network.`
+                  : "You do not have any networks yet. Create one to get started."}
           </p>
         </div>
         <Button onClick={openCreateNetwork}>
@@ -449,7 +459,7 @@ export default function Home() {
         <StatCard
           to="/app/networks"
           label="Networks"
-          value={networkList.length}
+          value={networks.length}
           live={networkCounts.live}
           draft={networkCounts.draft}
           liveLabel="active"
@@ -531,9 +541,23 @@ export default function Home() {
             </Link>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            {networkList.map((network) => (
-              <NetworkCard key={network.id} network={network} />
-            ))}
+            {isNetworksLoading ? (
+              <p className="text-sm text-muted-foreground">
+                Loading networks...
+              </p>
+            ) : isNetworksError ? (
+              <p className="text-sm text-destructive">
+                {getHumaErrorMessage(networksError, "Failed to load networks")}
+              </p>
+            ) : networks.length > 0 ? (
+              networks.map((network) => (
+                <NetworkCard key={network.id} network={network} />
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                You do not have any networks yet.
+              </p>
+            )}
           </div>
         </section>
 

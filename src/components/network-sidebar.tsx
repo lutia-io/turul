@@ -30,12 +30,12 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { networkList } from "@/data/networks"
 import {
   networkSectionRest,
   networkWorkspacePath,
   parseNetworkPath,
   useNetworkWorkspace,
+  useWorkspaceNetworks,
 } from "@/lib/network-workspace"
 
 export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
@@ -44,6 +44,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const [searchParams] = useSearchParams()
   const { isMobile, setOpenMobile } = useSidebar()
   const { network, organizationId } = useNetworkWorkspace()
+  const { networks } = useWorkspaceNetworks()
   const { openCreateNetwork, openCreateOrganization } = useCreateEntity()
   const parsed = parseNetworkPath(pathname)
   const rest = parsed?.rest ?? ""
@@ -56,11 +57,15 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
     : "/app/records"
   const recordsSchemaId = searchParams.get("schema") ?? network?.schemas[0]?.id
 
-  const networkItems = networkList.map((item) => ({
+  const switcherNetworks =
+    network && !networks.some((item) => item.id === network.id)
+      ? [network, ...networks]
+      : networks
+  const networkItems = switcherNetworks.map((item) => ({
     id: item.id,
     name: item.name,
     logo: <GalleryVerticalEndIcon />,
-    plan: item.industry,
+    plan: item.summary,
     color: item.color,
   }))
 

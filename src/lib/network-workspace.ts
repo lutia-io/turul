@@ -3,9 +3,16 @@ import { useParams } from "react-router"
 
 import {
   getWorkspaceVersion,
-  networks,
   subscribeWorkspace,
+  type Network,
 } from "@/data/networks"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import {
+  useGetNetworkQuery,
+  useListNetworksQuery,
+  type ApiNetwork,
+} from "@/store/network-slice"
 
 export function useWorkspaceVersion() {
   return useSyncExternalStore(
@@ -88,10 +95,43 @@ export function networkSectionRest(rest: string) {
   return ""
 }
 
+export function workspaceNetworkFromApi(network: ApiNetwork): Network {
+  return {
+    id: network.id,
+    name: network.name,
+    summary: network.slug,
+    description: "",
+    industry: "",
+    headquarters: "",
+    coverage: "",
+    status: "Active",
+    color: "purple",
+    organizations: [],
+    schemas: [],
+    workflowDefinitions: [],
+    pipelineDefinitions: [],
+  }
+}
+
+export function useWorkspaceNetworks() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListNetworksQuery(undefined, { skip: !isAuthenticated })
+
+  return {
+    ...query,
+    networks: (query.data ?? []).map(workspaceNetworkFromApi),
+  }
+}
+
 export function useNetworkWorkspace() {
-  useWorkspaceVersion()
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { networkId, organizationId } = useParams()
-  const network = networkId ? networks[networkId] : undefined
+  const networkQuery = useGetNetworkQuery(networkId ?? "", {
+    skip: !isAuthenticated || !networkId,
+  })
+  const network = networkQuery.data
+    ? workspaceNetworkFromApi(networkQuery.data)
+    : undefined
   const organization = organizationId
     ? network?.organizations.find((item) => item.id === organizationId)
     : undefined
@@ -114,6 +154,8 @@ export function useNetworkWorkspace() {
     requestedOrganizationId: organizationId,
     network,
     organization,
+    isNetworkLoading: networkQuery.isLoading,
+    isNetworkError: networkQuery.isError,
     href,
   }
 }

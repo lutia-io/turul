@@ -1,28 +1,54 @@
 "use client"
 
+import { type FormEvent } from "react"
+import { Link, useLocation, useNavigate } from "react-router"
+
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { getHumaErrorMessage, useLoginUserMutation } from "@/store/api"
 import { FishIcon } from "lucide-react"
-import { Link } from "react-router"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const [loginUser, { isLoading, error }] = useLoginUserMutation()
+  const navigate = useNavigate()
+  const location = useLocation() as { state?: { from?: { pathname: string } } }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const email = String(form.get("email") ?? "").trim()
+    const password = String(form.get("password") ?? "")
+
+    try {
+      await loginUser({ email, password }).unwrap()
+      const from = location.state?.from?.pathname
+      navigate(from?.startsWith("/app") ? from : "/app/home", { replace: true })
+    } catch {
+      // Error is rendered from the mutation state.
+    }
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form>
+      <form onSubmit={handleSubmit}>
         <FieldGroup>
           <div className="flex flex-col items-center gap-2 text-center">
-            <Link to="/" className="flex flex-col items-center gap-2 font-medium">
+            <Link
+              to="/"
+              className="flex flex-col items-center gap-2 font-medium"
+            >
               <div className="flex size-8 items-center justify-center rounded-md">
                 <FishIcon className="size-6 text-primary" />
               </div>
@@ -33,17 +59,36 @@ export function LoginForm({
               Don&apos;t have an account? <Link to="/app/signup">Sign up</Link>
             </FieldDescription>
           </div>
-          <Field>
+          <Field data-invalid={error ? true : undefined}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="john.doe@example.com"
+              autoComplete="email"
               required
+              disabled={isLoading}
+              aria-invalid={error ? true : undefined}
             />
           </Field>
+          <Field data-invalid={error ? true : undefined}>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              disabled={isLoading}
+              aria-invalid={error ? true : undefined}
+            />
+          </Field>
+          {error ? <FieldError>{getHumaErrorMessage(error)}</FieldError> : null}
           <Field>
-            <Button type="submit">Login</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Logging in..." : "Login"}
+            </Button>
           </Field>
           <FieldSeparator>Or</FieldSeparator>
           <Field className="grid gap-4 sm:grid-cols-2">

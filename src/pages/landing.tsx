@@ -1,7 +1,7 @@
 import { Link } from "react-router"
 import { FishIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import hero from "@/assets/hero.svg"
 
@@ -15,10 +15,12 @@ export default function Landing() {
             <span className="hidden md:inline">Lutia</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" render={<Link to="/app/login" />}>
+            <Link to="/app/login" className={buttonVariants({ variant: "ghost" })}>
               Log in
-            </Button>
-            <Button render={<Link to="/app/signup" />}>Sign up</Button>
+            </Link>
+            <Link to="/app/signup" className={buttonVariants()}>
+              Sign up
+            </Link>
           </div>
         </div>
       </header>
@@ -37,17 +39,22 @@ export default function Landing() {
               We provide the tools you need to integrate your workflow.
             </p>
             <div className="mt-2 flex gap-3">
-              <Button size="lg" className="h-11 px-6" render={<Link to="/app/signup" />}>
+              <Link
+                to="/app/signup"
+                className={buttonVariants({ size: "lg", className: "h-11 px-6" })}
+              >
                 Get Started
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-11 px-6"
-                render={<Link to="" />}
+              </Link>
+              <Link
+                to=""
+                className={buttonVariants({
+                  size: "lg",
+                  variant: "outline",
+                  className: "h-11 px-6",
+                })}
               >
                 Learn more
-              </Button>
+              </Link>
             </div>
           </div>
           <div className="md:col-span-5">

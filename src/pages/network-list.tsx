@@ -10,12 +10,12 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import { networkList, type Network, type Organization } from "@/data/networks"
+import { type Network, type Organization } from "@/data/networks"
 import {
   networkWorkspacePath,
-  useWorkspaceVersion,
+  useWorkspaceNetworks,
 } from "@/lib/network-workspace"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { useCreateEntity } from "@/components/create-entity"
 import {
   DropdownMenu,
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
+import { getHumaErrorMessage } from "@/store/api"
 
 function StatusBadge({ status }: { status: string }) {
   const config = statusBadgeConfig[status]
@@ -121,22 +122,34 @@ function NetworkSection({ network }: { network: Network }) {
               {network.name}
             </h2>
             <StatusBadge status={network.status} />
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {network.industry}
-            </span>
+            {network.industry ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                {network.industry}
+              </span>
+            ) : (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                {network.summary}
+              </span>
+            )}
           </div>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            {network.description}
-          </p>
+          {network.description ? (
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              {network.description}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <MapPinIcon className="size-3.5" />
-              {network.headquarters}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <GlobeIcon className="size-3.5" />
-              {network.coverage}
-            </span>
+            {network.headquarters ? (
+              <span className="inline-flex items-center gap-1">
+                <MapPinIcon className="size-3.5" />
+                {network.headquarters}
+              </span>
+            ) : null}
+            {network.coverage ? (
+              <span className="inline-flex items-center gap-1">
+                <GlobeIcon className="size-3.5" />
+                {network.coverage}
+              </span>
+            ) : null}
             <span>
               {network.organizations.length} organizations ·{" "}
               {network.schemas.length} schemas ·{" "}
@@ -154,14 +167,13 @@ function NetworkSection({ network }: { network: Network }) {
             <PlusIcon />
             Create
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            render={<Link to={`/app/networks/${network.id}`} />}
+          <Link
+            to={`/app/networks/${network.id}`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             <Settings2Icon />
             Settings
-          </Button>
+          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="outline" size="icon-sm" />}
@@ -211,13 +223,19 @@ function NetworkSection({ network }: { network: Network }) {
           Organizations
         </h3>
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {network.organizations.map((organization) => (
-            <OrganizationCard
-              key={organization.id}
-              organization={organization}
-              networkId={network.id}
-            />
-          ))}
+          {network.organizations.length > 0 ? (
+            network.organizations.map((organization) => (
+              <OrganizationCard
+                key={organization.id}
+                organization={organization}
+                networkId={network.id}
+              />
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No organizations yet.
+            </p>
+          )}
         </div>
       </div>
 
@@ -233,8 +251,9 @@ function NetworkSection({ network }: { network: Network }) {
 }
 
 export default function NetworkList() {
-  useWorkspaceVersion()
   const { openCreateNetwork } = useCreateEntity()
+  const { networks, isLoading, isError, error } = useWorkspaceNetworks()
+
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -253,11 +272,23 @@ export default function NetworkList() {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-6">
-        {networkList.map((network) => (
-          <NetworkSection key={network.id} network={network} />
-        ))}
-      </div>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading networks...</p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(error, "Failed to load networks")}
+        </p>
+      ) : networks.length === 0 ? (
+        <div className="rounded-2xl bg-card p-6 text-sm text-muted-foreground shadow-xs ring-1 ring-foreground/10">
+          You do not have any networks yet. Create one to get started.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {networks.map((network) => (
+            <NetworkSection key={network.id} network={network} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

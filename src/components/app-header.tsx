@@ -1,21 +1,49 @@
-import { FormEvent } from "react"
-import { Link } from "react-router"
+import { type FormEvent } from "react"
+import { Link, useNavigate } from "react-router"
 import { FishIcon, SearchIcon } from "lucide-react"
 
 import { NavUser } from "@/components/nav-user"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useLogoutMutation } from "@/store/api"
+import {
+  clearCredentials,
+  selectAuthEmail,
+  selectRefreshToken,
+} from "@/store/auth-slice"
+import { useAppDispatch, useAppSelector } from "@/store/hooks"
 
-const user = {
-  name: "John Doe",
-  email: "john@dhl.com",
-  avatar: "/avatars/shadcn.jpg",
+function displayName(email: string | null) {
+  if (!email) {
+    return "Account"
+  }
+
+  return email.split("@")[0] || email
 }
 
 export function AppHeader() {
+  const navigate = useNavigate()
+  const dispatch = useAppDispatch()
+  const email = useAppSelector(selectAuthEmail)
+  const refreshToken = useAppSelector(selectRefreshToken)
+  const [logout] = useLogoutMutation()
+
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+  }
+
+  async function handleLogout() {
+    if (refreshToken) {
+      try {
+        await logout({ refreshToken }).unwrap()
+      } catch {
+        // Local session is cleared in the logout mutation.
+      }
+    } else {
+      dispatch(clearCredentials())
+    }
+    navigate("/app/login", { replace: true })
   }
 
   return (
@@ -44,7 +72,14 @@ export function AppHeader() {
             />
           </div>
         </form>
-        <NavUser user={user} />
+        <NavUser
+          user={{
+            name: displayName(email),
+            email: email ?? "",
+            avatar: "",
+          }}
+          onLogout={handleLogout}
+        />
       </div>
       <Separator />
     </header>

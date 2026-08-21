@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router"
 
 import { CreateEntityProvider } from "@/components/create-entity"
+import { RequireAuth } from "@/components/require-auth"
 import {
   AppLayout,
   Landing,
@@ -62,19 +63,21 @@ export function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/app/signup" element={<Signup />} />
         <Route path="/app/login" element={<Login />} />
-        <Route element={<AppLayout />}>
-          <Route path="/app/home" element={<Home />} />
-          <Route path="/app/networks" element={<NetworkList />} />
-          <Route path="/app/organizations" element={<OrganizationList />} />
-          <Route path="/app/records" element={<RecordsPage />} />
-          <Route path="/app/files" element={<FilesPage />} />
-          <Route path="/app/workflows" element={<WorkflowList />} />
-          <Route path="/app/pipelines" element={<PipelineList />} />
-        </Route>
-        <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
-          {networkWorkspaceRoutes()}
-          <Route path="organizations/:organizationId">
+        <Route element={<RequireAuth />}>
+          <Route element={<AppLayout />}>
+            <Route path="/app/home" element={<Home />} />
+            <Route path="/app/networks" element={<NetworkList />} />
+            <Route path="/app/organizations" element={<OrganizationList />} />
+            <Route path="/app/records" element={<RecordsPage />} />
+            <Route path="/app/files" element={<FilesPage />} />
+            <Route path="/app/workflows" element={<WorkflowList />} />
+            <Route path="/app/pipelines" element={<PipelineList />} />
+          </Route>
+          <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
             {networkWorkspaceRoutes()}
+            <Route path="organizations/:organizationId">
+              {networkWorkspaceRoutes()}
+            </Route>
           </Route>
         </Route>
       </Routes>
