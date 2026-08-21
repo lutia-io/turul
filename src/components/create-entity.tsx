@@ -17,7 +17,12 @@ import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialo
 type CreateState =
   | { kind: "network" }
   | { kind: "organization"; networkId?: string }
-  | { kind: "schema"; networkId?: string; schemaId?: string }
+  | {
+      kind: "schema"
+      networkId?: string
+      organizationId?: string
+      schemaId?: string
+    }
   | { kind: "workflow"; networkId?: string; workflowDefinitionId?: string }
   | { kind: "pipeline"; networkId?: string; pipelineDefinitionId?: string }
   | {
@@ -32,7 +37,10 @@ type CreateState =
 type CreateEntityContextValue = {
   openCreateNetwork: () => void
   openCreateOrganization: (networkId?: string) => void
-  openCreateSchema: (networkId?: string) => void
+  openCreateSchema: (scope?: {
+    networkId?: string
+    organizationId?: string
+  }) => void
   openEditSchema: (schemaId: string) => void
   openCreateWorkflow: (networkId?: string) => void
   openEditWorkflow: (workflowDefinitionId: string) => void
@@ -62,8 +70,8 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       openCreateOrganization(networkId) {
         setState({ kind: "organization", networkId })
       },
-      openCreateSchema(networkId) {
-        setState({ kind: "schema", networkId })
+      openCreateSchema(scope) {
+        setState({ kind: "schema", ...scope })
       },
       openEditSchema(schemaId) {
         setState({ kind: "schema", schemaId })
@@ -122,6 +130,9 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           }
         }}
         networkId={state?.kind === "schema" ? state.networkId : undefined}
+        organizationId={
+          state?.kind === "schema" ? state.organizationId : undefined
+        }
         schemaId={state?.kind === "schema" ? state.schemaId : undefined}
       />
       <WorkflowDefinitionDialog

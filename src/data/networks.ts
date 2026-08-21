@@ -28,6 +28,8 @@ export type Schema = {
   internal: boolean
   definition: JsonObject
   color: BadgeColor
+  networkId?: string
+  organizationId?: string
 }
 
 export type WorkflowDefinition = {

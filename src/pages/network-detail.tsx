@@ -37,6 +37,7 @@ import {
 } from "@/lib/runs"
 import {
   networkWorkspacePath,
+  schemaScopeLabel,
   useNetworkWorkspace,
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
@@ -586,9 +587,8 @@ export default function NetworkDetail() {
                     color={item.color}
                     icon={Building2Icon}
                     subtitle={
-                      [item.type, item.location]
-                        .filter(Boolean)
-                        .join(" · ") || "Organization"
+                      [item.type, item.location].filter(Boolean).join(" · ") ||
+                      "Organization"
                     }
                   />
                 ))}
@@ -610,12 +610,17 @@ export default function NetworkDetail() {
               <DefinitionColumn
                 title="Schemas"
                 viewAll={href("schemas")}
-                onAdd={() => openCreateSchema(network.id)}
+                onAdd={() =>
+                  openCreateSchema({
+                    networkId: network.id,
+                    organizationId,
+                  })
+                }
                 empty="No schemas yet."
                 items={network.schemas.map((schema) => ({
                   id: schema.id,
                   name: schema.name,
-                  subtitle: `${jsonSchemaPropertyCount(schema.definition)} properties`,
+                  subtitle: `${schemaScopeLabel(schema, network.organizations)} · ${jsonSchemaPropertyCount(schema.definition)} properties`,
                   status: publicationStatus(schema.active),
                   color: accentColor,
                   icon: FileJsonIcon,
@@ -627,30 +632,34 @@ export default function NetworkDetail() {
                 viewAll={href("workflow-definitions")}
                 onAdd={() => openCreateWorkflow(network.id)}
                 empty="No workflow definitions yet."
-                items={network.workflowDefinitions.map((workflowDefinition) => ({
-                  id: workflowDefinition.id,
-                  name: workflowDefinition.name,
-                  subtitle: `${workflowTriggerLabel(workflowDefinition.definition)} · ${getWorkflowSteps(workflowDefinition.definition).length} steps`,
-                  status: publicationStatus(workflowDefinition.active),
-                  color: accentColor,
-                  icon: WorkflowIcon,
-                  to: href(`workflow-definitions/${workflowDefinition.id}`),
-                }))}
+                items={network.workflowDefinitions.map(
+                  (workflowDefinition) => ({
+                    id: workflowDefinition.id,
+                    name: workflowDefinition.name,
+                    subtitle: `${workflowTriggerLabel(workflowDefinition.definition)} · ${getWorkflowSteps(workflowDefinition.definition).length} steps`,
+                    status: publicationStatus(workflowDefinition.active),
+                    color: accentColor,
+                    icon: WorkflowIcon,
+                    to: href(`workflow-definitions/${workflowDefinition.id}`),
+                  })
+                )}
               />
               <DefinitionColumn
                 title="Pipelines"
                 viewAll={href("pipeline-definitions")}
                 onAdd={() => openCreatePipeline(network.id)}
                 empty="No pipeline definitions yet."
-                items={network.pipelineDefinitions.map((pipelineDefinition) => ({
-                  id: pipelineDefinition.id,
-                  name: pipelineDefinition.name,
-                  subtitle: `${pipelineSourceLabel(pipelineDefinition.definition)} · ${getPipelineStages(pipelineDefinition.definition).length} stages`,
-                  status: publicationStatus(pipelineDefinition.active),
-                  color: accentColor,
-                  icon: LayersIcon,
-                  to: href(`pipeline-definitions/${pipelineDefinition.id}`),
-                }))}
+                items={network.pipelineDefinitions.map(
+                  (pipelineDefinition) => ({
+                    id: pipelineDefinition.id,
+                    name: pipelineDefinition.name,
+                    subtitle: `${pipelineSourceLabel(pipelineDefinition.definition)} · ${getPipelineStages(pipelineDefinition.definition).length} stages`,
+                    status: publicationStatus(pipelineDefinition.active),
+                    color: accentColor,
+                    icon: LayersIcon,
+                    to: href(`pipeline-definitions/${pipelineDefinition.id}`),
+                  })
+                )}
               />
             </div>
           </section>
@@ -739,7 +748,12 @@ export default function NetworkDetail() {
             />
             <div className="flex flex-col gap-2">
               <QuickActionCard
-                onClick={() => openCreateSchema(network.id)}
+                onClick={() =>
+                  openCreateSchema({
+                    networkId: network.id,
+                    organizationId,
+                  })
+                }
                 label="Create schema"
                 description="Define a JSONB record shape"
                 color={accentColor}

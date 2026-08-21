@@ -54,7 +54,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         organizationId,
         rest: "records",
       })
-    : "/app/records"
+    : "/app/networks"
   const recordsSchemaId = searchParams.get("schema") ?? network?.schemas[0]?.id
 
   const switcherNetworks =
@@ -118,7 +118,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             organizationId,
             rest: "files",
           })
-        : "/app/files",
+        : "/app/networks",
       icon: <FileIcon />,
     },
     {
@@ -129,7 +129,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             organizationId,
             rest: "workflows",
           })
-        : "/app/workflows",
+        : "/app/networks",
       icon: <PlayIcon />,
     },
     {
@@ -140,7 +140,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             organizationId,
             rest: "pipelines",
           })
-        : "/app/pipelines",
+        : "/app/networks",
       icon: <ActivityIcon />,
     },
   ]

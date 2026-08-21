@@ -19,25 +19,36 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import type { JsonSchemaPropertySpec } from "@/data/define-records"
-import {
-  createSchema,
-  getSchema,
-  networkList,
-  updateSchema,
-} from "@/data/networks"
+import { getSchema, updateSchema } from "@/data/networks"
 import { type BadgeColor } from "@/lib/badge"
 import {
   getJsonSchemaProperties,
   stringifyDefinition,
+  type JsonObject,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
-import { networkWorkspacePath } from "@/lib/network-workspace"
+import {
+  networkWorkspacePath,
+  useWorkspaceNetworks,
+  useWorkspaceOrganizations,
+  workspaceSchemaFromApi,
+} from "@/lib/network-workspace"
 import { slugifyId, toFieldName } from "@/lib/slug"
+import { getHumaErrorMessage } from "@/store/api"
+import {
+  useCreateSchemaMutation,
+  useGetSchemaQuery,
+} from "@/store/schema-slice"
 
 const propertyTypes = [
   "string",
@@ -159,19 +170,32 @@ export function SchemaDefinitionDialog({
   open,
   onOpenChange,
   networkId,
+  organizationId,
   schemaId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
+  organizationId?: string
   schemaId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
+  const { networks } = useWorkspaceNetworks()
+  const { organizations } = useWorkspaceOrganizations()
+  const [createSchema, { isLoading, error, reset }] = useCreateSchemaMutation()
+  const apiSchemaQuery = useGetSchemaQuery(schemaId ?? "", {
+    skip: !open || !schemaId,
+  })
   const existing = schemaId ? getSchema(schemaId) : undefined
-  const editing = Boolean(existing)
+  const editing = Boolean(schemaId)
+  const lockNetwork = Boolean(networkId)
+  const lockOrganization = Boolean(organizationId)
   const [selectedNetworkId, setSelectedNetworkId] = useState(
-    networkId ?? existing?.network.id ?? networkList[0]?.id ?? ""
+    networkId ?? existing?.network.id ?? networks[0]?.id ?? ""
+  )
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(
+    organizationId ?? existing?.schema.organizationId ?? ""
   )
   const [name, setName] = useState("")
   const [slug, setSlug] = useState("")
@@ -184,34 +208,83 @@ export function SchemaDefinitionDialog({
     emptyProperty(1),
   ])
 
+  const firstNetworkId = networks[0]?.id ?? ""
+
+  useEffect(() => {
+    if (open) {
+      reset()
+      setSelectedOrganizationId(organizationId ?? "")
+    }
+  }, [open, organizationId, reset])
+
   useEffect(() => {
     if (!open) {
       return
     }
 
-    const current = schemaId ? getSchema(schemaId) : undefined
-    setSelectedNetworkId(
-      networkId ?? current?.network.id ?? networkList[0]?.id ?? ""
-    )
-    setName(current?.schema.name ?? "")
-    setSlug(current?.schema.slug ?? "")
+    const mockCurrent = schemaId ? getSchema(schemaId) : undefined
+    const current =
+      mockCurrent?.schema ??
+      (apiSchemaQuery.data
+        ? workspaceSchemaFromApi(apiSchemaQuery.data)
+        : undefined)
+    setName(current?.name ?? "")
+    setSlug(current?.slug ?? "")
     setSlugTouched(Boolean(current))
     setDescription(
-      typeof current?.schema.definition.description === "string"
-        ? current.schema.definition.description
+      typeof current?.definition.description === "string"
+        ? current.definition.description
         : ""
     )
-    setColor(current?.schema.color ?? "purple")
-    setActive(current?.schema.active ?? false)
-    setInternal(current?.schema.internal ?? false)
+    setColor(current?.color ?? "purple")
+    setActive(current?.active ?? false)
+    setInternal(current?.internal ?? false)
     setProperties(
       current
-        ? draftsFromProperties(
-            getJsonSchemaProperties(current.schema.definition)
-          )
+        ? draftsFromProperties(getJsonSchemaProperties(current.definition))
         : [emptyProperty(1)]
     )
-  }, [networkId, open, schemaId])
+  }, [apiSchemaQuery.data, open, schemaId])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    const mockCurrent = schemaId ? getSchema(schemaId) : undefined
+    setSelectedNetworkId((current) => {
+      if (networkId) {
+        return networkId
+      }
+      return (
+        (mockCurrent?.network.id ??
+          apiSchemaQuery.data?.networkId ??
+          current) ||
+        firstNetworkId
+      )
+    })
+    setSelectedOrganizationId((current) => {
+      if (organizationId) {
+        return organizationId
+      }
+      return (
+        mockCurrent?.schema.organizationId ??
+        apiSchemaQuery.data?.organizationId ??
+        current
+      )
+    })
+  }, [
+    apiSchemaQuery.data?.networkId,
+    apiSchemaQuery.data?.organizationId,
+    firstNetworkId,
+    networkId,
+    open,
+    organizationId,
+    schemaId,
+  ])
+
+  const networkOrganizations = organizations.filter(
+    (organization) => organization.networkId === selectedNetworkId
+  )
 
   const definitionPreview = stringifyDefinition({
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -244,7 +317,7 @@ export function SchemaDefinitionDialog({
     })
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!name.trim() || !selectedNetworkId) {
       return
@@ -260,18 +333,32 @@ export function SchemaDefinitionDialog({
       ...toSchemaInput(properties),
     }
 
-    const schema = editing
-      ? updateSchema(schemaId!, input)
-      : createSchema(selectedNetworkId, input)
+    if (editing) {
+      if (existing) {
+        updateSchema(schemaId!, input)
+      }
+      onOpenChange(false)
+      return
+    }
 
-    onOpenChange(false)
-    if (!editing) {
+    try {
+      const schema = await createSchema({
+        name: name.trim(),
+        active,
+        definition: JSON.parse(definitionPreview) as JsonObject,
+        networkId: selectedNetworkId,
+        organizationId: selectedOrganizationId || undefined,
+      }).unwrap()
+      onOpenChange(false)
       navigate(
         networkWorkspacePath({
           networkId: selectedNetworkId,
+          organizationId: selectedOrganizationId || undefined,
           rest: `schemas/${schema.id}`,
         })
       )
+    } catch {
+      // Error is rendered from the mutation state.
     }
   }
 
@@ -283,8 +370,9 @@ export function SchemaDefinitionDialog({
             {editing ? "Edit schema" : "Create a schema"}
           </DialogTitle>
           <DialogDescription>
-            Build the JSON Schema stored as JSONB. Properties become columns on
-            records in this network.
+            {selectedOrganizationId
+              ? "This schema will belong to the selected organization. Network schemas stay available to every organization."
+              : "This schema will be shared across every organization in the network."}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -295,21 +383,49 @@ export function SchemaDefinitionDialog({
         >
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
             <FieldGroup>
-              {networkList.length > 0 && !editing ? (
+              {networks.length > 0 && !editing ? (
                 <Field>
                   <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
                   <NativeSelect
                     id={`${formId}-network`}
                     value={selectedNetworkId}
-                    disabled={Boolean(networkId)}
-                    onChange={(event) =>
+                    disabled={lockNetwork || isLoading}
+                    onChange={(event) => {
                       setSelectedNetworkId(event.target.value)
-                    }
+                      setSelectedOrganizationId("")
+                    }}
                     required
                   >
-                    {networkList.map((network) => (
+                    {networks.map((network) => (
                       <NativeSelectOption key={network.id} value={network.id}>
                         {network.name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+              ) : null}
+              {networks.length > 0 && !editing ? (
+                <Field>
+                  <FieldLabel htmlFor={`${formId}-organization`}>
+                    Organization
+                  </FieldLabel>
+                  <NativeSelect
+                    id={`${formId}-organization`}
+                    value={selectedOrganizationId}
+                    disabled={lockOrganization || isLoading}
+                    onChange={(event) =>
+                      setSelectedOrganizationId(event.target.value)
+                    }
+                  >
+                    <NativeSelectOption value="">
+                      Entire network
+                    </NativeSelectOption>
+                    {networkOrganizations.map((organization) => (
+                      <NativeSelectOption
+                        key={organization.id}
+                        value={organization.id}
+                      >
+                        {organization.name}
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>
@@ -331,6 +447,8 @@ export function SchemaDefinitionDialog({
                     placeholder="Shipment Manifest"
                     autoFocus
                     required
+                    disabled={isLoading}
+                    aria-invalid={error ? true : undefined}
                   />
                 </Field>
                 <Field>
@@ -380,6 +498,9 @@ export function SchemaDefinitionDialog({
                   />
                 </div>
               </div>
+              {error ? (
+                <FieldError>{getHumaErrorMessage(error)}</FieldError>
+              ) : null}
             </FieldGroup>
 
             <div className="flex flex-col gap-2">
@@ -583,11 +704,20 @@ export function SchemaDefinitionDialog({
             </div>
           </div>
           <DialogFooter className="mx-0 mb-0">
-            <DialogClose render={<Button variant="outline" />}>
+            <DialogClose
+              render={<Button variant="outline" disabled={isLoading} />}
+            >
               Cancel
             </DialogClose>
-            <Button type="submit" disabled={!name.trim() || !selectedNetworkId}>
-              {editing ? "Save schema" : "Create schema"}
+            <Button
+              type="submit"
+              disabled={isLoading || !name.trim() || !selectedNetworkId}
+            >
+              {isLoading
+                ? "Creating..."
+                : editing
+                  ? "Save schema"
+                  : "Create schema"}
             </Button>
           </DialogFooter>
         </form>

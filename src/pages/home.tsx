@@ -34,7 +34,10 @@ import {
 } from "@/components/ui/card"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { pipelineRuns, workflowRuns } from "@/data/runs"
-import { useWorkspaceNetworks } from "@/lib/network-workspace"
+import {
+  networkWorkspacePath,
+  useWorkspaceNetworks,
+} from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 
@@ -365,6 +368,10 @@ export default function Home() {
   } = useWorkspaceNetworks()
   const greeting = greetingForHour(new Date().getHours())
   const currentNetwork = networks[0]
+  const workspaceHref = (rest = "") =>
+    currentNetwork
+      ? networkWorkspacePath({ networkId: currentNetwork.id, rest })
+      : "/app/networks"
   const organizations = networks.flatMap((network) => network.organizations)
   const networkCounts = countByStatus(networks, (network) => network.status)
   const organizationCounts = countByStatus(
@@ -455,7 +462,7 @@ export default function Home() {
           icon={ListIcon}
         />
         <StatCard
-          to="/app/organizations"
+          to={workspaceHref()}
           label="Organizations"
           value={organizations.length}
           live={organizationCounts.live}
@@ -465,7 +472,7 @@ export default function Home() {
           icon={Building2Icon}
         />
         <StatCard
-          to="/app/records"
+          to={workspaceHref("records")}
           label="Records"
           value={records.length}
           live={records.length}
@@ -475,7 +482,7 @@ export default function Home() {
           icon={TableIcon}
         />
         <StatCard
-          to="/app/files"
+          to={workspaceHref("files")}
           label="Files"
           value={files.length}
           live={files.length}
@@ -485,7 +492,7 @@ export default function Home() {
           icon={FileIcon}
         />
         <StatCard
-          to="/app/workflows"
+          to={workspaceHref("workflows")}
           label="Workflows"
           value={runningWorkflows + queuedWorkflows}
           live={runningWorkflows}
@@ -496,7 +503,7 @@ export default function Home() {
           icon={WorkflowIcon}
         />
         <StatCard
-          to="/app/pipelines"
+          to={workspaceHref("pipelines")}
           label="Pipelines"
           value={runningPipelines + queuedPipelines}
           live={runningPipelines}
@@ -598,21 +605,21 @@ export default function Home() {
                 icon={ListIcon}
               />
               <QuickActionCard
-                to="/app/organizations"
+                to={workspaceHref()}
                 label="View organizations"
-                description="Members across networks"
+                description="Members across the network"
                 color="orange"
                 icon={Building2Icon}
               />
               <QuickActionCard
-                to="/app/records"
+                to={workspaceHref("records")}
                 label="Open records"
                 description="Schema-backed data tables"
                 color="blue"
                 icon={TableIcon}
               />
               <QuickActionCard
-                to="/app/workflows"
+                to={workspaceHref("workflows")}
                 label="Open workflows"
                 description="Live executions in flight"
                 color="teal"

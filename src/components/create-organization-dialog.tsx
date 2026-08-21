@@ -11,10 +11,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { networkWorkspacePath, useWorkspaceNetworks } from "@/lib/network-workspace"
+import {
+  networkWorkspacePath,
+  useWorkspaceNetworks,
+} from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
 import { useCreateOrganizationMutation } from "@/store/organization-slice"
 
@@ -88,8 +96,8 @@ export function CreateOrganizationDialog({
         <DialogHeader>
           <DialogTitle>Create an organization</DialogTitle>
           <DialogDescription>
-            Organizations belong to a network and share its schemas and
-            definitions.
+            Organizations belong to a network. They can use shared network
+            schemas and define their own.
           </DialogDescription>
         </DialogHeader>
         <form id={formId} onSubmit={handleSubmit} autoComplete="off">
@@ -131,7 +139,9 @@ export function CreateOrganizationDialog({
           </FieldGroup>
         </form>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" disabled={isLoading} />}>
+          <DialogClose
+            render={<Button variant="outline" disabled={isLoading} />}
+          >
             Cancel
           </DialogClose>
           <Button

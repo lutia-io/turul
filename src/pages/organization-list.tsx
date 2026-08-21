@@ -10,10 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import {
-  type Network,
-  type Organization,
-} from "@/data/networks"
+import { type Network, type Organization } from "@/data/networks"
 import {
   networkWorkspacePath,
   useWorkspaceNetworks,
@@ -258,8 +255,9 @@ export default function OrganizationList() {
             All Organizations
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Organizations belong to a network and share its schemas. Open a card
-            to inspect a member, or view the full organization.
+            Organizations belong to a network. They can use shared network
+            schemas and define their own. Open a card to inspect a member, or
+            view the full organization.
           </p>
         </div>
         <Button onClick={() => openCreateOrganization()}>
