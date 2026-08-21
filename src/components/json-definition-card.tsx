@@ -168,3 +168,151 @@ export function DefinitionStepsList({
     </ol>
   )
 }
+
+function stringifyCriteriaValue(value: unknown) {
+  if (value == null) {
+    return "empty"
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join(", ")
+  }
+  return String(value)
+}
+
+export function WorkflowCriteriaTree({
+  criteria,
+}: {
+  criteria?: {
+    logic?: string
+    conditions?: unknown[]
+    field?: string
+    operator?: string
+    value?: unknown
+  }
+}) {
+  if (!criteria) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        This workflow does not declare any conditions.
+      </p>
+    )
+  }
+
+  if (criteria.logic) {
+    const logicLabel =
+      criteria.logic === "OR"
+        ? "Any of these"
+        : criteria.logic === "NOT"
+          ? "None of these"
+          : "All of these"
+    const conditions = Array.isArray(criteria.conditions)
+      ? criteria.conditions
+      : []
+
+    return (
+      <div className="flex flex-col gap-2 rounded-xl border bg-background p-3">
+        <p className="text-sm font-medium">{logicLabel}</p>
+        <div className="flex flex-col gap-2 pl-3">
+          {conditions.map((condition, index) => (
+            <WorkflowCriteriaTree
+              key={index}
+              criteria={
+                condition && typeof condition === "object"
+                  ? (condition as typeof criteria)
+                  : undefined
+              }
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (!criteria.field || !criteria.operator) {
+    return (
+      <p className="text-sm text-muted-foreground">Incomplete condition.</p>
+    )
+  }
+
+  const operator =
+    criteria.operator === "eq"
+      ? "is"
+      : criteria.operator === "neq"
+        ? "is not"
+        : criteria.operator === "gt"
+          ? "is greater than"
+          : criteria.operator === "gte"
+            ? "is at least"
+            : criteria.operator === "lt"
+              ? "is less than"
+              : criteria.operator === "lte"
+                ? "is at most"
+                : criteria.operator === "in"
+                  ? "is one of"
+                  : criteria.operator
+
+  return (
+    <p className="rounded-xl border bg-background px-3.5 py-3 text-sm">
+      <span className="font-mono">{criteria.field}</span> {operator}{" "}
+      <span className="font-medium">
+        {stringifyCriteriaValue(criteria.value)}
+      </span>
+    </p>
+  )
+}
+
+export function WorkflowActionsList({
+  actions,
+}: {
+  actions: { type: string; context?: Record<string, unknown> }[]
+}) {
+  if (actions.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        This workflow does not declare any actions.
+      </p>
+    )
+  }
+
+  const labels: Record<string, string> = {
+    CREATE_RECORD: "Create a record",
+    UPDATE_RECORD: "Update a record",
+    UPSERT_RECORD: "Create or update a record",
+    TRIGGER_PIPELINE: "Run a pipeline",
+  }
+
+  return (
+    <ol className="flex flex-col gap-2">
+      {actions.map((action, index) => {
+        const context = action.context ?? {}
+        const detail =
+          typeof context.schemaId === "string"
+            ? `Schema ${context.schemaId}`
+            : typeof context.pipeline === "string"
+              ? context.pipeline
+              : typeof context.recordId === "string"
+                ? `Record ${context.recordId}`
+                : action.type
+
+        return (
+          <li
+            key={`${action.type}-${index}`}
+            className="flex min-w-0 items-center gap-3 rounded-xl border bg-background px-3.5 py-3"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs font-medium">
+              {index + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">
+                {labels[action.type] ?? action.type}
+              </p>
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {detail}
+              </p>
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}

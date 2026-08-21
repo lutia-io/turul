@@ -6,6 +6,7 @@ import { authReducer } from "@/store/auth-slice"
 import "@/store/network-slice"
 import "@/store/organization-slice"
 import "@/store/schema-slice"
+import "@/store/workflow-slice"
 
 export const store = configureStore({
   reducer: {

@@ -40,6 +40,7 @@ export type WorkflowDefinition = {
   internal: boolean
   schemaId: string
   definition: JsonObject
+  networkId?: string
 }
 
 export type PipelineDefinition = {

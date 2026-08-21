@@ -10,40 +10,78 @@ import {
 import { useCreateEntity } from "@/components/create-entity"
 import {
   DefinitionFlags,
-  DefinitionStepsList,
   JsonDefinitionCard,
+  WorkflowActionsList,
+  WorkflowCriteriaTree,
 } from "@/components/json-definition-card"
 import { Button } from "@/components/ui/button"
-import { getSchema, getWorkflowDefinition } from "@/data/networks"
-import { getWorkflowSteps, workflowTriggerLabel } from "@/lib/json-definition"
-import { useNetworkWorkspace } from "@/lib/network-workspace"
+import {
+  useNetworkWorkspace,
+  useWorkspaceSchemas,
+  workspaceWorkflowFromApi,
+} from "@/lib/network-workspace"
+import {
+  parseWorkflowDefinition,
+  workflowSummary,
+} from "@/lib/workflow-definition"
+import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useGetWorkflowDefinitionQuery } from "@/store/workflow-slice"
 
 export default function WorkflowDefinitionDetail() {
   const { workflowDefinitionId } = useParams()
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network: workspaceNetwork, href } = useNetworkWorkspace()
+  const { schemas } = useWorkspaceSchemas()
   const { openEditWorkflow } = useCreateEntity()
-  const result = workflowDefinitionId
-    ? getWorkflowDefinition(workflowDefinitionId)
+  const workflowQuery = useGetWorkflowDefinitionQuery(
+    workflowDefinitionId ?? "",
+    { skip: !isAuthenticated || !workflowDefinitionId }
+  )
+  const workflowDefinition = workflowQuery.data
+    ? workspaceWorkflowFromApi(workflowQuery.data)
     : undefined
   const belongsToWorkspace =
-    !workspaceNetwork || result?.network.id === workspaceNetwork.id
-  const workflowDefinition = belongsToWorkspace
-    ? result?.workflowDefinition
+    !workspaceNetwork || workflowDefinition?.networkId === workspaceNetwork.id
+  const visibleWorkflow = belongsToWorkspace ? workflowDefinition : undefined
+  const network = belongsToWorkspace ? workspaceNetwork : undefined
+  const schema = visibleWorkflow
+    ? schemas.find((item) => item.id === visibleWorkflow.schemaId)
     : undefined
-  const network = belongsToWorkspace ? result?.network : undefined
-  const schema = workflowDefinition
-    ? getSchema(workflowDefinition.schemaId)?.schema
+  const parsed = visibleWorkflow
+    ? parseWorkflowDefinition(visibleWorkflow.definition)
     : undefined
-  const steps = workflowDefinition
-    ? getWorkflowSteps(workflowDefinition.definition)
-    : []
-  const trigger = workflowDefinition
-    ? workflowTriggerLabel(workflowDefinition.definition)
-    : ""
+  const actions = parsed?.actions ?? []
+
+  if (workflowQuery.isLoading) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
+        <h1 className="text-lg font-semibold">Loading workflow</h1>
+        <p className="text-sm text-muted-foreground">
+          Fetching this workflow definition from the server.
+        </p>
+      </div>
+    )
+  }
+
+  if (workflowQuery.isError) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
+        <h1 className="text-lg font-semibold">Workflow definition not found</h1>
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(
+            workflowQuery.error,
+            "This workflow definition does not exist or is no longer available."
+          )}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
-      {workflowDefinition && network ? (
+      {visibleWorkflow && network ? (
         <>
           <div className="flex items-start gap-3.5">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white">
@@ -52,20 +90,20 @@ export default function WorkflowDefinitionDetail() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-semibold tracking-tight">
-                  {workflowDefinition.name}
+                  {visibleWorkflow.name}
                 </h1>
                 <DefinitionFlags
-                  active={workflowDefinition.active}
-                  internal={workflowDefinition.internal}
+                  active={visibleWorkflow.active}
+                  internal={visibleWorkflow.internal}
                 />
               </div>
               <p className="font-mono text-xs text-muted-foreground">
-                {workflowDefinition.slug}
+                {visibleWorkflow.slug}
               </p>
             </div>
             <Button
               variant="outline"
-              onClick={() => openEditWorkflow(workflowDefinition.id)}
+              onClick={() => openEditWorkflow(visibleWorkflow.id)}
             >
               <PencilIcon />
               Edit
@@ -76,16 +114,16 @@ export default function WorkflowDefinitionDetail() {
             <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
               <p className="flex items-center gap-1 text-sm text-muted-foreground">
                 <HashIcon className="size-3.5" />
-                Steps
+                Actions
               </p>
               <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {steps.length}
+                {actions.length}
               </p>
             </div>
             <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs sm:col-span-2">
-              <p className="text-sm text-muted-foreground">Trigger</p>
-              <p className="mt-1 truncate font-mono text-sm font-medium">
-                {trigger}
+              <p className="text-sm text-muted-foreground">Runs when</p>
+              <p className="mt-1 truncate text-sm font-medium">
+                {workflowSummary(visibleWorkflow.definition)}
               </p>
             </div>
           </div>
@@ -97,7 +135,7 @@ export default function WorkflowDefinitionDetail() {
                   Schema
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  This workflow is bound to a schema row via schema_id.
+                  This workflow watches new records on this schema.
                 </p>
               </div>
               <Link
@@ -119,18 +157,25 @@ export default function WorkflowDefinitionDetail() {
 
           <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
             <div>
-              <h2 className="text-base font-semibold tracking-tight">Steps</h2>
+              <h2 className="text-base font-semibold tracking-tight">When</h2>
               <p className="text-sm text-muted-foreground">
-                Ordered steps stored in the workflow JSONB definition.
+                Conditions evaluated against the triggering record.
               </p>
             </div>
-            <DefinitionStepsList
-              steps={steps}
-              emptyLabel="This workflow definition does not declare any steps."
-            />
+            <WorkflowCriteriaTree criteria={parsed?.criteria} />
           </section>
 
-          <JsonDefinitionCard definition={workflowDefinition.definition} />
+          <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">Then</h2>
+              <p className="text-sm text-muted-foreground">
+                Actions that run in order when the conditions match.
+              </p>
+            </div>
+            <WorkflowActionsList actions={actions} />
+          </section>
+
+          <JsonDefinitionCard definition={visibleWorkflow.definition} />
 
           <section className="flex min-w-0 flex-col gap-3">
             <div>
@@ -151,7 +196,7 @@ export default function WorkflowDefinitionDetail() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{network.name}</p>
                 <p className="truncate text-sm text-muted-foreground">
-                  {network.description}
+                  {network.description || network.summary}
                 </p>
               </div>
             </Link>

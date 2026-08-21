@@ -7,6 +7,7 @@ import {
   type Network,
   type Organization,
   type Schema,
+  type WorkflowDefinition,
 } from "@/data/networks"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -21,6 +22,11 @@ import {
   type ApiOrganization,
 } from "@/store/organization-slice"
 import { useListSchemasQuery, type ApiSchema } from "@/store/schema-slice"
+import {
+  useListWorkflowDefinitionsQuery,
+  workflowDefinitionAsJson,
+  type ApiWorkflowDefinition,
+} from "@/store/workflow-slice"
 
 export function useWorkspaceVersion() {
   return useSyncExternalStore(
@@ -151,6 +157,21 @@ export function workspaceSchemaFromApi(schema: ApiSchema): Schema {
   }
 }
 
+export function workspaceWorkflowFromApi(
+  workflow: ApiWorkflowDefinition
+): WorkflowDefinition {
+  return {
+    id: workflow.id,
+    name: workflow.name,
+    slug: workflow.slug,
+    active: workflow.active,
+    internal: workflow.internal,
+    schemaId: workflow.schemaId,
+    definition: workflowDefinitionAsJson(workflow.definition),
+    networkId: workflow.networkId,
+  }
+}
+
 export function withNetworkOrganizations(
   network: Network,
   organizations: Organization[]
@@ -179,6 +200,20 @@ export function withNetworkSchemas(
       }
       return !schema.organizationId || schema.organizationId === organizationId
     }),
+  }
+}
+
+export function withNetworkWorkflows(
+  network: Network,
+  workflows: WorkflowDefinition[]
+): Network {
+  const schemaIds = new Set(network.schemas.map((schema) => schema.id))
+  return {
+    ...network,
+    workflowDefinitions: workflows.filter(
+      (workflow) =>
+        workflow.networkId === network.id && schemaIds.has(workflow.schemaId)
+    ),
   }
 }
 
@@ -216,6 +251,18 @@ export function useWorkspaceSchemas() {
   }
 }
 
+export function useWorkspaceWorkflows() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListWorkflowDefinitionsQuery(undefined, {
+    skip: !isAuthenticated,
+  })
+
+  return {
+    ...query,
+    workflows: (query.data ?? []).map(workspaceWorkflowFromApi),
+  }
+}
+
 export function useWorkspaceNetworks() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const query = useListNetworksQuery(undefined, { skip: !isAuthenticated })
@@ -231,19 +278,36 @@ export function useWorkspaceNetworks() {
     isError: isSchemasError,
     error: schemasError,
   } = useWorkspaceSchemas()
+  const {
+    workflows,
+    isLoading: isWorkflowsLoading,
+    isError: isWorkflowsError,
+    error: workflowsError,
+  } = useWorkspaceWorkflows()
 
   return {
     ...query,
-    isLoading: query.isLoading || isOrganizationsLoading || isSchemasLoading,
-    isError: query.isError || isOrganizationsError || isSchemasError,
-    error: query.error ?? organizationsError ?? schemasError,
+    isLoading:
+      query.isLoading ||
+      isOrganizationsLoading ||
+      isSchemasLoading ||
+      isWorkflowsLoading,
+    isError:
+      query.isError ||
+      isOrganizationsError ||
+      isSchemasError ||
+      isWorkflowsError,
+    error: query.error ?? organizationsError ?? schemasError ?? workflowsError,
     networks: (query.data ?? []).map((network) =>
-      withNetworkSchemas(
-        withNetworkOrganizations(
-          workspaceNetworkFromApi(network),
-          organizations
+      withNetworkWorkflows(
+        withNetworkSchemas(
+          withNetworkOrganizations(
+            workspaceNetworkFromApi(network),
+            organizations
+          ),
+          schemas
         ),
-        schemas
+        workflows
       )
     ),
   }
@@ -260,19 +324,23 @@ export function useNetworkWorkspace() {
   })
   const { organizations } = useWorkspaceOrganizations()
   const { schemas } = useWorkspaceSchemas()
+  const { workflows } = useWorkspaceWorkflows()
   const organization =
     organizationQuery.data &&
     (!networkId || organizationQuery.data.networkId === networkId)
       ? workspaceOrganizationFromApi(organizationQuery.data)
       : undefined
   const network = networkQuery.data
-    ? withNetworkSchemas(
-        withNetworkOrganizations(
-          workspaceNetworkFromApi(networkQuery.data),
-          organizations
+    ? withNetworkWorkflows(
+        withNetworkSchemas(
+          withNetworkOrganizations(
+            workspaceNetworkFromApi(networkQuery.data),
+            organizations
+          ),
+          schemas,
+          organization?.id
         ),
-        schemas,
-        organization?.id
+        workflows
       )
     : undefined
   const workspaceNetwork =

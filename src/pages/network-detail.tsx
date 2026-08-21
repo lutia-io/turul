@@ -24,12 +24,11 @@ import { records } from "@/data/records"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
   getPipelineStages,
-  getWorkflowSteps,
   jsonSchemaPropertyCount,
   pipelineSourceLabel,
   publicationStatus,
-  workflowTriggerLabel,
 } from "@/lib/json-definition"
+import { workflowSummary } from "@/lib/workflow-definition"
 import {
   formatRelativeTime,
   listPipelineRunViews,
@@ -636,7 +635,7 @@ export default function NetworkDetail() {
                   (workflowDefinition) => ({
                     id: workflowDefinition.id,
                     name: workflowDefinition.name,
-                    subtitle: `${workflowTriggerLabel(workflowDefinition.definition)} · ${getWorkflowSteps(workflowDefinition.definition).length} steps`,
+                    subtitle: workflowSummary(workflowDefinition.definition),
                     status: publicationStatus(workflowDefinition.active),
                     color: accentColor,
                     icon: WorkflowIcon,

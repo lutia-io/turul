@@ -141,7 +141,7 @@ const baseQueryWithReauth: BaseQueryFn<
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Network", "Organization", "Schema"],
+  tagTypes: ["Me", "Network", "Organization", "Schema", "WorkflowDefinition"],
   endpoints: (build) => ({
     createUser: build.mutation<CreateUserResponse, CreateUserRequest>({
       query: (body) => ({
