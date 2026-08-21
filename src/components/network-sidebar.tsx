@@ -46,6 +46,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
     name: item.name,
     logo: <GalleryVerticalEndIcon />,
     plan: item.industry,
+    color: item.color,
   }))
 
   const organizationItems = [
@@ -62,6 +63,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       name: organization.name,
       logo: <Building2Icon />,
       plan: organization.type,
+      color: organization.color,
     })) ?? []),
   ]
 

@@ -51,6 +51,7 @@ export type Network = {
   headquarters: string
   coverage: string
   status: string
+  color: BadgeColor
   organizations: Organization[]
   schemas: Schema[]
   workflowDefinitions: WorkflowDefinition[]
@@ -68,6 +69,7 @@ export const networks: Record<string, Network> = {
     headquarters: "Bonn, Germany",
     coverage: "220+ countries",
     status: "Active",
+    color: "yellow",
     organizations: [
       {
         id: "dhl-apac",
@@ -265,6 +267,7 @@ export const networks: Record<string, Network> = {
     headquarters: "Memphis, United States",
     coverage: "220+ countries",
     status: "Active",
+    color: "purple",
     organizations: [
       {
         id: "fedex-express",
@@ -410,6 +413,7 @@ export const networks: Record<string, Network> = {
     headquarters: "Portland, United States",
     coverage: "12 neighborhoods",
     status: "Active",
+    color: "orange",
     organizations: [
       {
         id: "cafe-downtown",
@@ -587,6 +591,7 @@ export const networks: Record<string, Network> = {
     headquarters: "Austin, United States",
     coverage: "8 locations",
     status: "Active",
+    color: "green",
     organizations: [
       {
         id: "gym-flagship",
@@ -753,6 +758,7 @@ export const networks: Record<string, Network> = {
     headquarters: "Chicago, United States",
     coverage: "6 practices",
     status: "Active",
+    color: "cyan",
     organizations: [
       {
         id: "dentist-family",

@@ -27,8 +27,7 @@ export function AppHeader() {
             to="/app/home"
             className="flex items-center gap-1.5 text-xl font-semibold"
           >
-            <FishIcon className="size-6 text-primary" />
-            <span className="hidden md:inline">Lutia</span>
+            <FishIcon className="size-6" />
           </Link>
         </div>
         <form

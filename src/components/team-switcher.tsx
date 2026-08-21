@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 
@@ -28,6 +29,7 @@ export type SwitcherItem = {
   name: string
   logo: React.ReactNode
   plan: string
+  color?: BadgeColor
 }
 
 const kindCopy: Record<SwitcherKind, { singular: string; plural: string }> = {
@@ -56,6 +58,7 @@ export function TeamSwitcher({
   )
   const selectedId = activeId ?? uncontrolledId
   const activeTeam = teams.find((team) => team.id === selectedId) ?? teams[0]
+  const activeTone = getBadgeColor(activeTeam?.color)
   const copy = kindCopy[kind]
   const menuLabel = label ?? copy.plural
   const actionLabel = addLabel === undefined ? `Add ${copy.singular.toLowerCase()}` : addLabel
@@ -87,9 +90,8 @@ export function TeamSwitcher({
             <div
               className={cn(
                 "flex aspect-square size-8 items-center justify-center rounded-lg",
-                kind === "network"
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "border bg-sidebar-accent text-sidebar-accent-foreground"
+                activeTone.bg,
+                activeTone.text
               )}
             >
               {activeTeam.logo}
@@ -112,26 +114,36 @@ export function TeamSwitcher({
               <DropdownMenuLabel className="text-xs text-muted-foreground">
                 {menuLabel}
               </DropdownMenuLabel>
-              {teams.map((team, index) => (
-                <DropdownMenuItem
-                  key={team.id}
-                  onClick={() => handleSelect(team)}
-                  className="gap-2 p-2"
-                >
-                  <div className="flex size-6 items-center justify-center rounded-md border">
-                    {team.logo}
-                  </div>
-                  <div className="grid flex-1 text-left leading-tight">
-                    <span>{team.name}</span>
-                    {team.plan ? (
-                      <span className="text-xs text-muted-foreground">
-                        {team.plan}
-                      </span>
-                    ) : null}
-                  </div>
-                  <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              ))}
+              {teams.map((team, index) => {
+                const tone = getBadgeColor(team.color)
+
+                return (
+                  <DropdownMenuItem
+                    key={team.id}
+                    onClick={() => handleSelect(team)}
+                    className="gap-2 p-2"
+                  >
+                    <div
+                      className={cn(
+                        "flex size-6 items-center justify-center rounded-md",
+                        tone.bg,
+                        tone.text
+                      )}
+                    >
+                      {team.logo}
+                    </div>
+                    <div className="grid flex-1 text-left leading-tight">
+                      <span>{team.name}</span>
+                      {team.plan ? (
+                        <span className="text-xs text-muted-foreground">
+                          {team.plan}
+                        </span>
+                      ) : null}
+                    </div>
+                    <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                )
+              })}
             </DropdownMenuGroup>
             {actionLabel ? (
               <>

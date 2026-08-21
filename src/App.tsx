@@ -4,6 +4,7 @@ import {
   Landing,
   NetworkLayout,
   NetworkList,
+  OrganizationList,
   NetworkDetail,
   SchemaList,
   SchemaDetail,
@@ -45,6 +46,7 @@ export function App() {
       <Route element={<AppLayout />}>
         <Route path="/app/home" element={<Home />} />
         <Route path="/app/networks" element={<NetworkList />} />
+        <Route path="/app/organizations" element={<OrganizationList />} />
       </Route>
       <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
         {networkWorkspaceRoutes()}

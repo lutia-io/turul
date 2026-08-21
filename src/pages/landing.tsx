@@ -11,7 +11,7 @@ export default function Landing() {
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link to="/" className="flex items-center gap-1.5 text-xl font-semibold">
-            <FishIcon className="size-6 text-primary" />
+            <FishIcon className="size-6" />
             <span className="hidden md:inline">Lutia</span>
           </Link>
           <div className="flex items-center gap-2">

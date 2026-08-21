@@ -1,9 +1,7 @@
-import { useMemo, useState } from "react"
 import { Link } from "react-router"
 import {
   ArrowRightIcon,
   Building2Icon,
-  ChevronDownIcon,
   EllipsisIcon,
   GlobeIcon,
   MapPinIcon,
@@ -20,20 +18,10 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
-
-type SortKey = "name" | "organizations" | "schemas"
-
-const sortLabels: Record<SortKey, string> = {
-  name: "Name",
-  organizations: "Organization count",
-  schemas: "Schema count",
-}
 
 function StatusBadge({ status }: { status: string }) {
   const config = statusBadgeConfig[status]
@@ -236,20 +224,6 @@ function NetworkSection({ network }: { network: Network }) {
 }
 
 export default function NetworkList() {
-  const [sort, setSort] = useState<SortKey>("name")
-
-  const sortedNetworks = useMemo(() => {
-    return [...networkList].sort((a, b) => {
-      if (sort === "organizations") {
-        return b.organizations.length - a.organizations.length
-      }
-      if (sort === "schemas") {
-        return b.schemas.length - a.schemas.length
-      }
-      return a.name.localeCompare(b.name)
-    })
-  }, [sort])
-
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -268,39 +242,8 @@ export default function NetworkList() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
-            Sorted by {sortLabels[sort].toLowerCase()}
-            <ChevronDownIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuRadioGroup
-              value={sort}
-              onValueChange={(value) => {
-                if (
-                  value === "name" ||
-                  value === "organizations" ||
-                  value === "schemas"
-                ) {
-                  setSort(value)
-                }
-              }}
-            >
-              <DropdownMenuRadioItem value="name">Name</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="organizations">
-                Organization count
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="schemas">
-                Schema count
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       <div className="flex flex-col gap-6">
-        {sortedNetworks.map((network) => (
+        {networkList.map((network) => (
           <NetworkSection key={network.id} network={network} />
         ))}
       </div>

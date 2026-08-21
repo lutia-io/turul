@@ -133,7 +133,7 @@ function StatCard({
 function NetworkCard({ network }: { network: Network }) {
   const previewOrgs = network.organizations.slice(0, 5)
   const remaining = network.organizations.length - previewOrgs.length
-  const color = network.organizations[0]?.color ?? "gray"
+  const color = network.color
   const tone = getBadgeColor(color)
   const metrics = [
     {
@@ -431,7 +431,7 @@ export default function Home() {
           icon={ListIcon}
         />
         <StatCard
-          to={`/app/networks/${currentNetwork.id}`}
+          to="/app/organizations"
           label="Organizations"
           value={organizationList.length}
           live={organizationCounts.live}
@@ -548,7 +548,7 @@ export default function Home() {
                 icon={ListIcon}
               />
               <QuickActionCard
-                to={`/app/networks/${currentNetwork.id}`}
+                to="/app/organizations"
                 label="View organizations"
                 description="Members across networks"
                 color="orange"
