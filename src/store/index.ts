@@ -4,6 +4,7 @@ import { setupListeners } from "@reduxjs/toolkit/query"
 import { api } from "@/store/api"
 import { authReducer } from "@/store/auth-slice"
 import "@/store/network-slice"
+import "@/store/organization-slice"
 
 export const store = configureStore({
   reducer: {

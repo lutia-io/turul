@@ -11,13 +11,12 @@ import {
 } from "lucide-react"
 
 import {
-  organizationList,
   type Network,
   type Organization,
 } from "@/data/networks"
 import {
   networkWorkspacePath,
-  useWorkspaceVersion,
+  useWorkspaceNetworks,
 } from "@/lib/network-workspace"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useCreateEntity } from "@/components/create-entity"
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
+import { getHumaErrorMessage } from "@/store/api"
 
 function StatusBadge({ status }: { status: string }) {
   const config = statusBadgeConfig[status]
@@ -114,22 +114,30 @@ function OrganizationSection({
               {organization.name}
             </h2>
             <StatusBadge status={organization.status} />
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {organization.type}
-            </span>
+            {organization.type ? (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                {organization.type}
+              </span>
+            ) : null}
           </div>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            {organization.description}
-          </p>
+          {organization.description ? (
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              {organization.description}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <MapPinIcon className="size-3.5" />
-              {organization.location}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <UsersIcon className="size-3.5" />
-              {organization.members} members
-            </span>
+            {organization.location ? (
+              <span className="inline-flex items-center gap-1">
+                <MapPinIcon className="size-3.5" />
+                {organization.location}
+              </span>
+            ) : null}
+            {organization.members > 0 ? (
+              <span className="inline-flex items-center gap-1">
+                <UsersIcon className="size-3.5" />
+                {organization.members} members
+              </span>
+            ) : null}
             <span>
               {network.schemas.length} schemas ·{" "}
               {network.workflowDefinitions.length} workflows ·{" "}
@@ -216,7 +224,11 @@ function OrganizationSection({
             status={network.status}
             color={network.color}
             icon={GalleryVerticalEndIcon}
-            subtitle={`${network.industry} · ${network.headquarters} · ${network.coverage}`}
+            subtitle={
+              [network.industry, network.headquarters, network.coverage]
+                .filter(Boolean)
+                .join(" · ") || network.summary
+            }
           />
         </div>
       </div>
@@ -233,8 +245,11 @@ function OrganizationSection({
 }
 
 export default function OrganizationList() {
-  useWorkspaceVersion()
   const { openCreateOrganization } = useCreateEntity()
+  const { networks, isLoading, isError, error } = useWorkspaceNetworks()
+  const items = networks.flatMap((network) =>
+    network.organizations.map((organization) => ({ organization, network }))
+  )
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -253,15 +268,29 @@ export default function OrganizationList() {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-6">
-        {organizationList.map(({ organization, network }) => (
-          <OrganizationSection
-            key={organization.id}
-            organization={organization}
-            network={network}
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">
+          Loading organizations...
+        </p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(error, "Failed to load organizations")}
+        </p>
+      ) : items.length === 0 ? (
+        <div className="rounded-2xl bg-card p-6 text-sm text-muted-foreground shadow-xs ring-1 ring-foreground/10">
+          You do not have any organizations yet. Create one to get started.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {items.map(({ organization, network }) => (
+            <OrganizationSection
+              key={organization.id}
+              organization={organization}
+              network={network}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

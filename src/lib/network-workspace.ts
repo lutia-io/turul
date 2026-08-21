@@ -5,6 +5,7 @@ import {
   getWorkspaceVersion,
   subscribeWorkspace,
   type Network,
+  type Organization,
 } from "@/data/networks"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -13,6 +14,11 @@ import {
   useListNetworksQuery,
   type ApiNetwork,
 } from "@/store/network-slice"
+import {
+  useGetOrganizationQuery,
+  useListOrganizationsQuery,
+  type ApiOrganization,
+} from "@/store/organization-slice"
 
 export function useWorkspaceVersion() {
   return useSyncExternalStore(
@@ -113,13 +119,62 @@ export function workspaceNetworkFromApi(network: ApiNetwork): Network {
   }
 }
 
-export function useWorkspaceNetworks() {
+export function workspaceOrganizationFromApi(
+  organization: ApiOrganization
+): Organization {
+  return {
+    id: organization.id,
+    name: organization.name,
+    type: organization.slug,
+    location: "",
+    members: 0,
+    description: "",
+    status: "Active",
+    color: "orange",
+    networkId: organization.networkId,
+  }
+}
+
+export function withNetworkOrganizations(
+  network: Network,
+  organizations: Organization[]
+): Network {
+  return {
+    ...network,
+    organizations: organizations.filter(
+      (organization) => organization.networkId === network.id
+    ),
+  }
+}
+
+export function useWorkspaceOrganizations() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListNetworksQuery(undefined, { skip: !isAuthenticated })
+  const query = useListOrganizationsQuery(undefined, { skip: !isAuthenticated })
 
   return {
     ...query,
-    networks: (query.data ?? []).map(workspaceNetworkFromApi),
+    organizations: (query.data ?? []).map(workspaceOrganizationFromApi),
+  }
+}
+
+export function useWorkspaceNetworks() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListNetworksQuery(undefined, { skip: !isAuthenticated })
+  const {
+    organizations,
+    isLoading: isOrganizationsLoading,
+    isError: isOrganizationsError,
+    error: organizationsError,
+  } = useWorkspaceOrganizations()
+
+  return {
+    ...query,
+    isLoading: query.isLoading || isOrganizationsLoading,
+    isError: query.isError || isOrganizationsError,
+    error: query.error ?? organizationsError,
+    networks: (query.data ?? []).map((network) =>
+      withNetworkOrganizations(workspaceNetworkFromApi(network), organizations)
+    ),
   }
 }
 
@@ -129,12 +184,30 @@ export function useNetworkWorkspace() {
   const networkQuery = useGetNetworkQuery(networkId ?? "", {
     skip: !isAuthenticated || !networkId,
   })
+  const organizationQuery = useGetOrganizationQuery(organizationId ?? "", {
+    skip: !isAuthenticated || !organizationId,
+  })
+  const { organizations } = useWorkspaceOrganizations()
   const network = networkQuery.data
-    ? workspaceNetworkFromApi(networkQuery.data)
+    ? withNetworkOrganizations(
+        workspaceNetworkFromApi(networkQuery.data),
+        organizations
+      )
     : undefined
-  const organization = organizationId
-    ? network?.organizations.find((item) => item.id === organizationId)
-    : undefined
+  const organization =
+    organizationQuery.data &&
+    (!networkId || organizationQuery.data.networkId === networkId)
+      ? workspaceOrganizationFromApi(organizationQuery.data)
+      : undefined
+  const workspaceNetwork =
+    network && organization
+      ? network.organizations.some((item) => item.id === organization.id)
+        ? network
+        : {
+            ...network,
+            organizations: [organization, ...network.organizations],
+          }
+      : network
 
   function href(rest = "") {
     if (!networkId) {
@@ -152,10 +225,12 @@ export function useNetworkWorkspace() {
     networkId,
     organizationId: organization?.id,
     requestedOrganizationId: organizationId,
-    network,
+    network: workspaceNetwork,
     organization,
     isNetworkLoading: networkQuery.isLoading,
     isNetworkError: networkQuery.isError,
+    isOrganizationLoading: Boolean(organizationId) && organizationQuery.isLoading,
+    isOrganizationError: organizationQuery.isError,
     href,
   }
 }

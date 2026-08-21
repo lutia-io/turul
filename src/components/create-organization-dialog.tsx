@@ -1,7 +1,6 @@
 import { useEffect, useId, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 
-import { ColorPicker } from "@/components/color-picker"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -12,21 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { Textarea } from "@/components/ui/textarea"
-import { createOrganization, networkList } from "@/data/networks"
-import { type BadgeColor } from "@/lib/badge"
-import { networkWorkspacePath } from "@/lib/network-workspace"
-
-const emptyForm = {
-  name: "",
-  type: "",
-  location: "",
-  description: "",
-  color: "orange" as BadgeColor,
-}
+import { networkWorkspacePath, useWorkspaceNetworks } from "@/lib/network-workspace"
+import { getHumaErrorMessage } from "@/store/api"
+import { useCreateOrganizationMutation } from "@/store/organization-slice"
 
 export function CreateOrganizationDialog({
   open,
@@ -39,32 +29,57 @@ export function CreateOrganizationDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const defaultNetworkId = networkId ?? networkList[0]?.id ?? ""
-  const [selectedNetworkId, setSelectedNetworkId] = useState(defaultNetworkId)
-  const [form, setForm] = useState(emptyForm)
+  const { networks } = useWorkspaceNetworks()
   const lockNetwork = Boolean(networkId)
+  const [selectedNetworkId, setSelectedNetworkId] = useState(
+    networkId ?? networks[0]?.id ?? ""
+  )
+  const [name, setName] = useState("")
+  const [createOrganization, { isLoading, error, reset }] =
+    useCreateOrganizationMutation()
+  const firstNetworkId = networks[0]?.id ?? ""
 
   useEffect(() => {
     if (open) {
-      setForm(emptyForm)
-      setSelectedNetworkId(networkId ?? networkList[0]?.id ?? "")
+      setName("")
+      reset()
     }
-  }, [networkId, open])
+  }, [open, reset])
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    setSelectedNetworkId((current) => {
+      if (networkId) {
+        return networkId
+      }
+      return current || firstNetworkId
+    })
+  }, [firstNetworkId, networkId, open])
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim() || !selectedNetworkId) {
+    const trimmed = name.trim()
+    if (!trimmed || !selectedNetworkId) {
       return
     }
 
-    const organization = createOrganization(selectedNetworkId, form)
-    onOpenChange(false)
-    navigate(
-      networkWorkspacePath({
+    try {
+      const organization = await createOrganization({
+        name: trimmed,
         networkId: selectedNetworkId,
-        organizationId: organization.id,
-      })
-    )
+      }).unwrap()
+      onOpenChange(false)
+      navigate(
+        networkWorkspacePath({
+          networkId: selectedNetworkId,
+          organizationId: organization.id,
+        })
+      )
+    } catch {
+      // Error is rendered from the mutation state.
+    }
   }
 
   return (
@@ -79,17 +94,17 @@ export function CreateOrganizationDialog({
         </DialogHeader>
         <form id={formId} onSubmit={handleSubmit} autoComplete="off">
           <FieldGroup>
-            {networkList.length > 0 ? (
+            {networks.length > 0 ? (
               <Field>
                 <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
                 <NativeSelect
                   id={`${formId}-network`}
                   value={selectedNetworkId}
-                  disabled={lockNetwork}
+                  disabled={lockNetwork || isLoading}
                   onChange={(event) => setSelectedNetworkId(event.target.value)}
                   required
                 >
-                  {networkList.map((network) => (
+                  {networks.map((network) => (
                     <NativeSelectOption key={network.id} value={network.id}>
                       {network.name}
                     </NativeSelectOption>
@@ -97,89 +112,34 @@ export function CreateOrganizationDialog({
                 </NativeSelect>
               </Field>
             ) : null}
-            <Field>
+            <Field data-invalid={error ? true : undefined}>
               <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
               <Input
                 id={`${formId}-name`}
-                value={form.name}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
+                value={name}
+                onChange={(event) => setName(event.target.value)}
                 placeholder="DHL APAC"
                 autoFocus
                 required
+                disabled={isLoading}
+                aria-invalid={error ? true : undefined}
               />
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel htmlFor={`${formId}-type`}>Type</FieldLabel>
-                <Input
-                  id={`${formId}-type`}
-                  value={form.type}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      type: event.target.value,
-                    }))
-                  }
-                  placeholder="Express delivery"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={`${formId}-location`}>Location</FieldLabel>
-                <Input
-                  id={`${formId}-location`}
-                  value={form.location}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      location: event.target.value,
-                    }))
-                  }
-                  placeholder="Singapore"
-                />
-              </Field>
-            </div>
-            <Field>
-              <FieldLabel htmlFor={`${formId}-description`}>
-                Description
-              </FieldLabel>
-              <Textarea
-                id={`${formId}-description`}
-                value={form.description}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="What this organization does in the network."
-              />
-            </Field>
-            <Field>
-              <FieldLabel>Color</FieldLabel>
-              <ColorPicker
-                value={form.color}
-                onChange={(color) =>
-                  setForm((current) => ({ ...current, color }))
-                }
-              />
-            </Field>
+            {error ? (
+              <FieldError>{getHumaErrorMessage(error)}</FieldError>
+            ) : null}
           </FieldGroup>
         </form>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
+          <DialogClose render={<Button variant="outline" disabled={isLoading} />}>
             Cancel
           </DialogClose>
           <Button
             type="submit"
             form={formId}
-            disabled={!form.name.trim() || !selectedNetworkId}
+            disabled={isLoading || !name.trim() || !selectedNetworkId}
           >
-            Create organization
+            {isLoading ? "Creating..." : "Create organization"}
           </Button>
         </DialogFooter>
       </DialogContent>

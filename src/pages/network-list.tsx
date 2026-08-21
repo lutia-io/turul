@@ -106,7 +106,11 @@ function OrganizationCard({
       status={organization.status}
       color={organization.color}
       icon={Building2Icon}
-      subtitle={`${organization.type} · ${organization.location} · ${organization.members} members`}
+      subtitle={
+        [organization.type, organization.location]
+          .filter(Boolean)
+          .join(" · ") || "Organization"
+      }
     />
   )
 }

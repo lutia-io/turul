@@ -15,6 +15,7 @@ export default function NetworkLayout() {
     requestedOrganizationId,
     organization,
     isNetworkLoading,
+    isOrganizationLoading,
   } = useNetworkWorkspace()
   const parsed = parseNetworkPath(pathname)
 
@@ -25,6 +26,19 @@ export default function NetworkLayout() {
           <h1 className="text-lg font-semibold">Loading network</h1>
           <p className="text-sm text-muted-foreground">
             Fetching this network from the server.
+          </p>
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (requestedOrganizationId && isOrganizationLoading) {
+    return (
+      <AppShell sidebar={<NetworkSidebar style={appSidebarStyle} />}>
+        <div className="flex flex-1 flex-col gap-2 p-4">
+          <h1 className="text-lg font-semibold">Loading organization</h1>
+          <p className="text-sm text-muted-foreground">
+            Fetching this organization from the server.
           </p>
         </div>
       </AppShell>

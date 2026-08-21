@@ -585,7 +585,11 @@ export default function NetworkDetail() {
                     status={item.status}
                     color={item.color}
                     icon={Building2Icon}
-                    subtitle={`${item.type} · ${item.location} · ${item.members} members`}
+                    subtitle={
+                      [item.type, item.location]
+                        .filter(Boolean)
+                        .join(" · ") || "Organization"
+                    }
                   />
                 ))}
               </div>

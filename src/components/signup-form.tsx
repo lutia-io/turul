@@ -1,28 +1,64 @@
 "use client"
 
+import { type FormEvent } from "react"
+import { Link, useNavigate } from "react-router"
+
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {
+  getHumaErrorMessage,
+  useCreateUserMutation,
+  useLoginUserMutation,
+} from "@/store/api"
 import { FishIcon } from "lucide-react"
-import { Link } from "react-router"
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const [createUser, { isLoading: isCreating, error: createError }] =
+    useCreateUserMutation()
+  const [loginUser, { isLoading: isLoggingIn, error: loginError }] =
+    useLoginUserMutation()
+  const navigate = useNavigate()
+  const isLoading = isCreating || isLoggingIn
+  const error = createError ?? loginError
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const firstName = String(form.get("firstName") ?? "").trim()
+    const lastName = String(form.get("lastName") ?? "").trim()
+    const email = String(form.get("email") ?? "").trim()
+    const password = String(form.get("password") ?? "")
+
+    try {
+      await createUser({ firstName, lastName, email, password }).unwrap()
+      await loginUser({ email, password }).unwrap()
+      navigate("/app/home", { replace: true })
+    } catch {
+      // Error is rendered from the mutation state.
+    }
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form>
+      <form onSubmit={handleSubmit}>
         <FieldGroup>
           <div className="flex flex-col items-center gap-2 text-center">
-            <Link to="/" className="flex flex-col items-center gap-2 font-medium">
+            <Link
+              to="/"
+              className="flex flex-col items-center gap-2 font-medium"
+            >
               <div className="flex size-8 items-center justify-center rounded-md">
                 <FishIcon className="size-6 text-primary" />
               </div>
@@ -33,17 +69,62 @@ export function SignupForm({
               Already have an account? <Link to="/app/login">Sign in</Link>
             </FieldDescription>
           </div>
-          <Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field data-invalid={error ? true : undefined}>
+              <FieldLabel htmlFor="firstName">First name</FieldLabel>
+              <Input
+                id="firstName"
+                name="firstName"
+                type="text"
+                autoComplete="given-name"
+                required
+                disabled={isLoading}
+                aria-invalid={error ? true : undefined}
+              />
+            </Field>
+            <Field data-invalid={error ? true : undefined}>
+              <FieldLabel htmlFor="lastName">Last name</FieldLabel>
+              <Input
+                id="lastName"
+                name="lastName"
+                type="text"
+                autoComplete="family-name"
+                required
+                disabled={isLoading}
+                aria-invalid={error ? true : undefined}
+              />
+            </Field>
+          </div>
+          <Field data-invalid={error ? true : undefined}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="john.doe@example.com"
+              autoComplete="email"
               required
+              disabled={isLoading}
+              aria-invalid={error ? true : undefined}
             />
           </Field>
+          <Field data-invalid={error ? true : undefined}>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              disabled={isLoading}
+              aria-invalid={error ? true : undefined}
+            />
+          </Field>
+          {error ? <FieldError>{getHumaErrorMessage(error)}</FieldError> : null}
           <Field>
-            <Button type="submit">Create Account</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Creating account..." : "Create Account"}
+            </Button>
           </Field>
           <FieldSeparator>Or</FieldSeparator>
           <Field className="grid gap-4 sm:grid-cols-2">

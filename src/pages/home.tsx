@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 
 import {
-  organizationList,
   pipelineDefinitionList,
   schemaList,
   workflowDefinitionList,
@@ -366,10 +365,11 @@ export default function Home() {
   } = useWorkspaceNetworks()
   const greeting = greetingForHour(new Date().getHours())
   const currentNetwork = networks[0]
+  const organizations = networks.flatMap((network) => network.organizations)
   const networkCounts = countByStatus(networks, (network) => network.status)
   const organizationCounts = countByStatus(
-    organizationList,
-    ({ organization }) => organization.status
+    organizations,
+    (organization) => organization.status
   )
   const runningWorkflows = workflowRuns.filter(
     (run) => run.status === "Running"
@@ -457,7 +457,7 @@ export default function Home() {
         <StatCard
           to="/app/organizations"
           label="Organizations"
-          value={organizationList.length}
+          value={organizations.length}
           live={organizationCounts.live}
           draft={organizationCounts.draft}
           liveLabel="active"

@@ -17,6 +17,7 @@ export type Organization = {
   description: string
   status: string
   color: BadgeColor
+  networkId?: string
 }
 
 export type Schema = {

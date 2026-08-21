@@ -14,6 +14,17 @@ import {
   type TokenPair,
 } from "@/store/auth-slice"
 
+export type CreateUserRequest = {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+}
+
+export type CreateUserResponse = {
+  id: string
+}
+
 export type LoginUserRequest = {
   email: string
   password: string
@@ -65,7 +76,8 @@ function isAnonymousAuthRequest(args: string | FetchArgs) {
   return (
     url.startsWith("/auth/login") ||
     url.startsWith("/auth/refresh") ||
-    url.startsWith("/auth/logout")
+    url.startsWith("/auth/logout") ||
+    url === "/user"
   )
 }
 
@@ -129,8 +141,15 @@ const baseQueryWithReauth: BaseQueryFn<
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["Me", "Network"],
+  tagTypes: ["Me", "Network", "Organization"],
   endpoints: (build) => ({
+    createUser: build.mutation<CreateUserResponse, CreateUserRequest>({
+      query: (body) => ({
+        url: "/user",
+        method: "POST",
+        body,
+      }),
+    }),
     loginUser: build.mutation<TokenPair, LoginUserRequest>({
       query: (body) => ({
         url: "/auth/login/user",
@@ -202,6 +221,7 @@ export const api = createApi({
 })
 
 export const {
+  useCreateUserMutation,
   useLoginUserMutation,
   useLoginOrganizationUserMutation,
   useRefreshMutation,
