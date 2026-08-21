@@ -18,6 +18,7 @@ import {
 
 import { NavMain } from "@/components/nav-main"
 import { TeamSwitcher } from "@/components/team-switcher"
+import { useCreateEntity } from "@/components/create-entity"
 import {
   Sidebar,
   SidebarContent,
@@ -43,6 +44,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const [searchParams] = useSearchParams()
   const { isMobile, setOpenMobile } = useSidebar()
   const { network, organizationId } = useNetworkWorkspace()
+  const { openCreateNetwork, openCreateOrganization } = useCreateEntity()
   const parsed = parseNetworkPath(pathname)
   const rest = parsed?.rest ?? ""
   const recordsUrl = network
@@ -52,8 +54,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         rest: "records",
       })
     : "/app/records"
-  const recordsSchemaId =
-    searchParams.get("schema") ?? network?.schemas[0]?.id
+  const recordsSchemaId = searchParams.get("schema") ?? network?.schemas[0]?.id
 
   const networkItems = networkList.map((item) => ({
     id: item.id,
@@ -197,6 +198,10 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
               })
             )
           }}
+          onAdd={() => {
+            closeMobileSidebar()
+            openCreateNetwork()
+          }}
         />
         <TeamSwitcher
           kind="organization"
@@ -214,6 +219,13 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
                 rest,
               })
             )
+          }}
+          onAdd={() => {
+            if (!network) {
+              return
+            }
+            closeMobileSidebar()
+            openCreateOrganization(network.id)
           }}
         />
       </SidebarHeader>

@@ -11,8 +11,12 @@ import {
 } from "lucide-react"
 
 import { networkList, type Network, type Organization } from "@/data/networks"
-import { networkWorkspacePath } from "@/lib/network-workspace"
+import {
+  networkWorkspacePath,
+  useWorkspaceVersion,
+} from "@/lib/network-workspace"
 import { Button } from "@/components/ui/button"
+import { useCreateEntity } from "@/components/create-entity"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,6 +111,7 @@ function OrganizationCard({
 }
 
 function NetworkSection({ network }: { network: Network }) {
+  const { openCreateOrganization } = useCreateEntity()
   return (
     <section className="flex min-w-0 flex-col gap-5 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -141,7 +146,11 @@ function NetworkSection({ network }: { network: Network }) {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openCreateOrganization(network.id)}
+          >
             <PlusIcon />
             Create
           </Button>
@@ -224,6 +233,8 @@ function NetworkSection({ network }: { network: Network }) {
 }
 
 export default function NetworkList() {
+  useWorkspaceVersion()
+  const { openCreateNetwork } = useCreateEntity()
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -236,7 +247,7 @@ export default function NetworkList() {
             to inspect a member, or view the full network.
           </p>
         </div>
-        <Button>
+        <Button onClick={openCreateNetwork}>
           <PlusIcon />
           Create a network
         </Button>

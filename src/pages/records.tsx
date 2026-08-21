@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { useSearchParams } from "react-router"
 import { PlusIcon, TableIcon } from "lucide-react"
 
+import { useCreateEntity } from "@/components/create-entity"
 import {
   SchemaRecordsTable,
   SchemaSheetTabs,
@@ -15,10 +16,13 @@ import { cn } from "@/lib/utils"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
+  useWorkspaceVersion,
 } from "@/lib/network-workspace"
 
 export default function RecordsPage() {
+  useWorkspaceVersion()
   const { network, organizationId } = useNetworkWorkspace()
+  const { openCreateRecord } = useCreateEntity()
   const [params, setParams] = useSearchParams()
   const networks = network ? [network] : networkList
   const requestedNetworkId = params.get("network")
@@ -32,7 +36,7 @@ export default function RecordsPage() {
     schemas.find((item) => item.id === requestedSchemaId) ?? schemas[0]
   const filesById = useMemo(
     () => new Map(files.map((file) => [file.id, file])),
-    []
+    [files]
   )
   const organizationsById = useMemo(
     () =>
@@ -42,7 +46,7 @@ export default function RecordsPage() {
           organization,
         ])
       ),
-    []
+    [organizationList]
   )
   const visibleRecords = records.filter((record) => {
     if (activeSchema && record.schemaId !== activeSchema.id) {
@@ -86,7 +90,15 @@ export default function RecordsPage() {
               to preview it.
             </p>
           </div>
-          <Button>
+          <Button
+            onClick={() =>
+              openCreateRecord({
+                networkId: network?.id ?? activeNetwork?.id,
+                organizationId,
+                schemaId: activeSchema?.id,
+              })
+            }
+          >
             <PlusIcon />
             Add record
           </Button>

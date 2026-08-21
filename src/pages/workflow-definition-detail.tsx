@@ -3,14 +3,17 @@ import {
   FileJsonIcon,
   GalleryVerticalEndIcon,
   HashIcon,
+  PencilIcon,
   WorkflowIcon,
 } from "lucide-react"
 
+import { useCreateEntity } from "@/components/create-entity"
 import {
   DefinitionFlags,
   DefinitionStepsList,
   JsonDefinitionCard,
 } from "@/components/json-definition-card"
+import { Button } from "@/components/ui/button"
 import { getSchema, getWorkflowDefinition } from "@/data/networks"
 import { getWorkflowSteps, workflowTriggerLabel } from "@/lib/json-definition"
 import { useNetworkWorkspace } from "@/lib/network-workspace"
@@ -18,6 +21,7 @@ import { useNetworkWorkspace } from "@/lib/network-workspace"
 export default function WorkflowDefinitionDetail() {
   const { workflowDefinitionId } = useParams()
   const { network: workspaceNetwork, href } = useNetworkWorkspace()
+  const { openEditWorkflow } = useCreateEntity()
   const result = workflowDefinitionId
     ? getWorkflowDefinition(workflowDefinitionId)
     : undefined
@@ -59,6 +63,13 @@ export default function WorkflowDefinitionDetail() {
                 {workflowDefinition.slug}
               </p>
             </div>
+            <Button
+              variant="outline"
+              onClick={() => openEditWorkflow(workflowDefinition.id)}
+            >
+              <PencilIcon />
+              Edit
+            </Button>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

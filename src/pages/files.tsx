@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 
 import { FilePreviewSheet, FileThumbnail } from "@/components/file-preview"
+import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -26,13 +27,16 @@ import { formatFileSize } from "@/lib/records"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
+  useWorkspaceVersion,
 } from "@/lib/network-workspace"
 
 type FileSortKey =
   "filename" | "contentType" | "sizeBytes" | "organization" | "createdAt"
 
 export default function FilesPage() {
+  useWorkspaceVersion()
   const { network, organizationId } = useNetworkWorkspace()
+  const { openCreateFile } = useCreateEntity()
   const [query, setQuery] = useState("")
   const [previewFileId, setPreviewFileId] = useState<string>()
   const [sort, setSort] = useState<{
@@ -50,7 +54,7 @@ export default function FilesPage() {
           organization,
         ])
       ),
-    []
+    [organizationList]
   )
   const scoped = files.filter((file) => {
     if (network && file.networkId !== network.id) {
@@ -114,7 +118,14 @@ export default function FilesPage() {
             it, or open the row for the full page.
           </p>
         </div>
-        <Button>
+        <Button
+          onClick={() =>
+            openCreateFile({
+              networkId: network?.id,
+              organizationId,
+            })
+          }
+        >
           <PlusIcon />
           Upload file
         </Button>

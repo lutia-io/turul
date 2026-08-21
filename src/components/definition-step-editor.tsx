@@ -1,0 +1,174 @@
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { slugifyId } from "@/lib/slug"
+
+export type FlowStepDraft = {
+  key: string
+  id: string
+  type: string
+  name: string
+}
+
+export function newFlowStep(
+  type: string,
+  name = "",
+  existing: FlowStepDraft[] = []
+): FlowStepDraft {
+  const base = slugifyId(name || type)
+  const used = new Set(existing.map((step) => step.id))
+  let id = base
+  let suffix = 2
+  while (used.has(id)) {
+    id = `${base}-${suffix}`
+    suffix += 1
+  }
+
+  return {
+    key: `${id}-${existing.length + 1}`,
+    id,
+    type,
+    name,
+  }
+}
+
+export function DefinitionStepEditor({
+  noun,
+  steps,
+  typeOptions,
+  onChange,
+}: {
+  noun: "step" | "stage"
+  steps: FlowStepDraft[]
+  typeOptions: string[]
+  onChange: (steps: FlowStepDraft[]) => void
+}) {
+  function update(key: string, patch: Partial<FlowStepDraft>) {
+    onChange(
+      steps.map((step) => {
+        if (step.key !== key) {
+          return step
+        }
+
+        const next = { ...step, ...patch }
+        if (patch.name && !step.id) {
+          next.id = slugifyId(patch.name)
+        }
+        return next
+      })
+    )
+  }
+
+  function move(index: number, offset: number) {
+    const nextIndex = index + offset
+    if (nextIndex < 0 || nextIndex >= steps.length) {
+      return
+    }
+
+    const next = [...steps]
+    const [item] = next.splice(index, 1)
+    next.splice(nextIndex, 0, item)
+    onChange(next)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {steps.map((step, index) => (
+        <div
+          key={step.key}
+          className="flex flex-col gap-2 rounded-xl border bg-background p-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex size-7 items-center justify-center rounded-md bg-muted font-mono text-xs">
+              {index + 1}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                disabled={index === 0}
+                onClick={() => move(index, -1)}
+              >
+                <ChevronUpIcon />
+                <span className="sr-only">Move up</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                disabled={index === steps.length - 1}
+                onClick={() => move(index, 1)}
+              >
+                <ChevronDownIcon />
+                <span className="sr-only">Move down</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={() =>
+                  onChange(steps.filter((item) => item.key !== step.key))
+                }
+              >
+                <Trash2Icon />
+                <span className="sr-only">Remove {noun}</span>
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_8rem_8rem]">
+            <Input
+              value={step.name}
+              onChange={(event) =>
+                update(step.key, { name: event.target.value })
+              }
+              placeholder={`${noun[0].toUpperCase()}${noun.slice(1)} name`}
+              required
+            />
+            <NativeSelect
+              value={step.type}
+              onChange={(event) =>
+                update(step.key, { type: event.target.value })
+              }
+            >
+              {typeOptions.map((type) => (
+                <NativeSelectOption key={type} value={type}>
+                  {type}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <Input
+              value={step.id}
+              onChange={(event) => update(step.key, { id: event.target.value })}
+              placeholder="id"
+              className="font-mono"
+              required
+            />
+          </div>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        onClick={() =>
+          onChange([
+            ...steps,
+            newFlowStep(typeOptions[0] ?? "transform", "", steps),
+          ])
+        }
+      >
+        <PlusIcon />
+        Add {noun}
+      </Button>
+    </div>
+  )
+}

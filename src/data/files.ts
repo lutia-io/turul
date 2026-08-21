@@ -1,5 +1,6 @@
 import type { JsonObject } from "@/lib/json-definition"
-import { organizationList } from "@/data/networks"
+import { organizationList, emitWorkspace } from "@/data/networks"
+import { uniqueId } from "@/lib/slug"
 
 const t0 = Date.now()
 
@@ -80,7 +81,7 @@ function file(
   }
 }
 
-export const files: StoredFile[] = [
+export let files: StoredFile[] = [
   file({
     id: "file-dhl-customs-01",
     filename: "DEC-4401-commercial-invoice.pdf",
@@ -226,6 +227,30 @@ export const files: StoredFile[] = [
 
 export function getFile(fileId: string) {
   return files.find((item) => item.id === fileId)
+}
+
+export function createFile(input: {
+  filename: string
+  contentType: string
+  sizeBytes: number
+  organizationId: string
+  networkId: string
+}): StoredFile {
+  const created = file({
+    id: uniqueId(`file-${input.filename}`, (id) =>
+      files.some((item) => item.id === id)
+    ),
+    filename: input.filename.trim(),
+    contentType: input.contentType.trim() || "application/octet-stream",
+    sizeBytes: Math.max(0, Math.round(input.sizeBytes)),
+    organizationId: input.organizationId,
+    networkId: input.networkId,
+    createdAt: hoursAgo(0),
+  })
+
+  files = [created, ...files]
+  emitWorkspace()
+  return created
 }
 
 export type StoredRecord = {

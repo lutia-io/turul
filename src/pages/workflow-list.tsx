@@ -1,5 +1,3 @@
-import { WorkflowIcon } from "lucide-react"
-
 import { ExecutionListPage } from "@/components/execution-list-page"
 import { listWorkflowRunViews } from "@/lib/runs"
 import {
@@ -21,7 +19,6 @@ export default function WorkflowList() {
     }),
     status: view.run.status,
     color: "teal" as const,
-    icon: WorkflowIcon,
     network: view.network,
     organizationName: view.organization?.name,
     currentLabel: view.current?.name,
@@ -44,6 +41,8 @@ export default function WorkflowList() {
       unit="Step"
       items={items}
       emptyLabel="No workflows match this filter."
+      showNetwork={!network}
+      showOrganization={!organizationId}
     />
   )
 }

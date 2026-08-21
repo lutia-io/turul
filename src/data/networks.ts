@@ -1,9 +1,11 @@
 import type { BadgeColor } from "@/lib/badge"
 import type { JsonObject } from "@/lib/json-definition"
+import { uniqueId } from "@/lib/slug"
 import {
   definePipeline,
   defineSchema,
   defineWorkflow,
+  type JsonSchemaPropertySpec,
 } from "@/data/define-records"
 
 export type Organization = {
@@ -1340,9 +1342,51 @@ export const networks: Record<string, Network> = {
   },
 }
 
-export const networkList = Object.values(networks)
+const workspaceListeners = new Set<() => void>()
+let workspaceVersion = 0
 
-export const organizationList = networkList.flatMap((network) =>
+export function subscribeWorkspace(listener: () => void) {
+  workspaceListeners.add(listener)
+  return () => {
+    workspaceListeners.delete(listener)
+  }
+}
+
+export function getWorkspaceVersion() {
+  return workspaceVersion
+}
+
+function refreshDerivedLists() {
+  networkList = Object.values(networks)
+  organizationList = networkList.flatMap((network) =>
+    network.organizations.map((organization) => ({ organization, network }))
+  )
+  schemaList = networkList.flatMap((network) =>
+    network.schemas.map((schema) => ({ schema, network }))
+  )
+  workflowDefinitionList = networkList.flatMap((network) =>
+    network.workflowDefinitions.map((workflowDefinition) => ({
+      workflowDefinition,
+      network,
+    }))
+  )
+  pipelineDefinitionList = networkList.flatMap((network) =>
+    network.pipelineDefinitions.map((pipelineDefinition) => ({
+      pipelineDefinition,
+      network,
+    }))
+  )
+}
+
+export function emitWorkspace() {
+  workspaceVersion += 1
+  refreshDerivedLists()
+  workspaceListeners.forEach((listener) => listener())
+}
+
+export let networkList = Object.values(networks)
+
+export let organizationList = networkList.flatMap((network) =>
   network.organizations.map((organization) => ({ organization, network }))
 )
 
@@ -1352,7 +1396,7 @@ export function getOrganization(organizationId: string) {
   )
 }
 
-export const schemaList = networkList.flatMap((network) =>
+export let schemaList = networkList.flatMap((network) =>
   network.schemas.map((schema) => ({ schema, network }))
 )
 
@@ -1360,7 +1404,7 @@ export function getSchema(schemaId: string) {
   return schemaList.find(({ schema }) => schema.id === schemaId)
 }
 
-export const workflowDefinitionList = networkList.flatMap((network) =>
+export let workflowDefinitionList = networkList.flatMap((network) =>
   network.workflowDefinitions.map((workflowDefinition) => ({
     workflowDefinition,
     network,
@@ -1373,7 +1417,7 @@ export function getWorkflowDefinition(workflowDefinitionId: string) {
   )
 }
 
-export const pipelineDefinitionList = networkList.flatMap((network) =>
+export let pipelineDefinitionList = networkList.flatMap((network) =>
   network.pipelineDefinitions.map((pipelineDefinition) => ({
     pipelineDefinition,
     network,
@@ -1384,4 +1428,333 @@ export function getPipelineDefinition(pipelineDefinitionId: string) {
   return pipelineDefinitionList.find(
     ({ pipelineDefinition }) => pipelineDefinition.id === pipelineDefinitionId
   )
+}
+
+export type CreateNetworkInput = {
+  name: string
+  summary?: string
+  description?: string
+  industry?: string
+  headquarters?: string
+  coverage?: string
+  color?: BadgeColor
+}
+
+export type CreateOrganizationInput = {
+  name: string
+  type?: string
+  location?: string
+  description?: string
+  color?: BadgeColor
+}
+
+export function createNetwork(input: CreateNetworkInput): Network {
+  const name = input.name.trim()
+  const id = uniqueId(name, (candidate) => candidate in networks)
+  const network: Network = {
+    id,
+    name,
+    summary: input.summary?.trim() || "New partner network",
+    description:
+      input.description?.trim() ||
+      `${name} network for partner organizations, shared schemas, and definitions.`,
+    industry: input.industry?.trim() || "General",
+    headquarters: input.headquarters?.trim() || "—",
+    coverage: input.coverage?.trim() || "—",
+    status: "Draft",
+    color: input.color ?? "purple",
+    organizations: [],
+    schemas: [],
+    workflowDefinitions: [],
+    pipelineDefinitions: [],
+  }
+
+  networks[id] = network
+  emitWorkspace()
+  return network
+}
+
+export function createOrganization(
+  networkId: string,
+  input: CreateOrganizationInput
+): Organization {
+  const network = networks[networkId]
+  if (!network) {
+    throw new Error(`Network ${networkId} was not found.`)
+  }
+
+  const name = input.name.trim()
+  const id = uniqueId(name, (candidate) =>
+    Object.values(networks).some((item) =>
+      item.organizations.some((organization) => organization.id === candidate)
+    )
+  )
+  const organization: Organization = {
+    id,
+    name,
+    type: input.type?.trim() || "Member",
+    location: input.location?.trim() || "—",
+    members: 1,
+    description: input.description?.trim() || `${name} organization.`,
+    status: "Draft",
+    color: input.color ?? network.color,
+  }
+
+  network.organizations = [...network.organizations, organization]
+  emitWorkspace()
+  return organization
+}
+
+function takenSchemaId(id: string) {
+  return Object.values(networks).some((network) =>
+    network.schemas.some((schema) => schema.id === id)
+  )
+}
+
+function takenWorkflowId(id: string) {
+  return Object.values(networks).some((network) =>
+    network.workflowDefinitions.some((item) => item.id === id)
+  )
+}
+
+function takenPipelineId(id: string) {
+  return Object.values(networks).some((network) =>
+    network.pipelineDefinitions.some((item) => item.id === id)
+  )
+}
+
+function takenSchemaSlug(networkId: string, slug: string, exceptId?: string) {
+  return (
+    networks[networkId]?.schemas.some(
+      (schema) => schema.slug === slug && schema.id !== exceptId
+    ) ?? false
+  )
+}
+
+export type CreateSchemaInput = {
+  name: string
+  slug?: string
+  description?: string
+  color?: BadgeColor
+  active?: boolean
+  internal?: boolean
+  properties: Record<string, JsonSchemaPropertySpec>
+  required?: string[]
+}
+
+export function createSchema(
+  networkId: string,
+  input: CreateSchemaInput
+): Schema {
+  const network = networks[networkId]
+  if (!network) {
+    throw new Error(`Network ${networkId} was not found.`)
+  }
+
+  const name = input.name.trim()
+  const slug = uniqueId(input.slug?.trim() || name, (candidate) =>
+    takenSchemaSlug(networkId, candidate)
+  )
+  const schema = defineSchema({
+    id: uniqueId(`${networkId}-${slug}`, takenSchemaId),
+    name,
+    slug,
+    color: input.color ?? "purple",
+    description: input.description?.trim() || `${name} schema.`,
+    properties: input.properties,
+    required: input.required,
+    active: input.active ?? false,
+    internal: input.internal ?? false,
+  })
+
+  network.schemas = [...network.schemas, schema]
+  emitWorkspace()
+  return schema
+}
+
+export function updateSchema(
+  schemaId: string,
+  input: CreateSchemaInput
+): Schema {
+  const result = getSchema(schemaId)
+  if (!result) {
+    throw new Error(`Schema ${schemaId} was not found.`)
+  }
+
+  const updated = defineSchema({
+    id: result.schema.id,
+    name: input.name.trim(),
+    slug: result.schema.slug,
+    color: input.color ?? result.schema.color,
+    description:
+      input.description?.trim() ||
+      (typeof result.schema.definition.description === "string"
+        ? result.schema.definition.description
+        : `${input.name.trim()} schema.`),
+    properties: input.properties,
+    required: input.required,
+    active: input.active ?? result.schema.active,
+    internal: input.internal ?? result.schema.internal,
+  })
+
+  result.network.schemas = result.network.schemas.map((schema) =>
+    schema.id === schemaId ? updated : schema
+  )
+  emitWorkspace()
+  return updated
+}
+
+export type CreateWorkflowInput = {
+  name: string
+  slug?: string
+  schemaId: string
+  triggerType?: string
+  triggerEvent?: string
+  steps: { id: string; type: string; name: string }[]
+  active?: boolean
+  internal?: boolean
+}
+
+export function createWorkflowDefinition(
+  networkId: string,
+  input: CreateWorkflowInput
+): WorkflowDefinition {
+  const network = networks[networkId]
+  if (!network) {
+    throw new Error(`Network ${networkId} was not found.`)
+  }
+
+  const name = input.name.trim()
+  const slug = uniqueId(input.slug?.trim() || name, (candidate) =>
+    network.workflowDefinitions.some((item) => item.slug === candidate)
+  )
+  const workflowDefinition = defineWorkflow({
+    id: uniqueId(`${networkId}-${slug}`, takenWorkflowId),
+    name,
+    slug,
+    schemaId: input.schemaId,
+    trigger: {
+      type: input.triggerType?.trim() || "event",
+      event: input.triggerEvent?.trim() || `${slug}.created`,
+    },
+    steps: input.steps,
+    active: input.active ?? false,
+    internal: input.internal ?? false,
+  })
+
+  network.workflowDefinitions = [
+    ...network.workflowDefinitions,
+    workflowDefinition,
+  ]
+  emitWorkspace()
+  return workflowDefinition
+}
+
+export function updateWorkflowDefinition(
+  workflowDefinitionId: string,
+  input: CreateWorkflowInput
+): WorkflowDefinition {
+  const result = getWorkflowDefinition(workflowDefinitionId)
+  if (!result) {
+    throw new Error(
+      `Workflow definition ${workflowDefinitionId} was not found.`
+    )
+  }
+
+  const updated = defineWorkflow({
+    id: result.workflowDefinition.id,
+    name: input.name.trim(),
+    slug: result.workflowDefinition.slug,
+    schemaId: input.schemaId,
+    trigger: {
+      type: input.triggerType?.trim() || "event",
+      event:
+        input.triggerEvent?.trim() ||
+        `${result.workflowDefinition.slug}.updated`,
+    },
+    steps: input.steps,
+    active: input.active ?? result.workflowDefinition.active,
+    internal: input.internal ?? result.workflowDefinition.internal,
+  })
+
+  result.network.workflowDefinitions = result.network.workflowDefinitions.map(
+    (item) => (item.id === workflowDefinitionId ? updated : item)
+  )
+  emitWorkspace()
+  return updated
+}
+
+export type CreatePipelineInput = {
+  name: string
+  slug?: string
+  sourceType?: string
+  sourceName?: string
+  stages: { id: string; type: string; name: string }[]
+  active?: boolean
+  internal?: boolean
+}
+
+export function createPipelineDefinition(
+  networkId: string,
+  input: CreatePipelineInput
+): PipelineDefinition {
+  const network = networks[networkId]
+  if (!network) {
+    throw new Error(`Network ${networkId} was not found.`)
+  }
+
+  const name = input.name.trim()
+  const slug = uniqueId(input.slug?.trim() || name, (candidate) =>
+    network.pipelineDefinitions.some((item) => item.slug === candidate)
+  )
+  const pipelineDefinition = definePipeline({
+    id: uniqueId(`${networkId}-${slug}`, takenPipelineId),
+    name,
+    slug,
+    source: {
+      type: input.sourceType?.trim() || "api",
+      name: input.sourceName?.trim() || "Partner API",
+    },
+    stages: input.stages,
+    active: input.active ?? false,
+    internal: input.internal ?? false,
+  })
+
+  network.pipelineDefinitions = [
+    ...network.pipelineDefinitions,
+    pipelineDefinition,
+  ]
+  emitWorkspace()
+  return pipelineDefinition
+}
+
+export function updatePipelineDefinition(
+  pipelineDefinitionId: string,
+  input: CreatePipelineInput
+): PipelineDefinition {
+  const result = getPipelineDefinition(pipelineDefinitionId)
+  if (!result) {
+    throw new Error(
+      `Pipeline definition ${pipelineDefinitionId} was not found.`
+    )
+  }
+
+  const updated = definePipeline({
+    id: result.pipelineDefinition.id,
+    name: input.name.trim(),
+    slug: result.pipelineDefinition.slug,
+    source: {
+      type: input.sourceType?.trim() || "api",
+      name: input.sourceName?.trim() || "Partner API",
+    },
+    stages: input.stages,
+    active: input.active ?? result.pipelineDefinition.active,
+    internal: input.internal ?? result.pipelineDefinition.internal,
+  })
+
+  result.network.pipelineDefinitions = result.network.pipelineDefinitions.map(
+    (item) => (item.id === pipelineDefinitionId ? updated : item)
+  )
+  emitWorkspace()
+  return updated
 }

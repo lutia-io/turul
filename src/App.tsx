@@ -1,4 +1,6 @@
 import { Route, Routes } from "react-router"
+
+import { CreateEntityProvider } from "@/components/create-entity"
 import {
   AppLayout,
   Landing,
@@ -55,26 +57,28 @@ function networkWorkspaceRoutes() {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/app/signup" element={<Signup />} />
-      <Route path="/app/login" element={<Login />} />
-      <Route element={<AppLayout />}>
-        <Route path="/app/home" element={<Home />} />
-        <Route path="/app/networks" element={<NetworkList />} />
-        <Route path="/app/organizations" element={<OrganizationList />} />
-        <Route path="/app/records" element={<RecordsPage />} />
-        <Route path="/app/files" element={<FilesPage />} />
-        <Route path="/app/workflows" element={<WorkflowList />} />
-        <Route path="/app/pipelines" element={<PipelineList />} />
-      </Route>
-      <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
-        {networkWorkspaceRoutes()}
-        <Route path="organizations/:organizationId">
-          {networkWorkspaceRoutes()}
+    <CreateEntityProvider>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/app/signup" element={<Signup />} />
+        <Route path="/app/login" element={<Login />} />
+        <Route element={<AppLayout />}>
+          <Route path="/app/home" element={<Home />} />
+          <Route path="/app/networks" element={<NetworkList />} />
+          <Route path="/app/organizations" element={<OrganizationList />} />
+          <Route path="/app/records" element={<RecordsPage />} />
+          <Route path="/app/files" element={<FilesPage />} />
+          <Route path="/app/workflows" element={<WorkflowList />} />
+          <Route path="/app/pipelines" element={<PipelineList />} />
         </Route>
-      </Route>
-    </Routes>
+        <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
+          {networkWorkspaceRoutes()}
+          <Route path="organizations/:organizationId">
+            {networkWorkspaceRoutes()}
+          </Route>
+        </Route>
+      </Routes>
+    </CreateEntityProvider>
   )
 }
 

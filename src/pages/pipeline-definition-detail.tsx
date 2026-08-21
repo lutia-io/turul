@@ -1,11 +1,18 @@
 import { Link, useParams } from "react-router"
-import { GalleryVerticalEndIcon, HashIcon, LayersIcon } from "lucide-react"
+import {
+  GalleryVerticalEndIcon,
+  HashIcon,
+  LayersIcon,
+  PencilIcon,
+} from "lucide-react"
 
+import { useCreateEntity } from "@/components/create-entity"
 import {
   DefinitionFlags,
   DefinitionStepsList,
   JsonDefinitionCard,
 } from "@/components/json-definition-card"
+import { Button } from "@/components/ui/button"
 import { getPipelineDefinition } from "@/data/networks"
 import { getPipelineStages, pipelineSourceLabel } from "@/lib/json-definition"
 import { useNetworkWorkspace } from "@/lib/network-workspace"
@@ -13,6 +20,7 @@ import { useNetworkWorkspace } from "@/lib/network-workspace"
 export default function PipelineDefinitionDetail() {
   const { pipelineDefinitionId } = useParams()
   const { network: workspaceNetwork, href } = useNetworkWorkspace()
+  const { openEditPipeline } = useCreateEntity()
   const result = pipelineDefinitionId
     ? getPipelineDefinition(pipelineDefinitionId)
     : undefined
@@ -51,6 +59,13 @@ export default function PipelineDefinitionDetail() {
                 {pipelineDefinition.slug}
               </p>
             </div>
+            <Button
+              variant="outline"
+              onClick={() => openEditPipeline(pipelineDefinition.id)}
+            >
+              <PencilIcon />
+              Edit
+            </Button>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -42,6 +42,7 @@ export function TeamSwitcher({
   teams,
   activeId,
   onSelect,
+  onAdd,
   label,
   addLabel,
 }: {
@@ -49,6 +50,7 @@ export function TeamSwitcher({
   teams: SwitcherItem[]
   activeId?: string
   onSelect?: (team: SwitcherItem) => void
+  onAdd?: () => void
   label?: string
   addLabel?: string | null
 }) {
@@ -61,7 +63,8 @@ export function TeamSwitcher({
   const activeTone = getBadgeColor(activeTeam?.color)
   const copy = kindCopy[kind]
   const menuLabel = label ?? copy.plural
-  const actionLabel = addLabel === undefined ? `Add ${copy.singular.toLowerCase()}` : addLabel
+  const actionLabel =
+    addLabel === undefined ? `Add ${copy.singular.toLowerCase()}` : addLabel
 
   if (!activeTeam) {
     return null
@@ -149,7 +152,7 @@ export function TeamSwitcher({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem className="gap-2 p-2">
+                  <DropdownMenuItem className="gap-2 p-2" onClick={onAdd}>
                     <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                       <PlusIcon className="size-4" />
                     </div>

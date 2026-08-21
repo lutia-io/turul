@@ -1,6 +1,19 @@
+import { useSyncExternalStore } from "react"
 import { useParams } from "react-router"
 
-import { networks } from "@/data/networks"
+import {
+  getWorkspaceVersion,
+  networks,
+  subscribeWorkspace,
+} from "@/data/networks"
+
+export function useWorkspaceVersion() {
+  return useSyncExternalStore(
+    subscribeWorkspace,
+    getWorkspaceVersion,
+    getWorkspaceVersion
+  )
+}
 
 export function networkWorkspacePath({
   networkId,
@@ -76,6 +89,7 @@ export function networkSectionRest(rest: string) {
 }
 
 export function useNetworkWorkspace() {
+  useWorkspaceVersion()
   const { networkId, organizationId } = useParams()
   const network = networkId ? networks[networkId] : undefined
   const organization = organizationId

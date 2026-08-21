@@ -1,5 +1,3 @@
-import { LayersIcon } from "lucide-react"
-
 import { ExecutionListPage } from "@/components/execution-list-page"
 import { listPipelineRunViews } from "@/lib/runs"
 import {
@@ -21,7 +19,6 @@ export default function PipelineList() {
     }),
     status: view.run.status,
     color: "pink" as const,
-    icon: LayersIcon,
     network: view.network,
     organizationName: view.organization?.name,
     currentLabel: view.current?.name,
@@ -44,6 +41,8 @@ export default function PipelineList() {
       unit="Stage"
       items={items}
       emptyLabel="No pipelines match this filter."
+      showNetwork={!network}
+      showOrganization={!organizationId}
     />
   )
 }

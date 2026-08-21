@@ -1,4 +1,7 @@
 import { record, type StoredRecord } from "@/data/files"
+import { emitWorkspace } from "@/data/networks"
+import type { JsonObject } from "@/lib/json-definition"
+import { uniqueId } from "@/lib/slug"
 
 const dhlManifests: StoredRecord[] = [
   ["SIN", "HKG", 4, 18.4, "DAP", "dhl-apac", 20],
@@ -773,7 +776,7 @@ const dentistClaims: StoredRecord[] = [
     })
 )
 
-export const records: StoredRecord[] = [
+export let records: StoredRecord[] = [
   ...dhlManifests,
   ...dhlTracking,
   ...dhlCustoms,
@@ -800,4 +803,28 @@ export function getRecord(recordId: string) {
 
 export function recordsForSchema(schemaId: string) {
   return records.filter((item) => item.schemaId === schemaId)
+}
+
+export function createRecord(input: {
+  schemaId: string
+  organizationId: string
+  networkId: string
+  data: JsonObject
+  key?: string
+}): StoredRecord {
+  const created = record({
+    id: uniqueId(`rec-${input.schemaId}`, (id) =>
+      records.some((item) => item.id === id)
+    ),
+    schemaId: input.schemaId,
+    organizationId: input.organizationId,
+    networkId: input.networkId,
+    data: input.data,
+    hours: 0,
+    key: input.key,
+  })
+
+  records = [created, ...records]
+  emitWorkspace()
+  return created
 }

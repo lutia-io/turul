@@ -3,14 +3,17 @@ import {
   FileJsonIcon,
   GalleryVerticalEndIcon,
   HashIcon,
+  PencilIcon,
   WorkflowIcon,
 } from "lucide-react"
 
+import { useCreateEntity } from "@/components/create-entity"
 import {
   DefinitionFlags,
   JsonDefinitionCard,
   SchemaPropertiesTable,
 } from "@/components/json-definition-card"
+import { Button } from "@/components/ui/button"
 import { getSchema } from "@/data/networks"
 import { getBadgeColor } from "@/lib/badge"
 import {
@@ -24,6 +27,7 @@ import { cn } from "@/lib/utils"
 export default function SchemaDetail() {
   const { schemaId } = useParams()
   const { network: workspaceNetwork, href } = useNetworkWorkspace()
+  const { openEditSchema } = useCreateEntity()
   const result = schemaId ? getSchema(schemaId) : undefined
   const belongsToWorkspace =
     !workspaceNetwork || result?.network.id === workspaceNetwork.id
@@ -75,6 +79,10 @@ export default function SchemaDetail() {
                 {schema.slug}
               </p>
             </div>
+            <Button variant="outline" onClick={() => openEditSchema(schema.id)}>
+              <PencilIcon />
+              Edit
+            </Button>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -7,13 +7,18 @@ import {
   GlobeIcon,
   LayersIcon,
   MapPinIcon,
+  PlusIcon,
   WorkflowIcon,
 } from "lucide-react"
 
+import { useCreateEntity } from "@/components/create-entity"
+import { Button } from "@/components/ui/button"
 import {
-  networkWorkspacePath,
-  useNetworkWorkspace,
-} from "@/lib/network-workspace"
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import {
   getPipelineStages,
   jsonSchemaPropertyCount,
@@ -22,14 +27,18 @@ import {
   workflowTriggerLabel,
 } from "@/lib/json-definition"
 import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  networkWorkspacePath,
+  useNetworkWorkspace,
+} from "@/lib/network-workspace"
 
 export default function NetworkDetail() {
   const { network, href } = useNetworkWorkspace()
+  const {
+    openCreateOrganization,
+    openCreateSchema,
+    openCreateWorkflow,
+    openCreatePipeline,
+  } = useCreateEntity()
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4">
@@ -106,128 +115,200 @@ export default function NetworkDetail() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Organizations</h2>
-              <p className="text-sm text-muted-foreground">
-                Members of the {network.name} network.
-              </p>
-            </div>
-            {network.organizations.map((organization) => (
-              <Link
-                key={organization.id}
-                to={networkWorkspacePath({
-                  networkId: network.id,
-                  organizationId: organization.id,
-                })}
-                className="block"
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Organizations</h2>
+                <p className="text-sm text-muted-foreground">
+                  Members of the {network.name} network.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openCreateOrganization(network.id)}
               >
-                <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Building2Icon className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle>{organization.name}</CardTitle>
-                    <CardDescription>
-                      {organization.type} · {organization.location} ·{" "}
-                      {organization.members} members
-                    </CardDescription>
-                  </div>
-                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                </Card>
-              </Link>
-            ))}
+                <PlusIcon />
+                Add
+              </Button>
+            </div>
+            {network.organizations.length > 0 ? (
+              network.organizations.map((organization) => (
+                <Link
+                  key={organization.id}
+                  to={networkWorkspacePath({
+                    networkId: network.id,
+                    organizationId: organization.id,
+                  })}
+                  className="block"
+                >
+                  <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Building2Icon className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle>{organization.name}</CardTitle>
+                      <CardDescription>
+                        {organization.type} · {organization.location} ·{" "}
+                        {organization.members} members
+                      </CardDescription>
+                    </div>
+                    <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+                  </Card>
+                </Link>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No organizations yet. Add one to start collaborating in this
+                network.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Schemas</h2>
-              <p className="text-sm text-muted-foreground">
-                Data schemas used by the {network.name} network.
-              </p>
-            </div>
-            {network.schemas.map((schema) => (
-              <Link
-                key={schema.id}
-                to={href(`schemas/${schema.id}`)}
-                className="block"
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Schemas</h2>
+                <p className="text-sm text-muted-foreground">
+                  Data schemas used by the {network.name} network.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openCreateSchema(network.id)}
               >
-                <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <FileJsonIcon className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle>{schema.name}</CardTitle>
-                    <CardDescription>
-                      {schema.slug} ·{" "}
-                      {jsonSchemaPropertyCount(schema.definition)} properties
-                    </CardDescription>
-                  </div>
-                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                </Card>
-              </Link>
-            ))}
+                <PlusIcon />
+                Add
+              </Button>
+            </div>
+            {network.schemas.length > 0 ? (
+              network.schemas.map((schema) => (
+                <Link
+                  key={schema.id}
+                  to={href(`schemas/${schema.id}`)}
+                  className="block"
+                >
+                  <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <FileJsonIcon className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle>{schema.name}</CardTitle>
+                      <CardDescription>
+                        {schema.slug} ·{" "}
+                        {jsonSchemaPropertyCount(schema.definition)} properties
+                      </CardDescription>
+                    </div>
+                    <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+                  </Card>
+                </Link>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No schemas yet. Add one to start capturing records.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Workflow Definitions</h2>
-              <p className="text-sm text-muted-foreground">
-                Workflow definitions used by the {network.name} network.
-              </p>
-            </div>
-            {network.workflowDefinitions.map((workflowDefinition) => (
-              <Link
-                key={workflowDefinition.id}
-                to={href(`workflow-definitions/${workflowDefinition.id}`)}
-                className="block"
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">
+                  Workflow Definitions
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Workflow definitions used by the {network.name} network.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openCreateWorkflow(network.id)}
               >
-                <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <WorkflowIcon className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle>{workflowDefinition.name}</CardTitle>
-                    <CardDescription>
-                      {workflowTriggerLabel(workflowDefinition.definition)} ·{" "}
-                      {getWorkflowSteps(workflowDefinition.definition).length}{" "}
-                      steps
-                    </CardDescription>
-                  </div>
-                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                </Card>
-              </Link>
-            ))}
+                <PlusIcon />
+                Add
+              </Button>
+            </div>
+            {network.workflowDefinitions.length > 0 ? (
+              network.workflowDefinitions.map((workflowDefinition) => (
+                <Link
+                  key={workflowDefinition.id}
+                  to={href(`workflow-definitions/${workflowDefinition.id}`)}
+                  className="block"
+                >
+                  <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <WorkflowIcon className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle>{workflowDefinition.name}</CardTitle>
+                      <CardDescription>
+                        {workflowTriggerLabel(workflowDefinition.definition)} ·{" "}
+                        {getWorkflowSteps(workflowDefinition.definition).length}{" "}
+                        steps
+                      </CardDescription>
+                    </div>
+                    <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+                  </Card>
+                </Link>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No workflow definitions yet.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Pipeline Definitions</h2>
-              <p className="text-sm text-muted-foreground">
-                Pipeline definitions used by the {network.name} network.
-              </p>
-            </div>
-            {network.pipelineDefinitions.map((pipelineDefinition) => (
-              <Link
-                key={pipelineDefinition.id}
-                to={href(`pipeline-definitions/${pipelineDefinition.id}`)}
-                className="block"
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">
+                  Pipeline Definitions
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Pipeline definitions used by the {network.name} network.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openCreatePipeline(network.id)}
               >
-                <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <LayersIcon className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle>{pipelineDefinition.name}</CardTitle>
-                    <CardDescription>
-                      {pipelineSourceLabel(pipelineDefinition.definition)} ·{" "}
-                      {getPipelineStages(pipelineDefinition.definition).length}{" "}
-                      stages
-                    </CardDescription>
-                  </div>
-                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                </Card>
-              </Link>
-            ))}
+                <PlusIcon />
+                Add
+              </Button>
+            </div>
+            {network.pipelineDefinitions.length > 0 ? (
+              network.pipelineDefinitions.map((pipelineDefinition) => (
+                <Link
+                  key={pipelineDefinition.id}
+                  to={href(`pipeline-definitions/${pipelineDefinition.id}`)}
+                  className="block"
+                >
+                  <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <LayersIcon className="size-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle>{pipelineDefinition.name}</CardTitle>
+                      <CardDescription>
+                        {pipelineSourceLabel(pipelineDefinition.definition)} ·{" "}
+                        {
+                          getPipelineStages(pipelineDefinition.definition)
+                            .length
+                        }{" "}
+                        stages
+                      </CardDescription>
+                    </div>
+                    <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+                  </Card>
+                </Link>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No pipeline definitions yet.
+              </p>
+            )}
           </div>
         </>
       ) : (

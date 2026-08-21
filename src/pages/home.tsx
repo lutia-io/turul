@@ -25,6 +25,7 @@ import {
 import { files } from "@/data/files"
 import { records } from "@/data/records"
 import { Button } from "@/components/ui/button"
+import { useCreateEntity } from "@/components/create-entity"
 import {
   Card,
   CardContent,
@@ -36,6 +37,7 @@ import {
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { pipelineRuns, workflowRuns } from "@/data/runs"
 import { publicationStatus } from "@/lib/json-definition"
+import { useWorkspaceVersion } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 
 const userName = "John"
@@ -350,6 +352,8 @@ type AttentionItem = {
 }
 
 export default function Home() {
+  useWorkspaceVersion()
+  const { openCreateNetwork } = useCreateEntity()
   const greeting = greetingForHour(new Date().getHours())
   const currentNetwork = networkList[0]
   const networkCounts = countByStatus(networkList, (network) => network.status)
@@ -435,7 +439,7 @@ export default function Home() {
               : "."}
           </p>
         </div>
-        <Button render={<Link to="/app/networks" />}>
+        <Button onClick={openCreateNetwork}>
           <PlusIcon />
           Create a network
         </Button>

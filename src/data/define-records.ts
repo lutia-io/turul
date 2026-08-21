@@ -1,7 +1,7 @@
 import type { BadgeColor } from "@/lib/badge"
 import type { JsonObject } from "@/lib/json-definition"
 
-type JsonSchemaPropertySpec = {
+export type JsonSchemaPropertySpec = {
   type: "string" | "number" | "integer" | "boolean" | "array" | "object"
   description: string
   format?: string
