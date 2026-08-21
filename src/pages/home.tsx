@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/card"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
 import { pipelineRuns, workflowRuns } from "@/data/runs"
-import { publicationStatus } from "@/lib/json-definition"
 import { useWorkspaceNetworks } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
@@ -371,17 +370,6 @@ export default function Home() {
   const organizationCounts = countByStatus(
     organizationList,
     ({ organization }) => organization.status
-  )
-  const schemaCounts = countByStatus(schemaList, ({ schema }) =>
-    publicationStatus(schema.active)
-  )
-  const workflowCounts = countByStatus(
-    workflowDefinitionList,
-    ({ workflowDefinition }) => publicationStatus(workflowDefinition.active)
-  )
-  const pipelineCounts = countByStatus(
-    pipelineDefinitionList,
-    ({ pipelineDefinition }) => publicationStatus(pipelineDefinition.active)
   )
   const runningWorkflows = workflowRuns.filter(
     (run) => run.status === "Running"
