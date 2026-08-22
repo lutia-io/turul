@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 import {
   ChevronDownIcon,
@@ -33,6 +33,7 @@ import { getSchema, updateSchema } from "@/data/networks"
 import { type BadgeColor } from "@/lib/badge"
 import {
   getJsonSchemaProperties,
+  parseJsonObject,
   stringifyDefinition,
   type JsonObject,
   type JsonSchemaProperty,
@@ -103,10 +104,6 @@ function asFormat(value: string | undefined): PropertyFormat {
 function draftsFromProperties(
   properties: JsonSchemaProperty[]
 ): PropertyDraft[] {
-  if (properties.length === 0) {
-    return [emptyProperty(1)]
-  }
-
   return properties.map((property, index) => ({
     key: `property-${property.name}-${index}`,
     name: property.name,
@@ -115,8 +112,76 @@ function draftsFromProperties(
     description: property.description ?? "",
     format: asFormat(property.format),
     enumText: property.enumValues?.join(", ") ?? "",
-    itemsType: "string",
+    itemsType: asItemsType(property.itemsType),
   }))
+}
+
+function asItemsType(value: string | undefined): PropertyDraft["itemsType"] {
+  return value === "number" || value === "integer" || value === "boolean"
+    ? value
+    : "string"
+}
+
+function asJsonObject(value: unknown): JsonObject | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonObject
+  }
+  return undefined
+}
+
+function definitionFromDrafts({
+  name,
+  description,
+  properties,
+  base,
+}: {
+  name: string
+  description: string
+  properties: PropertyDraft[]
+  base?: JsonObject
+}): JsonObject {
+  const input = toSchemaInput(properties)
+  const previousProperties = asJsonObject(base?.properties)
+  const mergedProperties: JsonObject = {}
+
+  for (const [key, spec] of Object.entries(input.properties)) {
+    const previous = asJsonObject(previousProperties?.[key])
+    mergedProperties[key] = previous ? { ...previous, ...spec } : spec
+  }
+
+  const next: JsonObject = {
+    ...base,
+    $schema: base?.$schema ?? "https://json-schema.org/draft/2020-12/schema",
+    title: name.trim() || "Untitled schema",
+    type: base?.type ?? "object",
+    additionalProperties:
+      base?.additionalProperties === undefined
+        ? false
+        : base.additionalProperties,
+    properties: mergedProperties,
+    required: input.required,
+  }
+  const trimmedDescription = description.trim()
+
+  if (trimmedDescription) {
+    next.description = trimmedDescription
+  } else {
+    delete next.description
+  }
+
+  return next
+}
+
+function jsonSchemaError(text: string) {
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (!asJsonObject(parsed)) {
+      return "JSON must be an object schema"
+    }
+    return null
+  } catch {
+    return "Invalid JSON"
+  }
 }
 
 function toSchemaInput(properties: PropertyDraft[]) {
@@ -207,6 +272,10 @@ export function SchemaDefinitionDialog({
   const [properties, setProperties] = useState<PropertyDraft[]>([
     emptyProperty(1),
   ])
+  const [definitionBase, setDefinitionBase] = useState<JsonObject | undefined>()
+  const [jsonText, setJsonText] = useState("")
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const jsonSourceRef = useRef<"builder" | "json">("builder")
 
   const firstNetworkId = networks[0]?.id ?? ""
 
@@ -239,6 +308,9 @@ export function SchemaDefinitionDialog({
     setColor(current?.color ?? "purple")
     setActive(current?.active ?? false)
     setInternal(current?.internal ?? false)
+    jsonSourceRef.current = "builder"
+    setDefinitionBase(current?.definition)
+    setJsonError(null)
     setProperties(
       current
         ? draftsFromProperties(getJsonSchemaProperties(current.definition))
@@ -286,16 +358,80 @@ export function SchemaDefinitionDialog({
     (organization) => organization.networkId === selectedNetworkId
   )
 
-  const definitionPreview = stringifyDefinition({
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    title: name.trim() || "Untitled schema",
-    description: description.trim() || undefined,
-    type: "object",
-    additionalProperties: false,
-    ...toSchemaInput(properties),
-  })
+  const generatedDefinition = useMemo(
+    () =>
+      definitionFromDrafts({
+        name,
+        description,
+        properties,
+        base: definitionBase,
+      }),
+    [definitionBase, description, name, properties]
+  )
+  const generatedJson = stringifyDefinition(generatedDefinition)
+
+  useEffect(() => {
+    if (jsonSourceRef.current === "json") {
+      return
+    }
+    setJsonText(generatedJson)
+    setJsonError(null)
+  }, [generatedJson])
+
+  function markBuilderSource() {
+    jsonSourceRef.current = "builder"
+  }
+
+  function applyJsonSchema(definition: JsonObject) {
+    const title =
+      typeof definition.title === "string" ? definition.title.trim() : ""
+    const nextDescription =
+      typeof definition.description === "string" ? definition.description : ""
+
+    jsonSourceRef.current = "json"
+    setDefinitionBase(definition)
+    if (title) {
+      setName(title)
+      if (!slugTouched && !editing) {
+        setSlug(slugifyId(title))
+      }
+    }
+    setDescription(nextDescription)
+    setProperties(draftsFromProperties(getJsonSchemaProperties(definition)))
+  }
+
+  function handleJsonChange(text: string) {
+    jsonSourceRef.current = "json"
+    setJsonText(text)
+    const parsed = parseJsonObject(text)
+    if (!parsed) {
+      setJsonError(jsonSchemaError(text))
+      return
+    }
+    setJsonError(null)
+    applyJsonSchema(parsed)
+  }
+
+  function handleJsonBlur() {
+    if (!jsonText.trim()) {
+      jsonSourceRef.current = "builder"
+      setJsonText(generatedJson)
+      setJsonError(null)
+      return
+    }
+    const parsed = parseJsonObject(jsonText)
+    if (!parsed) {
+      setJsonError(jsonSchemaError(jsonText))
+      return
+    }
+    jsonSourceRef.current = "json"
+    setJsonError(null)
+    applyJsonSchema(parsed)
+    setJsonText(stringifyDefinition(parsed))
+  }
 
   function updateProperty(key: string, patch: Partial<PropertyDraft>) {
+    markBuilderSource()
     setProperties((current) =>
       current.map((property) =>
         property.key === key ? { ...property, ...patch } : property
@@ -304,6 +440,7 @@ export function SchemaDefinitionDialog({
   }
 
   function moveProperty(index: number, offset: number) {
+    markBuilderSource()
     setProperties((current) => {
       const nextIndex = index + offset
       if (nextIndex < 0 || nextIndex >= current.length) {
@@ -319,7 +456,7 @@ export function SchemaDefinitionDialog({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!name.trim() || !selectedNetworkId) {
+    if (!name.trim() || !selectedNetworkId || jsonError) {
       return
     }
 
@@ -342,10 +479,11 @@ export function SchemaDefinitionDialog({
     }
 
     try {
+      const definition = parseJsonObject(jsonText) ?? generatedDefinition
       const schema = await createSchema({
         name: name.trim(),
         active,
-        definition: JSON.parse(definitionPreview) as JsonObject,
+        definition,
         networkId: selectedNetworkId,
         organizationId: selectedOrganizationId || undefined,
       }).unwrap()
@@ -364,8 +502,8 @@ export function SchemaDefinitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="shrink-0 border-b p-4 pr-12">
+      <DialogContent size="full">
+        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
             {editing ? "Edit schema" : "Create a schema"}
           </DialogTitle>
@@ -381,7 +519,7 @@ export function SchemaDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
             <FieldGroup>
               {networks.length > 0 && !editing ? (
                 <Field>
@@ -439,6 +577,7 @@ export function SchemaDefinitionDialog({
                     value={name}
                     onChange={(event) => {
                       const next = event.target.value
+                      markBuilderSource()
                       setName(next)
                       if (!slugTouched) {
                         setSlug(slugifyId(next))
@@ -474,7 +613,10 @@ export function SchemaDefinitionDialog({
                 <Textarea
                   id={`${formId}-description`}
                   value={description}
-                  onChange={(event) => setDescription(event.target.value)}
+                  onChange={(event) => {
+                    markBuilderSource()
+                    setDescription(event.target.value)
+                  }}
                   placeholder="What this schema represents for partner records."
                 />
               </Field>
@@ -511,6 +653,11 @@ export function SchemaDefinitionDialog({
                   column.
                 </p>
               </div>
+              {properties.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No properties yet. Paste a JSON Schema below or add a field.
+                </p>
+              ) : null}
               {properties.map((property, index) => (
                 <div
                   key={property.key}
@@ -545,12 +692,12 @@ export function SchemaDefinitionDialog({
                         type="button"
                         variant="ghost"
                         size="icon-xs"
-                        disabled={properties.length === 1}
-                        onClick={() =>
+                        onClick={() => {
+                          markBuilderSource()
                           setProperties((current) =>
                             current.filter((item) => item.key !== property.key)
                           )
-                        }
+                        }}
                       >
                         <Trash2Icon />
                         <span className="sr-only">Remove property</span>
@@ -682,12 +829,13 @@ export function SchemaDefinitionDialog({
                 variant="outline"
                 size="sm"
                 className="self-start"
-                onClick={() =>
+                onClick={() => {
+                  markBuilderSource()
                   setProperties((current) => [
                     ...current,
                     emptyProperty(current.length + 1),
                   ])
-                }
+                }}
               >
                 <PlusIcon />
                 Add property
@@ -697,13 +845,28 @@ export function SchemaDefinitionDialog({
             <div className="overflow-hidden rounded-xl border bg-muted/30">
               <div className="border-b px-3 py-2">
                 <p className="text-xs font-medium">JSONB preview</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Paste a JSON Schema to fill the builder, or edit properties
+                  above to update this definition.
+                </p>
               </div>
-              <pre className="max-h-48 overflow-auto p-3 font-mono text-[12px] leading-relaxed">
-                {definitionPreview}
-              </pre>
+              <Textarea
+                id={`${formId}-json`}
+                value={jsonText}
+                onChange={(event) => handleJsonChange(event.target.value)}
+                onBlur={handleJsonBlur}
+                spellCheck={false}
+                aria-invalid={jsonError ? true : undefined}
+                className="max-h-64 min-h-48 resize-y rounded-none border-0 bg-transparent font-mono text-[12px] leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+              />
+              {jsonError ? (
+                <div className="border-t px-3 py-2">
+                  <FieldError>{jsonError}</FieldError>
+                </div>
+              ) : null}
             </div>
           </div>
-          <DialogFooter className="mx-0 mb-0">
+          <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={isLoading} />}
             >
@@ -711,7 +874,12 @@ export function SchemaDefinitionDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={isLoading || !name.trim() || !selectedNetworkId}
+              disabled={
+                isLoading ||
+                !name.trim() ||
+                !selectedNetworkId ||
+                Boolean(jsonError)
+              }
             >
               {isLoading
                 ? "Creating..."

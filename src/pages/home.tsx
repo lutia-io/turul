@@ -14,12 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import {
-  pipelineDefinitionList,
-  schemaList,
-  workflowDefinitionList,
-  type Network,
-} from "@/data/networks"
+import { type Network } from "@/data/networks"
 import { Button } from "@/components/ui/button"
 import { useCreateEntity } from "@/components/create-entity"
 import {
@@ -31,7 +26,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
-import { pipelineRuns } from "@/data/runs"
 import {
   networkWorkspacePath,
   useWorkspaceFiles,
@@ -41,8 +35,16 @@ import {
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
+import { selectAuthEmail } from "@/store/auth-slice"
+import { useAppSelector } from "@/store/hooks"
 
-const userName = "John"
+function displayNameFromEmail(email: string | null) {
+  if (!email) {
+    return null
+  }
+
+  return email.split("@")[0] || email
+}
 
 function greetingForHour(hour: number) {
   if (hour < 12) return "Good morning"
@@ -361,6 +363,8 @@ type AttentionItem = {
 
 export default function Home() {
   const { openCreateNetwork } = useCreateEntity()
+  const email = useAppSelector(selectAuthEmail)
+  const userName = displayNameFromEmail(email)
   const {
     networks,
     isLoading: isNetworksLoading,
@@ -388,17 +392,13 @@ export default function Home() {
   const queuedWorkflows = workflowRuns.filter(
     (run) => run.status === "pending"
   ).length
-  const runningPipelines = pipelineRuns.filter(
-    (run) => run.status === "Running"
-  ).length
-  const queuedPipelines = pipelineRuns.filter(
-    (run) => run.status === "Queued"
-  ).length
+  const runningPipelines = 0
+  const queuedPipelines = 0
 
-  const attentionItems: AttentionItem[] = [
-    ...schemaList
-      .filter(({ schema }) => !schema.active)
-      .map(({ schema, network }) => ({
+  const attentionItems: AttentionItem[] = networks.flatMap((network) => [
+    ...network.schemas
+      .filter((schema) => !schema.active)
+      .map((schema) => ({
         id: schema.id,
         name: schema.name,
         kind: "Schema",
@@ -407,9 +407,9 @@ export default function Home() {
         color: schema.color,
         icon: FileJsonIcon,
       })),
-    ...workflowDefinitionList
-      .filter(({ workflowDefinition }) => !workflowDefinition.active)
-      .map(({ workflowDefinition, network }) => ({
+    ...network.workflowDefinitions
+      .filter((workflowDefinition) => !workflowDefinition.active)
+      .map((workflowDefinition) => ({
         id: workflowDefinition.id,
         name: workflowDefinition.name,
         kind: "Workflow",
@@ -418,9 +418,9 @@ export default function Home() {
         color: "teal" as const,
         icon: WorkflowIcon,
       })),
-    ...pipelineDefinitionList
-      .filter(({ pipelineDefinition }) => !pipelineDefinition.active)
-      .map(({ pipelineDefinition, network }) => ({
+    ...network.pipelineDefinitions
+      .filter((pipelineDefinition) => !pipelineDefinition.active)
+      .map((pipelineDefinition) => ({
         id: pipelineDefinition.id,
         name: pipelineDefinition.name,
         kind: "Pipeline",
@@ -429,14 +429,14 @@ export default function Home() {
         color: "pink" as const,
         icon: LayersIcon,
       })),
-  ]
+  ])
 
   return (
     <div className="flex flex-1 flex-col gap-6 bg-muted/40 p-4 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {greeting}, {userName}
+            {userName ? `${greeting}, ${userName}` : greeting}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             {isNetworksLoading

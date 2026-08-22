@@ -10,6 +10,7 @@ export type JsonSchemaProperty = {
   description?: string
   format?: string
   enumValues?: string[]
+  itemsType?: string
 }
 
 export type DefinitionStep = {
@@ -45,6 +46,14 @@ export function stringifyDefinition(value: unknown) {
   return JSON.stringify(value, null, 2)
 }
 
+export function parseJsonObject(text: string): JsonObject | undefined {
+  try {
+    return asObject(JSON.parse(text) as unknown)
+  } catch {
+    return undefined
+  }
+}
+
 export function definitionDescription(definition: JsonObject) {
   return asString(definition.description)
 }
@@ -66,6 +75,7 @@ export function getJsonSchemaProperties(
   return Object.entries(properties).map(([name, spec]) => {
     const property = asObject(spec)
     const enumValues = asStringArray(property?.enum)
+    const items = asObject(property?.items)
 
     return {
       name,
@@ -74,6 +84,7 @@ export function getJsonSchemaProperties(
       description: asString(property?.description),
       format: asString(property?.format),
       enumValues,
+      itemsType: asString(items?.type),
     }
   })
 }

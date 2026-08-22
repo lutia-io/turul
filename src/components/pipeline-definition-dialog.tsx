@@ -166,8 +166,8 @@ export function PipelineDefinitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 border-b p-4 pr-12">
+      <DialogContent size="full">
+        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
             {editing
               ? "Edit pipeline definition"
@@ -183,7 +183,7 @@ export function PipelineDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
             <FieldGroup>
               {!editing ? (
                 <Field>
@@ -307,7 +307,7 @@ export function PipelineDefinitionDialog({
               </pre>
             </div>
           </div>
-          <DialogFooter className="mx-0 mb-0">
+          <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>
               Cancel
             </DialogClose>

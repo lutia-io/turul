@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 
 import { CheckboxField } from "@/components/checkbox-field"
@@ -20,13 +20,18 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Textarea } from "@/components/ui/textarea"
 import { WorkflowActionsBuilder } from "@/components/workflow-actions-builder"
 import { WorkflowCriteriaBuilder } from "@/components/workflow-criteria-builder"
 import {
   getWorkflowDefinition,
   updateWorkflowDefinition,
 } from "@/data/networks"
-import { stringifyDefinition } from "@/lib/json-definition"
+import {
+  parseJsonObject,
+  stringifyDefinition,
+  type JsonObject,
+} from "@/lib/json-definition"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
@@ -53,6 +58,21 @@ import {
   useCreateWorkflowDefinitionMutation,
   useGetWorkflowDefinitionQuery,
 } from "@/store/workflow-slice"
+
+function workflowDefinitionError(text: string) {
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "JSON must be a workflow definition object"
+    }
+    if (!parseWorkflowDefinition(parsed as JsonObject)) {
+      return "JSON must include criteria or actions"
+    }
+    return null
+  } catch {
+    return "Invalid JSON"
+  }
+}
 
 export function WorkflowDefinitionDialog({
   open,
@@ -91,6 +111,9 @@ export function WorkflowDefinitionDialog({
   const [active, setActive] = useState(true)
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
   const [actions, setActions] = useState<ActionDraft[]>([emptyAction()])
+  const [jsonText, setJsonText] = useState("")
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const jsonSourceRef = useRef<"builder" | "json">("builder")
 
   const firstNetworkId = networks[0]?.id ?? ""
   const networkSchemas = useMemo(
@@ -126,6 +149,8 @@ export function WorkflowDefinitionDialog({
     setSlugTouched(Boolean(current))
     setSchemaId(current?.schemaId ?? "")
     setActive(current?.active ?? true)
+    jsonSourceRef.current = "builder"
+    setJsonError(null)
     setCriteria(criteriaFromApi(parsed?.criteria))
     setActions(actionsFromApi(parsed?.actions))
   }, [apiWorkflowQuery.data, open, workflowDefinitionId])
@@ -175,19 +200,81 @@ export function WorkflowDefinitionDialog({
     }
   }, [actions, criteria, triggerFields])
 
-  const definitionPreview = stringifyDefinition(
+  const generatedJson = stringifyDefinition(
     definition ?? { criteria: {}, actions: [] }
   )
+
+  useEffect(() => {
+    if (jsonSourceRef.current === "json") {
+      return
+    }
+    setJsonText(generatedJson)
+    setJsonError(null)
+  }, [generatedJson])
+
+  function markBuilderSource() {
+    jsonSourceRef.current = "builder"
+  }
+
+  function applyWorkflowDefinition(body: WorkflowDefinitionBody) {
+    jsonSourceRef.current = "json"
+    setCriteria(criteriaFromApi(body.criteria))
+    setActions(actionsFromApi(body.actions))
+  }
+
+  function handleJsonChange(text: string) {
+    jsonSourceRef.current = "json"
+    setJsonText(text)
+    const parsed = parseJsonObject(text)
+    if (!parsed) {
+      setJsonError(workflowDefinitionError(text))
+      return
+    }
+    const body = parseWorkflowDefinition(parsed)
+    if (!body) {
+      setJsonError("JSON must include criteria or actions")
+      return
+    }
+    setJsonError(null)
+    applyWorkflowDefinition(body)
+  }
+
+  function handleJsonBlur() {
+    if (!jsonText.trim()) {
+      jsonSourceRef.current = "builder"
+      setJsonText(generatedJson)
+      setJsonError(null)
+      return
+    }
+    const parsed = parseJsonObject(jsonText)
+    const body = parsed ? parseWorkflowDefinition(parsed) : undefined
+    if (!parsed || !body) {
+      setJsonError(workflowDefinitionError(jsonText))
+      return
+    }
+    jsonSourceRef.current = "json"
+    setJsonError(null)
+    applyWorkflowDefinition(body)
+    setJsonText(stringifyDefinition(parsed))
+  }
+
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(selectedNetworkId) &&
     Boolean(schemaId) &&
     Boolean(definition) &&
-    (definition?.actions.length ?? 0) > 0
+    (definition?.actions.length ?? 0) > 0 &&
+    !jsonError
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit || !definition) {
+      return
+    }
+
+    const parsed = parseJsonObject(jsonText)
+    const body = parsed ? parseWorkflowDefinition(parsed) : definition
+    if (!body || body.actions.length === 0) {
       return
     }
 
@@ -208,7 +295,7 @@ export function WorkflowDefinitionDialog({
       return
     }
 
-    void submitCreate(definition)
+    void submitCreate(body)
   }
 
   async function submitCreate(body: WorkflowDefinitionBody) {
@@ -235,8 +322,8 @@ export function WorkflowDefinitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="shrink-0 border-b p-4 pr-12">
+      <DialogContent size="full">
+        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
             {editing ? "Edit workflow" : "Create a workflow"}
           </DialogTitle>
@@ -251,7 +338,7 @@ export function WorkflowDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
             <FieldGroup>
               {networks.length > 0 && !editing ? (
                 <Field>
@@ -356,32 +443,56 @@ export function WorkflowDefinitionDialog({
             <WorkflowCriteriaBuilder
               value={criteria}
               fields={triggerFields}
-              onChange={setCriteria}
+              onChange={(next) => {
+                markBuilderSource()
+                setCriteria(next)
+              }}
             />
 
             <WorkflowActionsBuilder
               value={actions}
               schemas={networkSchemas}
               triggerFields={triggerFields}
-              onChange={setActions}
+              onChange={(next) => {
+                markBuilderSource()
+                setActions(next)
+              }}
             />
 
             <div className="overflow-hidden rounded-xl border bg-muted/30">
               <div className="border-b px-3 py-2">
                 <p className="text-xs font-medium">JSONB preview</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Paste a workflow definition to fill the builder, or edit
+                  conditions and actions above to update this JSON.
+                </p>
               </div>
-              <pre className="max-h-40 overflow-auto p-3 font-mono text-[12px] leading-relaxed">
-                {definitionPreview}
-              </pre>
+              <Textarea
+                id={`${formId}-json`}
+                value={jsonText}
+                onChange={(event) => handleJsonChange(event.target.value)}
+                onBlur={handleJsonBlur}
+                spellCheck={false}
+                aria-invalid={jsonError ? true : undefined}
+                className="max-h-64 min-h-48 resize-y rounded-none border-0 bg-transparent font-mono text-[12px] leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+              />
+              {jsonError ? (
+                <div className="border-t px-3 py-2">
+                  <FieldError>{jsonError}</FieldError>
+                </div>
+              ) : null}
             </div>
           </div>
-          <DialogFooter className="mx-0 mb-0">
+          <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={isLoading} />}
             >
               Cancel
             </DialogClose>
-            <Button type="submit" disabled={isLoading || !canSubmit}>
+            <Button
+              type="submit"
+              disabled={isLoading || !canSubmit || Boolean(jsonError)}
+            >
               {isLoading
                 ? "Creating..."
                 : editing

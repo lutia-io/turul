@@ -98,7 +98,7 @@ function DataEntriesEditor({
       {entries.map((entry) => (
         <div
           key={entry.key}
-          className="grid gap-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_auto]"
+          className="grid items-start gap-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_auto]"
         >
           {targetFields.length > 0 ? (
             <NativeSelect
@@ -136,19 +136,20 @@ function DataEntriesEditor({
             fields={triggerFields}
             placeholder="Value or insert from the record"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="mt-1"
-            disabled={entries.length === 1}
-            onClick={() =>
-              onChange(entries.filter((item) => item.key !== entry.key))
-            }
-          >
-            <Trash2Icon />
-            <span className="sr-only">Remove field</span>
-          </Button>
+          <div className="flex h-8 items-center">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              disabled={entries.length === 1}
+              onClick={() =>
+                onChange(entries.filter((item) => item.key !== entry.key))
+              }
+            >
+              <Trash2Icon />
+              <span className="sr-only">Remove field</span>
+            </Button>
+          </div>
         </div>
       ))}
       <div className="flex flex-wrap gap-2">
