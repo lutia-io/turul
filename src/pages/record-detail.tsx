@@ -2,11 +2,8 @@ import { useState } from "react"
 import { Link, useParams } from "react-router"
 import { Building2Icon, FileJsonIcon, TableIcon } from "lucide-react"
 
-import { FilePreviewSheet, FileThumbnail } from "@/components/file-preview"
+import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
-import { getFile, getOrganizationUser } from "@/data/files"
-import { getOrganization, getSchema } from "@/data/networks"
-import { getRecord } from "@/data/records"
 import { getBadgeColor } from "@/lib/badge"
 import { formatCellValue, formatFileSize } from "@/lib/records"
 import {
@@ -16,29 +13,84 @@ import {
 } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
+  organizationUserName,
   useNetworkWorkspace,
+  useWorkspaceOrganizationUsers,
+  useWorkspaceOrganizations,
+  useWorkspaceSchemas,
+  workspaceFileFromApi,
+  workspaceRecordFromApi,
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
+import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useGetFileQuery } from "@/store/file-slice"
+import { useGetRecordQuery } from "@/store/record-slice"
 
 export default function RecordDetail() {
   const { recordId } = useParams()
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network: workspaceNetwork, organizationId } = useNetworkWorkspace()
-  const stored = recordId ? getRecord(recordId) : undefined
-  const schemaResult = stored ? getSchema(stored.schemaId) : undefined
-  const belongsToWorkspace =
-    !workspaceNetwork || stored?.networkId === workspaceNetwork.id
-  const record = belongsToWorkspace ? stored : undefined
-  const schema = belongsToWorkspace ? schemaResult?.schema : undefined
-  const network = belongsToWorkspace ? schemaResult?.network : undefined
-  const organization = record
-    ? getOrganization(record.organizationId)?.organization
+  const { organizations } = useWorkspaceOrganizations()
+  const { organizationUsers } = useWorkspaceOrganizationUsers()
+  const { schemas } = useWorkspaceSchemas()
+  const recordQuery = useGetRecordQuery(recordId ?? "", {
+    skip: !isAuthenticated || !recordId,
+  })
+  const stored = recordQuery.data
+    ? workspaceRecordFromApi(recordQuery.data)
     : undefined
-  const user = record ? getOrganizationUser(record.organizationId) : undefined
+  const belongsToWorkspace =
+    !workspaceNetwork ||
+    (stored?.networkId === workspaceNetwork.id &&
+      (!organizationId || stored.organizationId === organizationId))
+  const record = belongsToWorkspace ? stored : undefined
+  const schema = record
+    ? schemas.find((item) => item.id === record.schemaId)
+    : undefined
+  const network = belongsToWorkspace ? workspaceNetwork : undefined
+  const organization = record
+    ? organizations.find((item) => item.id === record.organizationId)
+    : undefined
+  const user = record
+    ? organizationUsers.find((item) => item.id === record.organizationUserId)
+    : undefined
   const properties = schema ? getJsonSchemaProperties(schema.definition) : []
   const fileIds = record ? getRecordFileIds(record.data, properties) : []
   const tone = getBadgeColor(schema?.color)
   const [previewFileId, setPreviewFileId] = useState<string>()
-  const previewFile = previewFileId ? getFile(previewFileId) : undefined
+  const previewQuery = useGetFileQuery(previewFileId ?? "", {
+    skip: !isAuthenticated || !previewFileId,
+  })
+  const previewFile = previewQuery.data
+    ? workspaceFileFromApi(previewQuery.data)
+    : undefined
+
+  if (recordQuery.isLoading) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
+        <h1 className="text-lg font-semibold">Loading record</h1>
+        <p className="text-sm text-muted-foreground">
+          Fetching this record from the server.
+        </p>
+      </div>
+    )
+  }
+
+  if (recordQuery.isError) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
+        <h1 className="text-lg font-semibold">Record not found</h1>
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(
+            recordQuery.error,
+            "This record does not exist or is no longer available."
+          )}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
@@ -65,7 +117,7 @@ export default function RecordDetail() {
               </div>
               <p className="text-sm text-muted-foreground">
                 {organization?.name ?? record.organizationId}
-                {user ? ` · ${user.name}` : ""}
+                {user ? ` · ${organizationUserName(user)}` : ""}
               </p>
             </div>
           </div>
@@ -120,36 +172,13 @@ export default function RecordDetail() {
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {fileIds.map((fileId) => {
-                  const file = getFile(fileId)
-
-                  return (
-                    <button
-                      key={fileId}
-                      type="button"
-                      onClick={() => setPreviewFileId(fileId)}
-                      className="flex items-center gap-3 rounded-xl border bg-background px-3.5 py-3 text-left shadow-xs transition-colors hover:bg-muted/50"
-                    >
-                      {file ? (
-                        <FileThumbnail file={file} className="size-12" />
-                      ) : (
-                        <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
-                          <TableIcon className="size-4" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">
-                          {file?.filename ?? fileId}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {file
-                            ? `${file.contentType} · ${formatFileSize(file.sizeBytes)}`
-                            : "Missing file"}
-                        </p>
-                      </div>
-                    </button>
-                  )
-                })}
+                {fileIds.map((fileId) => (
+                  <RecordFileCard
+                    key={fileId}
+                    fileId={fileId}
+                    onPreview={() => setPreviewFileId(fileId)}
+                  />
+                ))}
               </div>
             </section>
           ) : null}
@@ -192,9 +221,9 @@ export default function RecordDetail() {
             ) : null}
           </div>
 
-          <FilePreviewSheet
+          <FilePreviewDialog
             file={previewFile}
-            open={Boolean(previewFile)}
+            open={Boolean(previewFileId)}
             onOpenChange={(open) => {
               if (!open) {
                 setPreviewFileId(undefined)
@@ -223,6 +252,14 @@ export default function RecordDetail() {
   )
 }
 
+function useStoredFile(fileId: string) {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useGetFileQuery(fileId, {
+    skip: !isAuthenticated || !fileId,
+  })
+  return query.data ? workspaceFileFromApi(query.data) : undefined
+}
+
 function FileChip({
   fileId,
   onPreview,
@@ -230,7 +267,7 @@ function FileChip({
   fileId: string
   onPreview: () => void
 }) {
-  const file = getFile(fileId)
+  const file = useStoredFile(fileId)
 
   return (
     <button
@@ -240,6 +277,40 @@ function FileChip({
     >
       {file ? <FileThumbnail file={file} className="size-5" /> : null}
       <span className="truncate">{file?.filename ?? fileId}</span>
+    </button>
+  )
+}
+
+function RecordFileCard({
+  fileId,
+  onPreview,
+}: {
+  fileId: string
+  onPreview: () => void
+}) {
+  const file = useStoredFile(fileId)
+
+  return (
+    <button
+      type="button"
+      onClick={onPreview}
+      className="flex items-center gap-3 rounded-xl border bg-background px-3.5 py-3 text-left shadow-xs transition-colors hover:bg-muted/50"
+    >
+      {file ? (
+        <FileThumbnail file={file} className="size-12" />
+      ) : (
+        <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
+          <TableIcon className="size-4" />
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="truncate font-medium">{file?.filename ?? fileId}</p>
+        <p className="text-xs text-muted-foreground">
+          {file
+            ? `${file.contentType} · ${formatFileSize(file.sizeBytes)}`
+            : "Missing file"}
+        </p>
+      </div>
     </button>
   )
 }

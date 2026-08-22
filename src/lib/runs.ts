@@ -20,6 +20,13 @@ import {
   getWorkflowSteps,
   type DefinitionStep,
 } from "@/lib/json-definition"
+import {
+  actionTypeLabels,
+  parseWorkflowDefinition,
+  type WorkflowActionType,
+  type WorkflowDefinitionBody,
+} from "@/lib/workflow-definition"
+import type { ApiWorkflow } from "@/store/workflow-slice"
 
 export const activeRunStatuses: RunStatus[] = ["Running", "Queued", "Paused"]
 
@@ -218,4 +225,57 @@ export function listPipelineRunViews({
     .filter((run) => matchesFilter(run.status, filter))
     .map(getPipelineRunView)
     .filter((view): view is PipelineRunView => view !== undefined)
+}
+
+export function apiWorkflowStatus(status: string): RunStatus {
+  switch (status) {
+    case "running":
+      return "Running"
+    case "completed":
+      return "Succeeded"
+    case "failed":
+      return "Failed"
+    default:
+      return "Queued"
+  }
+}
+
+export function apiWorkflowSteps(
+  definition: WorkflowDefinitionBody | undefined
+): DefinitionStep[] {
+  return (definition?.actions ?? []).map((action, index) => ({
+    id: String(index),
+    type: action.type,
+    name: actionTypeLabels[action.type as WorkflowActionType] ?? action.type,
+    order: index + 1,
+  }))
+}
+
+export function apiWorkflowCurrentStep(workflow: ApiWorkflow) {
+  const total =
+    parseWorkflowDefinition(workflow.definition)?.actions.length ?? 0
+  if (workflow.status === "pending") {
+    return 0
+  }
+  if (workflow.status === "completed") {
+    return total
+  }
+  if (workflow.status === "failed") {
+    return Math.min(Math.max(workflow.currentAction, 1), Math.max(total, 1))
+  }
+  return Math.min(workflow.currentAction + 1, Math.max(total, 1))
+}
+
+export function matchesWorkflowScope(
+  workflow: Pick<ApiWorkflow, "networkId" | "organizationId">,
+  networkId?: string,
+  organizationId?: string
+) {
+  if (networkId && workflow.networkId !== networkId) {
+    return false
+  }
+  if (organizationId && workflow.organizationId !== organizationId) {
+    return false
+  }
+  return true
 }

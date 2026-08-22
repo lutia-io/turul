@@ -4,10 +4,12 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   ChevronsUpDownIcon,
+  PlusIcon,
   SearchIcon,
 } from "lucide-react"
 
-import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
+import { useCreateEntity } from "@/components/create-entity"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Table,
@@ -17,102 +19,112 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { StoredFile } from "@/data/files"
-import { fileKindLabel } from "@/lib/file-preview"
-import { formatFileSize } from "@/lib/records"
 import {
   networkWorkspacePath,
+  organizationUserName,
   useNetworkWorkspace,
-  useWorkspaceFiles,
+  useWorkspaceOrganizationUsers,
   useWorkspaceOrganizations,
+  workspaceOrganizationUserFromApi,
 } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
 
-type FileSortKey =
-  | "filename"
-  | "contentType"
-  | "sizeBytes"
-  | "organization"
-  | "createdAt"
+type OrganizationUser = ReturnType<typeof workspaceOrganizationUserFromApi>
+type UserSortKey = "name" | "email" | "organization" | "createdAt"
 
-export default function FilesPage() {
-  const { network, organizationId } = useNetworkWorkspace()
+export default function OrganizationUserList() {
+  const { network, organization, organizationId } = useNetworkWorkspace()
+  const { openCreateOrganizationUser } = useCreateEntity()
   const { organizations } = useWorkspaceOrganizations()
-  const { files, isLoading, isError, error } = useWorkspaceFiles()
+  const { organizationUsers, isLoading, isError, error } =
+    useWorkspaceOrganizationUsers()
   const [query, setQuery] = useState("")
-  const [previewFileId, setPreviewFileId] = useState<string>()
   const [sort, setSort] = useState<{
-    key: FileSortKey
+    key: UserSortKey
     direction: "asc" | "desc"
   }>({
-    key: "createdAt",
-    direction: "desc",
+    key: "name",
+    direction: "asc",
   })
   const organizationsById = useMemo(
     () =>
-      new Map(organizations.map((organization) => [organization.id, organization])),
+      new Map(
+        organizations.map((item) => [item.id, item])
+      ),
     [organizations]
   )
-  const scoped = files.filter((file) => {
-    if (network && file.networkId !== network.id) {
+  const scoped = organizationUsers.filter((user) => {
+    if (network && user.networkId !== network.id) {
       return false
     }
-
-    if (organizationId && file.organizationId !== organizationId) {
+    if (organizationId && user.organizationId !== organizationId) {
       return false
     }
-
     return true
   })
-  const searched = scoped.filter((file) => {
+  const searched = scoped.filter((user) => {
     const needle = query.trim().toLowerCase()
     if (!needle) {
       return true
     }
 
-    const organization = organizationsById.get(file.organizationId)?.name ?? ""
-    return [file.filename, file.contentType, organization, file.id]
+    const organizationName =
+      organizationsById.get(user.organizationId)?.name ?? ""
+    return [organizationUserName(user), user.email, organizationName, user.id]
       .join(" ")
       .toLowerCase()
       .includes(needle)
   })
   const rows = [...searched].sort((left, right) => {
-    const result = compareFiles(left, right, sort.key, organizationsById)
+    const result = compareUsers(left, right, sort.key, organizationsById)
     return sort.direction === "asc" ? result : -result
   })
 
-  function toggleSort(key: FileSortKey) {
+  function toggleSort(key: UserSortKey) {
     setSort((current) =>
       current.key === key
         ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
         : {
             key,
-            direction:
-              key === "createdAt" || key === "sizeBytes" ? "desc" : "asc",
+            direction: key === "createdAt" ? "desc" : "asc",
           }
     )
   }
 
-  function hrefFor(file: StoredFile) {
+  function hrefFor(user: OrganizationUser) {
     return networkWorkspacePath({
-      networkId: file.networkId,
+      networkId: user.networkId,
       organizationId,
-      rest: `files/${file.id}`,
+      rest: `organization-users/${user.id}`,
     })
   }
 
-  const previewFile = previewFileId
-    ? rows.find((file) => file.id === previewFileId)
-    : undefined
-
   return (
     <div className="flex h-[calc(100svh-var(--app-header-height))] min-h-0 flex-col gap-4 overflow-hidden bg-muted/40 p-4 sm:p-6">
-      <div className="shrink-0">
-        <h1 className="text-2xl font-semibold tracking-tight">Files</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Uploaded files referenced from record data. Click a file to preview
-          it, or open the row for the full page.
-        </p>
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Organization Users
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            {organization
+              ? `People who can sign in to ${organization.name}.`
+              : network
+                ? `People who can sign in to an organization in ${network.name}.`
+                : "People who can sign in to an organization."}
+          </p>
+        </div>
+        <Button
+          onClick={() =>
+            openCreateOrganizationUser({
+              networkId: network?.id,
+              organizationId,
+            })
+          }
+        >
+          <PlusIcon />
+          Create organization user
+        </Button>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -122,56 +134,49 @@ export default function FilesPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search files..."
-            className="h-8 pl-8"
+            placeholder="Search organization users..."
+            className="h-8 bg-background pl-8"
           />
         </div>
         <p className="text-sm text-muted-foreground tabular-nums">
           {isLoading
-            ? "Loading files..."
+            ? "Loading organization users..."
             : rows.length === scoped.length
-              ? `${scoped.length} files`
-              : `${rows.length} of ${scoped.length} files`}
+              ? `${scoped.length} users`
+              : `${rows.length} of ${scoped.length} users`}
         </p>
       </div>
 
       {isError ? (
         <p className="text-sm text-destructive">
-          {getHumaErrorMessage(error, "Failed to load files")}
+          {getHumaErrorMessage(error, "Failed to load organization users")}
         </p>
       ) : (
         <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-xl border bg-background shadow-xs">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-14">Preview</TableHead>
-                <FileHead
-                  label="Filename"
-                  sortKey="filename"
+                <UserHead
+                  label="Name"
+                  sortKey="name"
                   sort={sort}
                   onSort={toggleSort}
                 />
-                <FileHead
-                  label="Type"
-                  sortKey="contentType"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-                <FileHead
-                  label="Size"
-                  sortKey="sizeBytes"
+                <UserHead
+                  label="Email"
+                  sortKey="email"
                   sort={sort}
                   onSort={toggleSort}
                 />
                 {!organizationId ? (
-                  <FileHead
+                  <UserHead
                     label="Organization"
                     sortKey="organization"
                     sort={sort}
                     onSort={toggleSort}
                   />
                 ) : null}
-                <FileHead
+                <UserHead
                   label="Created"
                   sortKey="createdAt"
                   sort={sort}
@@ -181,48 +186,32 @@ export default function FilesPage() {
             </TableHeader>
             <TableBody>
               {rows.length > 0 ? (
-                rows.map((file) => (
-                  <TableRow key={file.id}>
+                rows.map((user) => (
+                  <TableRow key={user.id}>
                     <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewFileId(file.id)}
-                        className="rounded-sm"
+                      <Link
+                        to={hrefFor(user)}
+                        className="block max-w-[22rem] truncate font-medium"
                       >
-                        <FileThumbnail file={file} className="size-10" />
-                        <span className="sr-only">Preview {file.filename}</span>
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewFileId(file.id)}
-                        className="block max-w-[22rem] truncate text-left font-medium hover:underline"
-                      >
-                        {file.filename}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <Link to={hrefFor(file)} className="block truncate">
-                        {fileKindLabel(file)}
+                        {organizationUserName(user)}
                       </Link>
                     </TableCell>
-                    <TableCell className="font-mono tabular-nums">
-                      <Link to={hrefFor(file)} className="block">
-                        {formatFileSize(file.sizeBytes)}
+                    <TableCell className="text-muted-foreground">
+                      <Link to={hrefFor(user)} className="block truncate">
+                        {user.email}
                       </Link>
                     </TableCell>
                     {!organizationId ? (
                       <TableCell className="text-muted-foreground">
-                        <Link to={hrefFor(file)} className="block truncate">
-                          {organizationsById.get(file.organizationId)?.name ??
-                            file.organizationId}
+                        <Link to={hrefFor(user)} className="block truncate">
+                          {organizationsById.get(user.organizationId)?.name ??
+                            user.organizationId}
                         </Link>
                       </TableCell>
                     ) : null}
                     <TableCell className="text-muted-foreground">
                       <Link
-                        to={hrefFor(file)}
+                        to={hrefFor(user)}
                         className="block whitespace-nowrap"
                       >
                         {new Intl.DateTimeFormat("en-US", {
@@ -230,7 +219,7 @@ export default function FilesPage() {
                           day: "numeric",
                           hour: "numeric",
                           minute: "2-digit",
-                        }).format(new Date(file.createdAt))}
+                        }).format(new Date(user.createdAt))}
                       </Link>
                     </TableCell>
                   </TableRow>
@@ -238,10 +227,14 @@ export default function FilesPage() {
               ) : (
                 <TableRow className="hover:bg-transparent">
                   <TableCell
-                    colSpan={organizationId ? 5 : 6}
+                    colSpan={organizationId ? 3 : 4}
                     className="h-24 text-center text-muted-foreground"
                   >
-                    {isLoading ? "Loading files..." : "No files match this view."}
+                    {isLoading
+                      ? "Loading organization users..."
+                      : query.trim()
+                        ? "No organization users match this view."
+                        : "No organization users yet. Create one so people can sign in."}
                   </TableCell>
                 </TableRow>
               )}
@@ -249,31 +242,20 @@ export default function FilesPage() {
           </Table>
         </div>
       )}
-
-      <FilePreviewDialog
-        file={previewFile}
-        open={Boolean(previewFileId)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPreviewFileId(undefined)
-          }
-        }}
-        href={previewFile ? hrefFor(previewFile) : undefined}
-      />
     </div>
   )
 }
 
-function FileHead({
+function UserHead({
   label,
   sortKey,
   sort,
   onSort,
 }: {
   label: string
-  sortKey: FileSortKey
-  sort: { key: FileSortKey; direction: "asc" | "desc" }
-  onSort: (key: FileSortKey) => void
+  sortKey: UserSortKey
+  sort: { key: UserSortKey; direction: "asc" | "desc" }
+  onSort: (key: UserSortKey) => void
 }) {
   const direction = sort.key === sortKey ? sort.direction : undefined
   const Icon =
@@ -297,16 +279,12 @@ function FileHead({
   )
 }
 
-function compareFiles(
-  left: StoredFile,
-  right: StoredFile,
-  key: FileSortKey,
+function compareUsers(
+  left: OrganizationUser,
+  right: OrganizationUser,
+  key: UserSortKey,
   organizationsById: Map<string, { name: string }>
 ) {
-  if (key === "sizeBytes") {
-    return left.sizeBytes - right.sizeBytes
-  }
-
   if (key === "createdAt") {
     return (
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
@@ -319,8 +297,15 @@ function compareFiles(
     return leftName.localeCompare(rightName)
   }
 
-  return String(left[key]).localeCompare(String(right[key]), undefined, {
-    numeric: true,
+  if (key === "name") {
+    return organizationUserName(left).localeCompare(
+      organizationUserName(right),
+      undefined,
+      { sensitivity: "base" }
+    )
+  }
+
+  return left.email.localeCompare(right.email, undefined, {
     sensitivity: "base",
   })
 }

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react"
 import { useParams } from "react-router"
 
+import type { StoredFile, StoredRecord } from "@/data/files"
 import {
   getWorkspaceVersion,
   subscribeWorkspace,
@@ -22,8 +23,15 @@ import {
   type ApiOrganization,
 } from "@/store/organization-slice"
 import { useListSchemasQuery, type ApiSchema } from "@/store/schema-slice"
+import { useListRecordsQuery, type ApiRecord } from "@/store/record-slice"
+import { useListFilesQuery, fileFromApi, type ApiFile } from "@/store/file-slice"
+import {
+  useListOrganizationUsersQuery,
+  type ApiOrganizationUser,
+} from "@/store/organization-user-slice"
 import {
   useListWorkflowDefinitionsQuery,
+  useListWorkflowsQuery,
   workflowDefinitionAsJson,
   type ApiWorkflowDefinition,
 } from "@/store/workflow-slice"
@@ -94,6 +102,13 @@ export function networkSectionRest(rest: string) {
     return "pipelines"
   }
 
+  if (
+    rest === "organization-users" ||
+    rest.startsWith("organization-users/")
+  ) {
+    return "organization-users"
+  }
+
   if (rest === "records" || rest.startsWith("records/")) {
     return "records"
   }
@@ -140,6 +155,45 @@ export function workspaceOrganizationFromApi(
     status: "Active",
     color: "orange",
     networkId: organization.networkId,
+  }
+}
+
+export function workspaceOrganizationUserFromApi(
+  organizationUser: ApiOrganizationUser
+) {
+  return {
+    id: organizationUser.id,
+    firstName: organizationUser.firstName,
+    lastName: organizationUser.lastName,
+    email: organizationUser.email,
+    organizationId: organizationUser.organizationId,
+    networkId: organizationUser.networkId,
+    createdAt: organizationUser.createdAt,
+    updatedAt: organizationUser.updatedAt,
+  }
+}
+
+export function organizationUserName(user: {
+  firstName: string
+  lastName: string
+}) {
+  return `${user.firstName} ${user.lastName}`.trim()
+}
+
+export function workspaceFileFromApi(file: ApiFile): StoredFile {
+  return fileFromApi(file)
+}
+
+export function workspaceRecordFromApi(record: ApiRecord): StoredRecord {
+  return {
+    id: record.id,
+    data: record.data,
+    schemaId: record.schemaId,
+    organizationId: record.organizationId,
+    organizationUserId: record.organizationUserId,
+    networkId: record.networkId,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
   }
 }
 
@@ -241,6 +295,38 @@ export function useWorkspaceOrganizations() {
   }
 }
 
+export function useWorkspaceOrganizationUsers() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListOrganizationUsersQuery(undefined, {
+    skip: !isAuthenticated,
+  })
+
+  return {
+    ...query,
+    organizationUsers: (query.data ?? []).map(workspaceOrganizationUserFromApi),
+  }
+}
+
+export function useWorkspaceFiles() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListFilesQuery(undefined, { skip: !isAuthenticated })
+
+  return {
+    ...query,
+    files: (query.data ?? []).map(workspaceFileFromApi),
+  }
+}
+
+export function useWorkspaceRecords() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListRecordsQuery(undefined, { skip: !isAuthenticated })
+
+  return {
+    ...query,
+    records: (query.data ?? []).map(workspaceRecordFromApi),
+  }
+}
+
 export function useWorkspaceSchemas() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const query = useListSchemasQuery(undefined, { skip: !isAuthenticated })
@@ -260,6 +346,16 @@ export function useWorkspaceWorkflows() {
   return {
     ...query,
     workflows: (query.data ?? []).map(workspaceWorkflowFromApi),
+  }
+}
+
+export function useWorkspaceWorkflowRuns() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListWorkflowsQuery(undefined, { skip: !isAuthenticated })
+
+  return {
+    ...query,
+    runs: query.data ?? [],
   }
 }
 

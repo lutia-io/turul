@@ -6,10 +6,9 @@ import {
   type ReactNode,
 } from "react"
 
-import { CreateFileDialog } from "@/components/create-file-dialog"
 import { CreateNetworkDialog } from "@/components/create-network-dialog"
 import { CreateOrganizationDialog } from "@/components/create-organization-dialog"
-import { CreateRecordDialog } from "@/components/create-record-dialog"
+import { CreateOrganizationUserDialog } from "@/components/create-organization-user-dialog"
 import { PipelineDefinitionDialog } from "@/components/pipeline-definition-dialog"
 import { SchemaDefinitionDialog } from "@/components/schema-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
@@ -18,6 +17,11 @@ type CreateState =
   | { kind: "network" }
   | { kind: "organization"; networkId?: string }
   | {
+      kind: "organizationUser"
+      networkId?: string
+      organizationId?: string
+    }
+  | {
       kind: "schema"
       networkId?: string
       organizationId?: string
@@ -25,18 +29,15 @@ type CreateState =
     }
   | { kind: "workflow"; networkId?: string; workflowDefinitionId?: string }
   | { kind: "pipeline"; networkId?: string; pipelineDefinitionId?: string }
-  | {
-      kind: "record"
-      networkId?: string
-      organizationId?: string
-      schemaId?: string
-    }
-  | { kind: "file"; networkId?: string; organizationId?: string }
   | null
 
 type CreateEntityContextValue = {
   openCreateNetwork: () => void
   openCreateOrganization: (networkId?: string) => void
+  openCreateOrganizationUser: (scope?: {
+    networkId?: string
+    organizationId?: string
+  }) => void
   openCreateSchema: (scope?: {
     networkId?: string
     organizationId?: string
@@ -46,15 +47,6 @@ type CreateEntityContextValue = {
   openEditWorkflow: (workflowDefinitionId: string) => void
   openCreatePipeline: (networkId?: string) => void
   openEditPipeline: (pipelineDefinitionId: string) => void
-  openCreateRecord: (scope?: {
-    networkId?: string
-    organizationId?: string
-    schemaId?: string
-  }) => void
-  openCreateFile: (scope?: {
-    networkId?: string
-    organizationId?: string
-  }) => void
 }
 
 const CreateEntityContext = createContext<CreateEntityContextValue | null>(null)
@@ -69,6 +61,9 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       },
       openCreateOrganization(networkId) {
         setState({ kind: "organization", networkId })
+      },
+      openCreateOrganizationUser(scope) {
+        setState({ kind: "organizationUser", ...scope })
       },
       openCreateSchema(scope) {
         setState({ kind: "schema", ...scope })
@@ -87,12 +82,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       },
       openEditPipeline(pipelineDefinitionId) {
         setState({ kind: "pipeline", pipelineDefinitionId })
-      },
-      openCreateRecord(scope) {
-        setState({ kind: "record", ...scope })
-      },
-      openCreateFile(scope) {
-        setState({ kind: "file", ...scope })
       },
     }),
     []
@@ -121,6 +110,20 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           }
         }}
         networkId={state?.kind === "organization" ? state.networkId : undefined}
+      />
+      <CreateOrganizationUserDialog
+        open={state?.kind === "organizationUser"}
+        onOpenChange={(open) => {
+          if (!open) {
+            close()
+          }
+        }}
+        networkId={
+          state?.kind === "organizationUser" ? state.networkId : undefined
+        }
+        organizationId={
+          state?.kind === "organizationUser" ? state.organizationId : undefined
+        }
       />
       <SchemaDefinitionDialog
         open={state?.kind === "schema"}
@@ -157,31 +160,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         networkId={state?.kind === "pipeline" ? state.networkId : undefined}
         pipelineDefinitionId={
           state?.kind === "pipeline" ? state.pipelineDefinitionId : undefined
-        }
-      />
-      <CreateRecordDialog
-        open={state?.kind === "record"}
-        onOpenChange={(open) => {
-          if (!open) {
-            close()
-          }
-        }}
-        networkId={state?.kind === "record" ? state.networkId : undefined}
-        organizationId={
-          state?.kind === "record" ? state.organizationId : undefined
-        }
-        schemaId={state?.kind === "record" ? state.schemaId : undefined}
-      />
-      <CreateFileDialog
-        open={state?.kind === "file"}
-        onOpenChange={(open) => {
-          if (!open) {
-            close()
-          }
-        }}
-        networkId={state?.kind === "file" ? state.networkId : undefined}
-        organizationId={
-          state?.kind === "file" ? state.organizationId : undefined
         }
       />
     </CreateEntityContext.Provider>

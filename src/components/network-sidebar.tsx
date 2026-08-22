@@ -13,6 +13,7 @@ import {
   LayoutDashboardIcon,
   PlayIcon,
   TableIcon,
+  UsersIcon,
   WorkflowIcon,
 } from "lucide-react"
 
@@ -98,6 +99,17 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         : "/app/networks",
       icon: <LayoutDashboardIcon />,
       exact: true,
+    },
+    {
+      title: "Organization Users",
+      url: network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: "organization-users",
+          })
+        : "/app/networks",
+      icon: <UsersIcon />,
     },
     {
       title: "Records",

@@ -8,7 +8,7 @@ import {
   SearchIcon,
 } from "lucide-react"
 
-import { FilePreviewSheet, FileThumbnail } from "@/components/file-preview"
+import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -274,9 +274,9 @@ export function SchemaRecordsTable({
         </Table>
       </div>
 
-      <FilePreviewSheet
+      <FilePreviewDialog
         file={previewFile}
-        open={Boolean(previewFile)}
+        open={Boolean(previewFileId)}
         onOpenChange={(open) => {
           if (!open) {
             setPreviewFileId(undefined)

@@ -1,30 +1,32 @@
 import { useMemo } from "react"
 import { useSearchParams } from "react-router"
-import { PlusIcon, TableIcon } from "lucide-react"
+import { TableIcon } from "lucide-react"
 
-import { useCreateEntity } from "@/components/create-entity"
 import {
   SchemaRecordsTable,
   SchemaSheetTabs,
 } from "@/components/schema-records-table"
-import { Button } from "@/components/ui/button"
-import { files } from "@/data/files"
-import { networkList, organizationList, type Network } from "@/data/networks"
-import { records } from "@/data/records"
+import { type Network } from "@/data/networks"
 import { getBadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
-  useWorkspaceVersion,
+  useWorkspaceFiles,
+  useWorkspaceNetworks,
+  useWorkspaceOrganizations,
+  useWorkspaceRecords,
 } from "@/lib/network-workspace"
+import { getHumaErrorMessage } from "@/store/api"
 
 export default function RecordsPage() {
-  useWorkspaceVersion()
   const { network, organizationId } = useNetworkWorkspace()
-  const { openCreateRecord } = useCreateEntity()
+  const { networks: workspaceNetworks } = useWorkspaceNetworks()
+  const { organizations } = useWorkspaceOrganizations()
+  const { records, isLoading, isError, error } = useWorkspaceRecords()
+  const { files } = useWorkspaceFiles()
   const [params, setParams] = useSearchParams()
-  const networks = network ? [network] : networkList
+  const networks = network ? [network] : workspaceNetworks
   const requestedNetworkId = params.get("network")
   const activeNetwork =
     network ??
@@ -39,14 +41,8 @@ export default function RecordsPage() {
     [files]
   )
   const organizationsById = useMemo(
-    () =>
-      new Map(
-        organizationList.map(({ organization }) => [
-          organization.id,
-          organization,
-        ])
-      ),
-    [organizationList]
+    () => new Map(organizations.map((organization) => [organization.id, organization])),
+    [organizations]
   )
   const visibleRecords = records.filter((record) => {
     if (activeSchema && record.schemaId !== activeSchema.id) {
@@ -82,26 +78,12 @@ export default function RecordsPage() {
   return (
     <div className="flex h-[calc(100svh-var(--app-header-height))] min-h-0 flex-col gap-4 overflow-hidden bg-muted/40 p-4 sm:p-6">
       <div className="flex shrink-0 flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Records</h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Each schema is a table. Open a row for the record, or click a file
-              to preview it.
-            </p>
-          </div>
-          <Button
-            onClick={() =>
-              openCreateRecord({
-                networkId: network?.id ?? activeNetwork?.id,
-                organizationId,
-                schemaId: activeSchema?.id,
-              })
-            }
-          >
-            <PlusIcon />
-            Add record
-          </Button>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Records</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Each schema is a table. Open a row for the record, or click a file
+            to preview it.
+          </p>
         </div>
 
         {!network ? (
@@ -126,7 +108,13 @@ export default function RecordsPage() {
         ) : null}
       </div>
 
-      {activeSchema ? (
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading records...</p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(error, "Failed to load records")}
+        </p>
+      ) : activeSchema ? (
         <SchemaRecordsTable
           schema={activeSchema}
           records={visibleRecords}

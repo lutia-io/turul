@@ -11,21 +11,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  getWorkflowActions,
-  type WorkflowAction,
-  type WorkflowActionStatus,
-} from "@/data/workflow-actions"
 import type { RunStatus } from "@/data/runs"
 import type { DefinitionStep } from "@/lib/json-definition"
 import { stringifyDefinition, type JsonObject } from "@/lib/json-definition"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
+import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import {
+  useListWorkflowActionsQuery,
+  type ApiWorkflowAction,
+} from "@/store/workflow-slice"
 
-const actionStatusLabel: Record<WorkflowActionStatus, RunStatus> = {
-  succeeded: "Succeeded",
+const actionStatusLabel: Record<string, RunStatus> = {
+  completed: "Succeeded",
   failed: "Failed",
+  succeeded: "Succeeded",
   running: "Running",
+}
+
+function asJsonObject(value: unknown): JsonObject | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonObject
+  }
+  return undefined
 }
 
 export function WorkflowActionsJournal({
@@ -35,11 +45,15 @@ export function WorkflowActionsJournal({
   workflowId: string
   steps: DefinitionStep[]
 }) {
-  const actions = getWorkflowActions(workflowId)
-  const [query, setQuery] = useState("")
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const query = useListWorkflowActionsQuery(workflowId, {
+    skip: !isAuthenticated || !workflowId,
+  })
+  const actions = query.data ?? []
+  const [search, setSearch] = useState("")
   const [expandedId, setExpandedId] = useState<string>()
   const rows = useMemo(() => {
-    const needle = query.trim().toLowerCase()
+    const needle = search.trim().toLowerCase()
     const labeled = actions.map((action) => {
       const step = steps.find((item) => item.order - 1 === action.actionIndex)
       return {
@@ -67,7 +81,7 @@ export function WorkflowActionsJournal({
         .toLowerCase()
         .includes(needle)
     )
-  }, [actions, query, steps])
+  }, [actions, search, steps])
 
   return (
     <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
@@ -79,20 +93,30 @@ export function WorkflowActionsJournal({
           </p>
         </div>
         <p className="text-sm text-muted-foreground tabular-nums">
-          {rows.length === actions.length
-            ? `${actions.length} attempt${actions.length === 1 ? "" : "s"}`
-            : `${rows.length} of ${actions.length} attempts`}
+          {query.isLoading
+            ? "Loading..."
+            : rows.length === actions.length
+              ? `${actions.length} attempt${actions.length === 1 ? "" : "s"}`
+              : `${rows.length} of ${actions.length} attempts`}
         </p>
       </div>
 
-      {actions.length > 0 ? (
+      {query.isError ? (
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(query.error, "Failed to load workflow actions")}
+        </p>
+      ) : query.isLoading ? (
+        <p className="text-sm text-muted-foreground">
+          Loading action attempts...
+        </p>
+      ) : actions.length > 0 ? (
         <>
           <div className="relative w-full max-w-md">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search actions..."
               className="h-8 bg-background pl-8"
             />
@@ -165,7 +189,7 @@ function ActionRows({
   expanded,
   onToggle,
 }: {
-  action: WorkflowAction
+  action: ApiWorkflowAction
   name: string
   type: string
   durationMs: number
@@ -190,7 +214,9 @@ function ActionRows({
         </TableCell>
         <TableCell className="tabular-nums">{action.attempt}</TableCell>
         <TableCell>
-          <RunStatusPill status={actionStatusLabel[action.status]} />
+          <RunStatusPill
+            status={actionStatusLabel[action.status] ?? "Queued"}
+          />
         </TableCell>
         <TableCell className="text-muted-foreground tabular-nums">
           {formatDuration(durationMs)}
@@ -217,8 +243,8 @@ function ActionRows({
               </p>
             ) : null}
             <div className="grid gap-2 sm:grid-cols-2">
-              <JsonBlock label="input" value={action.input} />
-              <JsonBlock label="output" value={action.output} />
+              <JsonBlock label="input" value={asJsonObject(action.input)} />
+              <JsonBlock label="output" value={asJsonObject(action.output)} />
             </div>
           </TableCell>
         </TableRow>

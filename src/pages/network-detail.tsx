@@ -19,8 +19,6 @@ import {
 import { useCreateEntity } from "@/components/create-entity"
 import { StatusBadge } from "@/components/json-definition-card"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { files } from "@/data/files"
-import { records } from "@/data/records"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
   getPipelineStages,
@@ -28,16 +26,25 @@ import {
   pipelineSourceLabel,
   publicationStatus,
 } from "@/lib/json-definition"
-import { workflowSummary } from "@/lib/workflow-definition"
 import {
+  apiWorkflowCurrentStep,
+  apiWorkflowStatus,
+  apiWorkflowSteps,
   formatRelativeTime,
   listPipelineRunViews,
-  listWorkflowRunViews,
+  matchesWorkflowScope,
 } from "@/lib/runs"
+import {
+  parseWorkflowDefinition,
+  workflowSummary,
+} from "@/lib/workflow-definition"
 import {
   networkWorkspacePath,
   schemaScopeLabel,
   useNetworkWorkspace,
+  useWorkspaceFiles,
+  useWorkspaceRecords,
+  useWorkspaceWorkflowRuns,
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 
@@ -286,13 +293,14 @@ function SectionHeader({
 
 export default function NetworkDetail() {
   const { network, organization, organizationId, href } = useNetworkWorkspace()
+  const { runs: workflowRuns } = useWorkspaceWorkflowRuns()
+  const { records } = useWorkspaceRecords()
+  const { files } = useWorkspaceFiles()
   const {
     openCreateOrganization,
     openCreateSchema,
     openCreateWorkflow,
     openCreatePipeline,
-    openCreateRecord,
-    openCreateFile,
   } = useCreateEntity()
 
   if (!network) {
@@ -327,19 +335,18 @@ export default function NetworkDetail() {
     }
     return !organizationId || file.organizationId === organizationId
   })
-  const workflowViews = listWorkflowRunViews({
-    networkId: network.id,
-    organizationId,
-  })
+  const scopedWorkflows = workflowRuns.filter((run) =>
+    matchesWorkflowScope(run, network.id, organizationId)
+  )
   const pipelineViews = listPipelineRunViews({
     networkId: network.id,
     organizationId,
   })
-  const runningWorkflows = workflowViews.filter(
-    (view) => view.run.status === "Running"
+  const runningWorkflows = scopedWorkflows.filter(
+    (run) => run.status === "running"
   ).length
-  const queuedWorkflows = workflowViews.filter(
-    (view) => view.run.status === "Queued"
+  const queuedWorkflows = scopedWorkflows.filter(
+    (run) => run.status === "pending"
   ).length
   const runningPipelines = pipelineViews.filter(
     (view) => view.run.status === "Running"
@@ -387,21 +394,28 @@ export default function NetworkDetail() {
       })),
   ]
   const activeRuns = [
-    ...listWorkflowRunViews({
-      networkId: network.id,
-      organizationId,
-      filter: "active",
-    }).map((view) => ({
-      id: view.run.id,
-      name: view.definition.name,
-      kind: "Workflow",
-      status: view.run.status,
-      href: href(`workflows/${view.run.id}`),
-      color: accentColor,
-      icon: PlayIcon,
-      current: view.current?.name,
-      updatedAt: view.run.updatedAt,
-    })),
+    ...scopedWorkflows
+      .filter((run) => run.status === "pending" || run.status === "running")
+      .map((run) => {
+        const definition = network.workflowDefinitions.find(
+          (item) => item.id === run.workflowDefinitionId
+        )
+        const steps = apiWorkflowSteps(parseWorkflowDefinition(run.definition))
+        const current = steps.find(
+          (step) => step.order === apiWorkflowCurrentStep(run)
+        )
+        return {
+          id: run.id,
+          name: definition?.name ?? "Workflow",
+          kind: "Workflow",
+          status: apiWorkflowStatus(run.status),
+          href: href(`workflows/${run.id}`),
+          color: accentColor,
+          icon: PlayIcon,
+          current: current?.name,
+          updatedAt: run.completedAt ?? run.createdAt,
+        }
+      }),
     ...listPipelineRunViews({
       networkId: network.id,
       organizationId,
@@ -757,30 +771,6 @@ export default function NetworkDetail() {
                 description="Define a JSONB record shape"
                 color={accentColor}
                 icon={FileJsonIcon}
-              />
-              <QuickActionCard
-                onClick={() =>
-                  openCreateRecord({
-                    networkId: network.id,
-                    organizationId,
-                  })
-                }
-                label="Add a record"
-                description="Capture a row against a schema"
-                color={accentColor}
-                icon={TableIcon}
-              />
-              <QuickActionCard
-                onClick={() =>
-                  openCreateFile({
-                    networkId: network.id,
-                    organizationId,
-                  })
-                }
-                label="Upload a file"
-                description="Attach a document to this network"
-                color={accentColor}
-                icon={FileIcon}
               />
               <QuickActionCard
                 to={href("workflows")}

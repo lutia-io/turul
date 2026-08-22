@@ -1,7 +1,6 @@
 import type { StoredFile } from "@/data/files"
 import type { StoredRecord } from "@/data/files"
-import { records } from "@/data/records"
-import { getSchema } from "@/data/networks"
+import type { Schema } from "@/data/networks"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
@@ -199,16 +198,20 @@ export function getRecordDataValue(data: JsonObject, name: string) {
   return data[name]
 }
 
-export function recordsReferencingFile(fileId: string) {
+export function recordsReferencingFile(
+  fileId: string,
+  records: StoredRecord[],
+  schemas: Schema[]
+) {
   return records.filter((item) => {
-    const result = getSchema(item.schemaId)
-    if (!result) {
+    const schema = schemas.find((schema) => schema.id === item.schemaId)
+    if (!schema) {
       return false
     }
 
     return getRecordFileIds(
       item.data,
-      getJsonSchemaProperties(result.schema.definition)
+      getJsonSchemaProperties(schema.definition)
     ).includes(fileId)
   })
 }

@@ -5,7 +5,10 @@ import { api } from "@/store/api"
 import { authReducer } from "@/store/auth-slice"
 import "@/store/network-slice"
 import "@/store/organization-slice"
+import "@/store/organization-user-slice"
 import "@/store/schema-slice"
+import "@/store/record-slice"
+import "@/store/file-slice"
 import "@/store/workflow-slice"
 
 export const store = configureStore({

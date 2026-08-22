@@ -20,8 +20,6 @@ import {
   workflowDefinitionList,
   type Network,
 } from "@/data/networks"
-import { files } from "@/data/files"
-import { records } from "@/data/records"
 import { Button } from "@/components/ui/button"
 import { useCreateEntity } from "@/components/create-entity"
 import {
@@ -33,10 +31,13 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
-import { pipelineRuns, workflowRuns } from "@/data/runs"
+import { pipelineRuns } from "@/data/runs"
 import {
   networkWorkspacePath,
+  useWorkspaceFiles,
   useWorkspaceNetworks,
+  useWorkspaceRecords,
+  useWorkspaceWorkflowRuns,
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
@@ -366,6 +367,9 @@ export default function Home() {
     isError: isNetworksError,
     error: networksError,
   } = useWorkspaceNetworks()
+  const { records } = useWorkspaceRecords()
+  const { files } = useWorkspaceFiles()
+  const { runs: workflowRuns } = useWorkspaceWorkflowRuns()
   const greeting = greetingForHour(new Date().getHours())
   const currentNetwork = networks[0]
   const workspaceHref = (rest = "") =>
@@ -379,10 +383,10 @@ export default function Home() {
     (organization) => organization.status
   )
   const runningWorkflows = workflowRuns.filter(
-    (run) => run.status === "Running"
+    (run) => run.status === "running"
   ).length
   const queuedWorkflows = workflowRuns.filter(
-    (run) => run.status === "Queued"
+    (run) => run.status === "pending"
   ).length
   const runningPipelines = pipelineRuns.filter(
     (run) => run.status === "Running"

@@ -47,9 +47,11 @@ export function DefinitionFlags({
 export function JsonDefinitionCard({
   definition,
   label = "JSONB definition",
+  description = "Stored as JSONB on the definition column.",
 }: {
   definition: JsonObject
   label?: string
+  description?: string
 }) {
   const json = stringifyDefinition(definition)
   const [copied, setCopied] = useState(false)
@@ -69,9 +71,7 @@ export function JsonDefinitionCard({
       <div className="flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
         <div>
           <h2 className="text-sm font-medium">{label}</h2>
-          <p className="text-xs text-muted-foreground">
-            Stored as JSONB on the definition column.
-          </p>
+          <p className="text-xs text-muted-foreground">{description}</p>
         </div>
         <Button variant="outline" size="sm" onClick={copyDefinition}>
           {copied ? <CheckIcon /> : <CopyIcon />}

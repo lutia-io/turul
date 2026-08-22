@@ -96,7 +96,6 @@ function OrganizationSection({
   organization: Organization
   network: Network
 }) {
-  const { openCreateRecord } = useCreateEntity()
   const organizationHref = networkWorkspacePath({
     networkId: network.id,
     organizationId: organization.id,
@@ -143,19 +142,6 @@ function OrganizationSection({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              openCreateRecord({
-                networkId: network.id,
-                organizationId: organization.id,
-              })
-            }
-          >
-            <PlusIcon />
-            Create
-          </Button>
           <Link
             to={organizationHref}
             className={buttonVariants({ variant: "outline", size: "sm" })}

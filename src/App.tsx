@@ -8,6 +8,8 @@ import {
   NetworkLayout,
   NetworkList,
   NetworkDetail,
+  OrganizationUserList,
+  OrganizationUserDetail,
   SchemaList,
   SchemaDetail,
   WorkflowDefinitionList,
@@ -25,6 +27,9 @@ import {
   Signup,
   Login,
   Home,
+  Account,
+  Billing,
+  Notifications,
 } from "./pages"
 
 function networkWorkspaceRoutes() {
@@ -47,6 +52,11 @@ function networkWorkspaceRoutes() {
       <Route path="workflows/:workflowRunId" element={<WorkflowRunDetail />} />
       <Route path="pipelines" element={<PipelineList />} />
       <Route path="pipelines/:pipelineRunId" element={<PipelineRunDetail />} />
+      <Route path="organization-users" element={<OrganizationUserList />} />
+      <Route
+        path="organization-users/:organizationUserId"
+        element={<OrganizationUserDetail />}
+      />
       <Route path="records" element={<RecordsPage />} />
       <Route path="records/:recordId" element={<RecordDetail />} />
       <Route path="files" element={<FilesPage />} />
@@ -66,6 +76,9 @@ export function App() {
           <Route element={<AppLayout />}>
             <Route path="/app/home" element={<Home />} />
             <Route path="/app/networks" element={<NetworkList />} />
+            <Route path="/app/account" element={<Account />} />
+            <Route path="/app/billing" element={<Billing />} />
+            <Route path="/app/notifications" element={<Notifications />} />
           </Route>
           <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
             {networkWorkspaceRoutes()}
