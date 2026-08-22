@@ -1,24 +1,21 @@
 import { useMemo, useState } from "react"
-import { Link } from "react-router"
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronsUpDownIcon,
-  PlusIcon,
-  SearchIcon,
-} from "lucide-react"
+import { PlusIcon } from "lucide-react"
 
+import {
+  DataTable,
+  DataTableCellLink,
+  DataTableFilter,
+  DataTablePage,
+  DataTableToolbar,
+  compareText,
+  dataTableCount,
+  matchesQuery,
+  toggleSort,
+  type DataTableColumn,
+  type DataTableSort,
+} from "@/components/data-table"
 import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   networkWorkspacePath,
   organizationUserName,
@@ -32,6 +29,15 @@ import { getHumaErrorMessage } from "@/store/api"
 type OrganizationUser = ReturnType<typeof workspaceOrganizationUserFromApi>
 type UserSortKey = "name" | "email" | "organization" | "createdAt"
 
+function formatCreatedAt(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value))
+}
+
 export default function OrganizationUserList() {
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateOrganizationUser } = useCreateEntity()
@@ -39,18 +45,13 @@ export default function OrganizationUserList() {
   const { organizationUsers, isLoading, isError, error } =
     useWorkspaceOrganizationUsers()
   const [query, setQuery] = useState("")
-  const [sort, setSort] = useState<{
-    key: UserSortKey
-    direction: "asc" | "desc"
-  }>({
+  const [orgFilter, setOrgFilter] = useState("all")
+  const [sort, setSort] = useState<DataTableSort<UserSortKey>>({
     key: "name",
     direction: "asc",
   })
   const organizationsById = useMemo(
-    () =>
-      new Map(
-        organizations.map((item) => [item.id, item])
-      ),
+    () => new Map(organizations.map((item) => [item.id, item])),
     [organizations]
   )
   const scoped = organizationUsers.filter((user) => {
@@ -62,34 +63,23 @@ export default function OrganizationUserList() {
     }
     return true
   })
-  const searched = scoped.filter((user) => {
-    const needle = query.trim().toLowerCase()
-    if (!needle) {
-      return true
+  const filtered = scoped.filter((user) => {
+    if (orgFilter !== "all" && user.organizationId !== orgFilter) {
+      return false
     }
 
-    const organizationName =
-      organizationsById.get(user.organizationId)?.name ?? ""
-    return [organizationUserName(user), user.email, organizationName, user.id]
-      .join(" ")
-      .toLowerCase()
-      .includes(needle)
+    return matchesQuery(query, [
+      organizationUserName(user),
+      user.email,
+      organizationsById.get(user.organizationId)?.name,
+      user.id,
+    ])
   })
-  const rows = [...searched].sort((left, right) => {
+  const rows = [...filtered].sort((left, right) => {
     const result = compareUsers(left, right, sort.key, organizationsById)
     return sort.direction === "asc" ? result : -result
   })
-
-  function toggleSort(key: UserSortKey) {
-    setSort((current) =>
-      current.key === key
-        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
-        : {
-            key,
-            direction: key === "createdAt" ? "desc" : "asc",
-          }
-    )
-  }
+  const filtersActive = query.trim().length > 0 || orgFilter !== "all"
 
   function hrefFor(user: OrganizationUser) {
     return networkWorkspacePath({
@@ -99,21 +89,65 @@ export default function OrganizationUserList() {
     })
   }
 
+  const columns: DataTableColumn<OrganizationUser, UserSortKey>[] = [
+    {
+      key: "name",
+      label: "Name",
+      render: (user) => (
+        <DataTableCellLink
+          to={hrefFor(user)}
+          className="max-w-[22rem] font-medium"
+        >
+          {organizationUserName(user)}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "email",
+      label: "Email",
+      className: "text-muted-foreground",
+      render: (user) => (
+        <DataTableCellLink to={hrefFor(user)}>{user.email}</DataTableCellLink>
+      ),
+    },
+    ...(!organizationId
+      ? [
+          {
+            key: "organization" as const,
+            label: "Organization",
+            className: "text-muted-foreground",
+            render: (user: OrganizationUser) => (
+              <DataTableCellLink to={hrefFor(user)}>
+                {organizationsById.get(user.organizationId)?.name ??
+                  user.organizationId}
+              </DataTableCellLink>
+            ),
+          },
+        ]
+      : []),
+    {
+      key: "createdAt",
+      label: "Created",
+      className: "text-muted-foreground",
+      render: (user) => (
+        <DataTableCellLink to={hrefFor(user)} className="whitespace-nowrap">
+          {formatCreatedAt(user.createdAt)}
+        </DataTableCellLink>
+      ),
+    },
+  ]
+
   return (
-    <div className="flex h-[calc(100svh-var(--app-header-height))] min-h-0 flex-col gap-4 overflow-hidden bg-muted/40 p-4 sm:p-6">
-      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Organization Users
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {organization
-              ? `People who can sign in to ${organization.name}.`
-              : network
-                ? `People who can sign in to an organization in ${network.name}.`
-                : "People who can sign in to an organization."}
-          </p>
-        </div>
+    <DataTablePage
+      title="Organization Users"
+      description={
+        organization
+          ? `People who can sign in to ${organization.name}.`
+          : network
+            ? `People who can sign in to an organization in ${network.name}.`
+            : "People who can sign in to an organization."
+      }
+      action={
         <Button
           onClick={() =>
             openCreateOrganizationUser({
@@ -125,157 +159,60 @@ export default function OrganizationUserList() {
           <PlusIcon />
           Create organization user
         </Button>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-md">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search organization users..."
-            className="h-8 bg-background pl-8"
-          />
-        </div>
-        <p className="text-sm text-muted-foreground tabular-nums">
-          {isLoading
-            ? "Loading organization users..."
-            : rows.length === scoped.length
-              ? `${scoped.length} users`
-              : `${rows.length} of ${scoped.length} users`}
-        </p>
-      </div>
-
+      }
+    >
+      <DataTableToolbar
+        query={query}
+        onQueryChange={setQuery}
+        searchPlaceholder="Search organization users..."
+        filters={
+          !organizationId && organizations.length > 0 ? (
+            <DataTableFilter
+              label="Filter by organization"
+              value={orgFilter}
+              onChange={setOrgFilter}
+              className="sm:w-52"
+              options={[
+                { value: "all", label: "All organizations" },
+                ...organizations.map((item) => ({
+                  value: item.id,
+                  label: item.name,
+                })),
+              ]}
+            />
+          ) : null
+        }
+        count={dataTableCount({
+          isLoading,
+          loadingLabel: "Loading organization users...",
+          visible: rows.length,
+          total: scoped.length,
+          singular: "user",
+        })}
+      />
       {isError ? (
         <p className="text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load organization users")}
         </p>
       ) : (
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-xl border bg-background shadow-xs">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <UserHead
-                  label="Name"
-                  sortKey="name"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-                <UserHead
-                  label="Email"
-                  sortKey="email"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-                {!organizationId ? (
-                  <UserHead
-                    label="Organization"
-                    sortKey="organization"
-                    sort={sort}
-                    onSort={toggleSort}
-                  />
-                ) : null}
-                <UserHead
-                  label="Created"
-                  sortKey="createdAt"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length > 0 ? (
-                rows.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <Link
-                        to={hrefFor(user)}
-                        className="block max-w-[22rem] truncate font-medium"
-                      >
-                        {organizationUserName(user)}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <Link to={hrefFor(user)} className="block truncate">
-                        {user.email}
-                      </Link>
-                    </TableCell>
-                    {!organizationId ? (
-                      <TableCell className="text-muted-foreground">
-                        <Link to={hrefFor(user)} className="block truncate">
-                          {organizationsById.get(user.organizationId)?.name ??
-                            user.organizationId}
-                        </Link>
-                      </TableCell>
-                    ) : null}
-                    <TableCell className="text-muted-foreground">
-                      <Link
-                        to={hrefFor(user)}
-                        className="block whitespace-nowrap"
-                      >
-                        {new Intl.DateTimeFormat("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        }).format(new Date(user.createdAt))}
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={organizationId ? 3 : 4}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    {isLoading
-                      ? "Loading organization users..."
-                      : query.trim()
-                        ? "No organization users match this view."
-                        : "No organization users yet. Create one so people can sign in."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          sort={sort}
+          onSort={(key) =>
+            setSort((current) => toggleSort(current, key, ["createdAt"]))
+          }
+          getRowId={(user) => user.id}
+          empty={
+            isLoading
+              ? "Loading organization users..."
+              : filtersActive
+                ? "No organization users match this view."
+                : "No organization users yet. Create one so people can sign in."
+          }
+        />
       )}
-    </div>
-  )
-}
-
-function UserHead({
-  label,
-  sortKey,
-  sort,
-  onSort,
-}: {
-  label: string
-  sortKey: UserSortKey
-  sort: { key: UserSortKey; direction: "asc" | "desc" }
-  onSort: (key: UserSortKey) => void
-}) {
-  const direction = sort.key === sortKey ? sort.direction : undefined
-  const Icon =
-    direction === "asc"
-      ? ArrowUpIcon
-      : direction === "desc"
-        ? ArrowDownIcon
-        : ChevronsUpDownIcon
-
-  return (
-    <TableHead>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-foreground"
-      >
-        {label}
-        <Icon className="size-3.5 opacity-60" />
-      </button>
-    </TableHead>
+    </DataTablePage>
   )
 }
 
@@ -290,22 +227,14 @@ function compareUsers(
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
     )
   }
-
   if (key === "organization") {
-    const leftName = organizationsById.get(left.organizationId)?.name ?? ""
-    const rightName = organizationsById.get(right.organizationId)?.name ?? ""
-    return leftName.localeCompare(rightName)
-  }
-
-  if (key === "name") {
-    return organizationUserName(left).localeCompare(
-      organizationUserName(right),
-      undefined,
-      { sensitivity: "base" }
+    return compareText(
+      organizationsById.get(left.organizationId)?.name ?? "",
+      organizationsById.get(right.organizationId)?.name ?? ""
     )
   }
-
-  return left.email.localeCompare(right.email, undefined, {
-    sensitivity: "base",
-  })
+  if (key === "name") {
+    return compareText(organizationUserName(left), organizationUserName(right))
+  }
+  return compareText(left.email, right.email)
 }

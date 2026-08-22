@@ -1,11 +1,13 @@
+import { useState, type ReactNode } from "react"
 import { Link, useParams } from "react-router"
 import {
   Building2Icon,
   FileJsonIcon,
   GalleryVerticalEndIcon,
-  HashIcon,
   PencilIcon,
+  TableIcon,
   WorkflowIcon,
+  type LucideIcon,
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
@@ -19,27 +21,37 @@ import { getBadgeColor } from "@/lib/badge"
 import {
   definitionDescription,
   getJsonSchemaProperties,
-  jsonSchemaPropertyCount,
 } from "@/lib/json-definition"
 import {
+  networkWorkspacePath,
   schemaScopeLabel,
   useNetworkWorkspace,
   useWorkspaceOrganizations,
+  useWorkspaceRecords,
   workspaceSchemaFromApi,
-  networkWorkspacePath,
 } from "@/lib/network-workspace"
+import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetSchemaQuery } from "@/store/schema-slice"
 
+type DefinitionView = "properties" | "json"
+
 export default function SchemaDetail() {
   const { schemaId } = useParams()
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const { network: workspaceNetwork, organizationId, href } = useNetworkWorkspace()
+  const {
+    network: workspaceNetwork,
+    organizationId,
+    href,
+  } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
+  const { records } = useWorkspaceRecords()
   const { openEditSchema } = useCreateEntity()
+  const [definitionView, setDefinitionView] =
+    useState<DefinitionView>("properties")
   const schemaQuery = useGetSchemaQuery(schemaId ?? "", {
     skip: !isAuthenticated || !schemaId,
   })
@@ -67,10 +79,14 @@ export default function SchemaDetail() {
     network?.workflowDefinitions.filter(
       (workflow) => workflow.schemaId === visibleSchema?.id
     ) ?? []
+  const recordCount = records.filter(
+    (record) => record.schemaId === visibleSchema?.id
+  ).length
   const tone = getBadgeColor(visibleSchema?.color)
   const description = visibleSchema
     ? definitionDescription(visibleSchema.definition)
     : undefined
+  const updatedAt = schemaQuery.data?.updatedAt
 
   if (schemaQuery.isLoading) {
     return (
@@ -120,17 +136,21 @@ export default function SchemaDetail() {
                   active={visibleSchema.active}
                   internal={visibleSchema.internal}
                 />
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  {schemaScopeLabel(visibleSchema, organizations)}
-                </span>
               </div>
               {description ? (
                 <p className="max-w-2xl text-sm text-muted-foreground">
                   {description}
                 </p>
               ) : null}
-              <p className="font-mono text-xs text-muted-foreground">
-                {visibleSchema.slug}
+              <p className="text-xs text-muted-foreground">
+                <span className="font-mono">{visibleSchema.slug}</span>
+                <span>
+                  {` · ${properties.length} ${properties.length === 1 ? "property" : "properties"}`}
+                  {requiredCount > 0 ? ` · ${requiredCount} required` : ""}
+                </span>
+                {updatedAt ? (
+                  <span>{` · Updated ${formatRelativeTime(updatedAt)}`}</span>
+                ) : null}
               </p>
             </div>
             <Button
@@ -142,136 +162,135 @@ export default function SchemaDetail() {
             </Button>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
-              <p className="flex items-center gap-1 text-sm text-muted-foreground">
-                <HashIcon className="size-3.5" />
-                Properties
-              </p>
-              <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {jsonSchemaPropertyCount(visibleSchema.definition)}
-              </p>
-            </div>
-            <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
-              <p className="text-sm text-muted-foreground">Required</p>
-              <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {requiredCount}
-              </p>
-            </div>
-            <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
-              <p className="text-sm text-muted-foreground">JSON Schema</p>
-              <p className="mt-1 truncate font-medium">
-                {typeof visibleSchema.definition.$schema === "string"
-                  ? visibleSchema.definition.$schema.replace(
-                      "https://json-schema.org/",
-                      ""
-                    )
-                  : "object"}
-              </p>
-            </div>
-          </div>
-
-          <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
-            <div>
-              <h2 className="text-base font-semibold tracking-tight">
-                Properties
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Fields declared on this JSON Schema.
-              </p>
-            </div>
-            <SchemaPropertiesTable properties={properties} />
-          </section>
-
-          <JsonDefinitionCard definition={visibleSchema.definition} />
-
-          {relatedWorkflows.length > 0 ? (
-            <section className="flex min-w-0 flex-col gap-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight">
-                  Workflows
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Workflow definitions that reference this schema.
-                </p>
-              </div>
-              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                {relatedWorkflows.map((workflow) => (
-                  <Link
-                    key={workflow.id}
-                    to={href(`workflow-definitions/${workflow.id}`)}
-                    className="flex min-w-0 items-center gap-3.5 rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
-                  >
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <WorkflowIcon className="size-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{workflow.name}</p>
-                      <p className="truncate font-mono text-xs text-muted-foreground">
-                        {workflow.slug}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <section className="flex min-w-0 flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold tracking-tight">
-                Network
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {visibleSchema.organizationId
-                  ? `This organization schema still belongs to the ${network.name} network.`
-                  : `This schema is shared across the ${network.name} network.`}
-              </p>
-            </div>
-            <Link
-              to={networkWorkspacePath({ networkId: network.id })}
-              className="flex min-w-0 items-center gap-3.5 rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
-            >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <GalleryVerticalEndIcon className="size-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{network.name}</p>
-                <p className="truncate text-sm text-muted-foreground">
-                  {network.description || network.summary}
-                </p>
-              </div>
-            </Link>
-          </section>
-
-          {organization ? (
-            <section className="flex min-w-0 flex-col gap-3">
-              <div>
-                <h2 className="text-base font-semibold tracking-tight">
-                  Organization
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  This schema belongs to {organization.name}.
-                </p>
-              </div>
-              <Link
+          <div className="grid gap-3 sm:grid-cols-3">
+            <DetailStat
+              to={`${href("records")}?schema=${visibleSchema.id}`}
+              icon={TableIcon}
+              label="Records"
+              value={recordCount}
+              detail={
+                recordCount === 1
+                  ? "1 row stored against this schema"
+                  : `${recordCount} rows stored against this schema`
+              }
+            />
+            <DetailStat
+              to={href("workflow-definitions")}
+              icon={WorkflowIcon}
+              label="Workflows"
+              value={relatedWorkflows.length}
+              detail={
+                relatedWorkflows.length > 0
+                  ? relatedWorkflows
+                      .map((workflow) => workflow.name)
+                      .join(" · ")
+                  : "No workflows watch this schema yet"
+              }
+            />
+            {organization ? (
+              <DetailStat
                 to={networkWorkspacePath({
                   networkId: network.id,
                   organizationId: organization.id,
                 })}
-                className="flex min-w-0 items-center gap-3.5 rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
+                icon={Building2Icon}
+                label="Organization"
+                value={organization.name}
+                detail={`${organization.description || organization.type} · ${network.name}`}
+              />
+            ) : (
+              <DetailStat
+                to={networkWorkspacePath({ networkId: network.id })}
+                icon={GalleryVerticalEndIcon}
+                label="Network"
+                value={network.name}
+                detail={`${schemaScopeLabel(visibleSchema, organizations)} schema · ${network.description || network.summary}`}
+              />
+            )}
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex items-end justify-between gap-3 xl:hidden">
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold tracking-tight">
+                  Definition
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Switch between the field table and the stored JSON Schema.
+                </p>
+              </div>
+              <div
+                className="inline-flex rounded-lg border bg-muted p-0.5"
+                role="tablist"
+                aria-label="Definition view"
               >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                  <Building2Icon className="size-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{organization.name}</p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {organization.description || organization.type}
+                <DefinitionTab
+                  active={definitionView === "properties"}
+                  onSelect={() => setDefinitionView("properties")}
+                >
+                  Properties
+                </DefinitionTab>
+                <DefinitionTab
+                  active={definitionView === "json"}
+                  onSelect={() => setDefinitionView("json")}
+                >
+                  JSON
+                </DefinitionTab>
+              </div>
+            </div>
+
+            <div className="grid min-w-0 items-stretch gap-6 xl:grid-cols-2">
+              <section
+                className={cn(
+                  "flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6",
+                  definitionView !== "properties" && "max-xl:hidden"
+                )}
+              >
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">
+                    Properties
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Fields declared on this JSON Schema.
                   </p>
                 </div>
-              </Link>
-            </section>
+                <div className="max-h-[32rem] min-h-0 overflow-auto">
+                  <SchemaPropertiesTable properties={properties} />
+                </div>
+              </section>
+              <JsonDefinitionCard
+                className={cn(
+                  "h-full",
+                  definitionView !== "json" && "max-xl:hidden"
+                )}
+                definition={visibleSchema.definition}
+                label="JSON Schema"
+                description="Stored as JSONB on the definition column."
+              />
+            </div>
+          </div>
+
+          {relatedWorkflows.length > 0 ? (
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              {relatedWorkflows.map((workflow) => (
+                <Link
+                  key={workflow.id}
+                  to={href(`workflow-definitions/${workflow.id}`)}
+                  className="flex min-w-0 items-center gap-3.5 rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
+                >
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <WorkflowIcon className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground">Workflow</p>
+                    <p className="truncate font-medium">{workflow.name}</p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                      {workflow.slug}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
           ) : null}
         </>
       ) : (
@@ -283,5 +302,68 @@ export default function SchemaDetail() {
         </div>
       )}
     </div>
+  )
+}
+
+function DetailStat({
+  to,
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  to: string
+  icon: LucideIcon
+  label: string
+  value: ReactNode
+  detail: string
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-background shadow-xs transition-colors hover:bg-muted/50"
+    >
+      <div className="flex items-start gap-3 px-3.5 py-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+          <Icon className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="truncate text-lg font-semibold tracking-tight">
+            {value}
+          </p>
+        </div>
+      </div>
+      <p className="truncate border-t bg-muted/40 px-3.5 py-2 text-xs text-muted-foreground">
+        {detail}
+      </p>
+    </Link>
+  )
+}
+
+function DefinitionTab({
+  active,
+  onSelect,
+  children,
+}: {
+  active: boolean
+  onSelect: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onSelect}
+      className={cn(
+        "rounded-md px-2.5 py-1 text-sm transition-colors",
+        active
+          ? "bg-background font-medium shadow-xs"
+          : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {children}
+    </button>
   )
 }

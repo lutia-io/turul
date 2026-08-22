@@ -1,22 +1,19 @@
 import { useMemo, useState } from "react"
-import { Link } from "react-router"
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronsUpDownIcon,
-  SearchIcon,
-} from "lucide-react"
 
 import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
-import { Input } from "@/components/ui/input"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  DataTable,
+  DataTableCellLink,
+  DataTableFilter,
+  DataTablePage,
+  DataTableToolbar,
+  compareText,
+  dataTableCount,
+  matchesQuery,
+  toggleSort,
+  type DataTableColumn,
+  type DataTableSort,
+} from "@/components/data-table"
 import type { StoredFile } from "@/data/files"
 import { fileKindLabel } from "@/lib/file-preview"
 import { formatFileSize } from "@/lib/records"
@@ -29,22 +26,52 @@ import {
 import { getHumaErrorMessage } from "@/store/api"
 
 type FileSortKey =
+  | "preview"
   | "filename"
   | "contentType"
   | "sizeBytes"
   | "organization"
   | "createdAt"
 
+const fileTypeOptions = [
+  { value: "all", label: "All types" },
+  { value: "Image", label: "Images" },
+  { value: "PDF", label: "PDFs" },
+  { value: "CSV", label: "CSVs" },
+  { value: "Spreadsheet", label: "Spreadsheets" },
+  { value: "Other", label: "Other" },
+]
+
+function fileTypeBucket(file: StoredFile) {
+  const label = fileKindLabel(file)
+  if (
+    label === "Image" ||
+    label === "PDF" ||
+    label === "CSV" ||
+    label === "Spreadsheet"
+  ) {
+    return label
+  }
+  return "Other"
+}
+
+function formatCreatedAt(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value))
+}
+
 export default function FilesPage() {
   const { network, organizationId } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
   const { files, isLoading, isError, error } = useWorkspaceFiles()
   const [query, setQuery] = useState("")
+  const [typeFilter, setTypeFilter] = useState("all")
   const [previewFileId, setPreviewFileId] = useState<string>()
-  const [sort, setSort] = useState<{
-    key: FileSortKey
-    direction: "asc" | "desc"
-  }>({
+  const [sort, setSort] = useState<DataTableSort<FileSortKey>>({
     key: "createdAt",
     direction: "desc",
   })
@@ -57,41 +84,29 @@ export default function FilesPage() {
     if (network && file.networkId !== network.id) {
       return false
     }
-
     if (organizationId && file.organizationId !== organizationId) {
       return false
     }
-
     return true
   })
-  const searched = scoped.filter((file) => {
-    const needle = query.trim().toLowerCase()
-    if (!needle) {
-      return true
+  const filtered = scoped.filter((file) => {
+    if (typeFilter !== "all" && fileTypeBucket(file) !== typeFilter) {
+      return false
     }
 
-    const organization = organizationsById.get(file.organizationId)?.name ?? ""
-    return [file.filename, file.contentType, organization, file.id]
-      .join(" ")
-      .toLowerCase()
-      .includes(needle)
+    return matchesQuery(query, [
+      file.filename,
+      file.contentType,
+      fileKindLabel(file),
+      organizationsById.get(file.organizationId)?.name,
+      file.id,
+    ])
   })
-  const rows = [...searched].sort((left, right) => {
+  const rows = [...filtered].sort((left, right) => {
     const result = compareFiles(left, right, sort.key, organizationsById)
     return sort.direction === "asc" ? result : -result
   })
-
-  function toggleSort(key: FileSortKey) {
-    setSort((current) =>
-      current.key === key
-        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
-        : {
-            key,
-            direction:
-              key === "createdAt" || key === "sizeBytes" ? "desc" : "asc",
-          }
-    )
-  }
+  const filtersActive = query.trim().length > 0 || typeFilter !== "all"
 
   function hrefFor(file: StoredFile) {
     return networkWorkspacePath({
@@ -105,151 +120,133 @@ export default function FilesPage() {
     ? rows.find((file) => file.id === previewFileId)
     : undefined
 
+  const columns: DataTableColumn<StoredFile, FileSortKey>[] = [
+    {
+      key: "preview",
+      label: "Preview",
+      sortable: false,
+      className: "w-14",
+      render: (file) => (
+        <button
+          type="button"
+          onClick={() => setPreviewFileId(file.id)}
+          className="rounded-sm"
+        >
+          <FileThumbnail file={file} className="size-10" />
+          <span className="sr-only">Preview {file.filename}</span>
+        </button>
+      ),
+    },
+    {
+      key: "filename",
+      label: "Filename",
+      render: (file) => (
+        <button
+          type="button"
+          onClick={() => setPreviewFileId(file.id)}
+          className="block max-w-[22rem] truncate text-left font-medium hover:underline"
+        >
+          {file.filename}
+        </button>
+      ),
+    },
+    {
+      key: "contentType",
+      label: "Type",
+      className: "text-muted-foreground",
+      render: (file) => (
+        <DataTableCellLink to={hrefFor(file)}>
+          {fileKindLabel(file)}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "sizeBytes",
+      label: "Size",
+      className: "font-mono tabular-nums",
+      render: (file) => (
+        <DataTableCellLink to={hrefFor(file)}>
+          {formatFileSize(file.sizeBytes)}
+        </DataTableCellLink>
+      ),
+    },
+    ...(!organizationId
+      ? [
+          {
+            key: "organization" as const,
+            label: "Organization",
+            className: "text-muted-foreground",
+            render: (file: StoredFile) => (
+              <DataTableCellLink to={hrefFor(file)}>
+                {organizationsById.get(file.organizationId)?.name ??
+                  file.organizationId}
+              </DataTableCellLink>
+            ),
+          },
+        ]
+      : []),
+    {
+      key: "createdAt",
+      label: "Created",
+      className: "text-muted-foreground",
+      render: (file) => (
+        <DataTableCellLink to={hrefFor(file)} className="whitespace-nowrap">
+          {formatCreatedAt(file.createdAt)}
+        </DataTableCellLink>
+      ),
+    },
+  ]
+
   return (
-    <div className="flex h-[calc(100svh-var(--app-header-height))] min-h-0 flex-col gap-4 overflow-hidden bg-muted/40 p-4 sm:p-6">
-      <div className="shrink-0">
-        <h1 className="text-2xl font-semibold tracking-tight">Files</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Uploaded files referenced from record data. Click a file to preview
-          it, or open the row for the full page.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-md">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search files..."
-            className="h-8 pl-8"
+    <DataTablePage
+      title="Files"
+      description="Uploaded files referenced from record data. Click a file to preview it, or open the row for the full page."
+    >
+      <DataTableToolbar
+        query={query}
+        onQueryChange={setQuery}
+        searchPlaceholder="Search files..."
+        filters={
+          <DataTableFilter
+            label="Filter by type"
+            value={typeFilter}
+            onChange={setTypeFilter}
+            className="sm:w-40"
+            options={fileTypeOptions}
           />
-        </div>
-        <p className="text-sm text-muted-foreground tabular-nums">
-          {isLoading
-            ? "Loading files..."
-            : rows.length === scoped.length
-              ? `${scoped.length} files`
-              : `${rows.length} of ${scoped.length} files`}
-        </p>
-      </div>
-
+        }
+        count={dataTableCount({
+          isLoading,
+          loadingLabel: "Loading files...",
+          visible: rows.length,
+          total: scoped.length,
+          singular: "file",
+        })}
+      />
       {isError ? (
         <p className="text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load files")}
         </p>
       ) : (
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-xl border bg-background shadow-xs">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-14">Preview</TableHead>
-                <FileHead
-                  label="Filename"
-                  sortKey="filename"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-                <FileHead
-                  label="Type"
-                  sortKey="contentType"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-                <FileHead
-                  label="Size"
-                  sortKey="sizeBytes"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-                {!organizationId ? (
-                  <FileHead
-                    label="Organization"
-                    sortKey="organization"
-                    sort={sort}
-                    onSort={toggleSort}
-                  />
-                ) : null}
-                <FileHead
-                  label="Created"
-                  sortKey="createdAt"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length > 0 ? (
-                rows.map((file) => (
-                  <TableRow key={file.id}>
-                    <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewFileId(file.id)}
-                        className="rounded-sm"
-                      >
-                        <FileThumbnail file={file} className="size-10" />
-                        <span className="sr-only">Preview {file.filename}</span>
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewFileId(file.id)}
-                        className="block max-w-[22rem] truncate text-left font-medium hover:underline"
-                      >
-                        {file.filename}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <Link to={hrefFor(file)} className="block truncate">
-                        {fileKindLabel(file)}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="font-mono tabular-nums">
-                      <Link to={hrefFor(file)} className="block">
-                        {formatFileSize(file.sizeBytes)}
-                      </Link>
-                    </TableCell>
-                    {!organizationId ? (
-                      <TableCell className="text-muted-foreground">
-                        <Link to={hrefFor(file)} className="block truncate">
-                          {organizationsById.get(file.organizationId)?.name ??
-                            file.organizationId}
-                        </Link>
-                      </TableCell>
-                    ) : null}
-                    <TableCell className="text-muted-foreground">
-                      <Link
-                        to={hrefFor(file)}
-                        className="block whitespace-nowrap"
-                      >
-                        {new Intl.DateTimeFormat("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        }).format(new Date(file.createdAt))}
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={organizationId ? 5 : 6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    {isLoading ? "Loading files..." : "No files match this view."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          sort={sort}
+          onSort={(key) =>
+            setSort((current) =>
+              toggleSort(current, key, ["createdAt", "sizeBytes"])
+            )
+          }
+          getRowId={(file) => file.id}
+          empty={
+            isLoading
+              ? "Loading files..."
+              : filtersActive
+                ? "No files match this view."
+                : "No files yet."
+          }
+        />
       )}
-
       <FilePreviewDialog
         file={previewFile}
         open={Boolean(previewFileId)}
@@ -260,40 +257,7 @@ export default function FilesPage() {
         }}
         href={previewFile ? hrefFor(previewFile) : undefined}
       />
-    </div>
-  )
-}
-
-function FileHead({
-  label,
-  sortKey,
-  sort,
-  onSort,
-}: {
-  label: string
-  sortKey: FileSortKey
-  sort: { key: FileSortKey; direction: "asc" | "desc" }
-  onSort: (key: FileSortKey) => void
-}) {
-  const direction = sort.key === sortKey ? sort.direction : undefined
-  const Icon =
-    direction === "asc"
-      ? ArrowUpIcon
-      : direction === "desc"
-        ? ArrowDownIcon
-        : ChevronsUpDownIcon
-
-  return (
-    <TableHead>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-foreground"
-      >
-        {label}
-        <Icon className="size-3.5 opacity-60" />
-      </button>
-    </TableHead>
+    </DataTablePage>
   )
 }
 
@@ -306,21 +270,19 @@ function compareFiles(
   if (key === "sizeBytes") {
     return left.sizeBytes - right.sizeBytes
   }
-
   if (key === "createdAt") {
     return (
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
     )
   }
-
   if (key === "organization") {
-    const leftName = organizationsById.get(left.organizationId)?.name ?? ""
-    const rightName = organizationsById.get(right.organizationId)?.name ?? ""
-    return leftName.localeCompare(rightName)
+    return compareText(
+      organizationsById.get(left.organizationId)?.name ?? "",
+      organizationsById.get(right.organizationId)?.name ?? ""
+    )
   }
-
-  return String(left[key]).localeCompare(String(right[key]), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  })
+  if (key === "contentType") {
+    return compareText(fileKindLabel(left), fileKindLabel(right))
+  }
+  return compareText(left.filename, right.filename)
 }

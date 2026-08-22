@@ -1,280 +1,228 @@
-import { Link } from "react-router"
-import {
-  ArrowRightIcon,
-  EllipsisIcon,
-  GalleryVerticalEndIcon,
-  MapPinIcon,
-  PlusIcon,
-  Settings2Icon,
-  UsersIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { useMemo, useState } from "react"
+import { PlusIcon } from "lucide-react"
 
-import { type Network, type Organization } from "@/data/networks"
+import {
+  DataTable,
+  DataTableCellLink,
+  DataTableFilter,
+  DataTablePage,
+  DataTableToolbar,
+  compareText,
+  dataTableCount,
+  matchesQuery,
+  toggleSort,
+  type DataTableColumn,
+  type DataTableSort,
+} from "@/components/data-table"
+import { StatusBadge } from "@/components/json-definition-card"
+import { useCreateEntity } from "@/components/create-entity"
+import { Button } from "@/components/ui/button"
+import type { Network, Organization } from "@/data/networks"
 import {
   networkWorkspacePath,
   useWorkspaceNetworks,
 } from "@/lib/network-workspace"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { useCreateEntity } from "@/components/create-entity"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { getBadgeColor, statusBadgeConfig, type BadgeColor } from "@/lib/badge"
-import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 
-function StatusBadge({ status }: { status: string }) {
-  const config = statusBadgeConfig[status]
-  const Icon = config?.icon ?? statusBadgeConfig.Active.icon
-  const tone = getBadgeColor(config?.color)
+type OrganizationSortKey =
+  | "name"
+  | "status"
+  | "type"
+  | "location"
+  | "network"
+  | "members"
 
-  return (
-    <span className="inline-flex" title={status}>
-      <Icon className={cn("size-4", tone.fg)} />
-      <span className="sr-only">{status}</span>
-    </span>
-  )
-}
-
-function EntityCard({
-  to,
-  name,
-  subtitle,
-  status,
-  color,
-  icon: Icon,
-}: {
-  to: string
-  name: string
-  subtitle: string
-  status?: string
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
-
-  return (
-    <Link
-      to={to}
-      className="group flex min-h-[88px] min-w-0 items-center gap-3.5 overflow-hidden rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
-    >
-      <div
-        className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-lg",
-          tone.bg,
-          tone.text
-        )}
-      >
-        <Icon className="size-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <p className="min-w-0 truncate font-medium">{name}</p>
-          {status ? (
-            <span className="shrink-0">
-              <StatusBadge status={status} />
-            </span>
-          ) : null}
-        </div>
-        <p className="text-sm wrap-break-word text-muted-foreground sm:truncate">
-          {subtitle}
-        </p>
-      </div>
-    </Link>
-  )
-}
-
-function OrganizationSection({
-  organization,
-  network,
-}: {
+type OrganizationRow = {
   organization: Organization
   network: Network
-}) {
-  const organizationHref = networkWorkspacePath({
-    networkId: network.id,
-    organizationId: organization.id,
-  })
-
-  return (
-    <section className="flex min-w-0 flex-col gap-5 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">
-              {organization.name}
-            </h2>
-            <StatusBadge status={organization.status} />
-            {organization.type ? (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                {organization.type}
-              </span>
-            ) : null}
-          </div>
-          {organization.description ? (
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              {organization.description}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            {organization.location ? (
-              <span className="inline-flex items-center gap-1">
-                <MapPinIcon className="size-3.5" />
-                {organization.location}
-              </span>
-            ) : null}
-            {organization.members > 0 ? (
-              <span className="inline-flex items-center gap-1">
-                <UsersIcon className="size-3.5" />
-                {organization.members} members
-              </span>
-            ) : null}
-            <span>
-              {network.schemas.length} schemas ·{" "}
-              {network.workflowDefinitions.length} workflows ·{" "}
-              {network.pipelineDefinitions.length} pipelines
-            </span>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Link
-            to={organizationHref}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <Settings2Icon />
-            Settings
-          </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline" size="icon-sm" />}
-            >
-              <EllipsisIcon />
-              <span className="sr-only">More actions</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuItem render={<Link to={organizationHref} />}>
-                  View organization
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  render={<Link to={`/app/networks/${network.id}`} />}
-                >
-                  View network
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  render={
-                    <Link
-                      to={networkWorkspacePath({
-                        networkId: network.id,
-                        organizationId: organization.id,
-                        rest: "schemas",
-                      })}
-                    />
-                  }
-                >
-                  View schemas
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  render={
-                    <Link
-                      to={networkWorkspacePath({
-                        networkId: network.id,
-                        organizationId: organization.id,
-                        rest: "workflow-definitions",
-                      })}
-                    />
-                  }
-                >
-                  View workflows
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="text-sm font-medium text-muted-foreground">Network</h3>
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <EntityCard
-            to={`/app/networks/${network.id}`}
-            name={network.name}
-            status={network.status}
-            color={network.color}
-            icon={GalleryVerticalEndIcon}
-            subtitle={
-              [network.industry, network.headquarters, network.coverage]
-                .filter(Boolean)
-                .join(" · ") || network.summary
-            }
-          />
-        </div>
-      </div>
-
-      <Link
-        to={organizationHref}
-        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-      >
-        View organization
-        <ArrowRightIcon className="size-3.5" />
-      </Link>
-    </section>
-  )
 }
 
 export default function OrganizationList() {
   const { openCreateOrganization } = useCreateEntity()
   const { networks, isLoading, isError, error } = useWorkspaceNetworks()
-  const items = networks.flatMap((network) =>
-    network.organizations.map((organization) => ({ organization, network }))
+  const [query, setQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [sort, setSort] = useState<DataTableSort<OrganizationSortKey>>({
+    key: "name",
+    direction: "asc",
+  })
+  const items = useMemo(
+    () =>
+      networks.flatMap((network) =>
+        network.organizations.map((organization) => ({ organization, network }))
+      ),
+    [networks]
   )
+  const filtered = items.filter(({ organization, network }) => {
+    if (statusFilter !== "all" && organization.status !== statusFilter) {
+      return false
+    }
+
+    return matchesQuery(query, [
+      organization.name,
+      organization.status,
+      organization.type,
+      organization.location,
+      network.name,
+      organization.id,
+    ])
+  })
+  const rows = [...filtered].sort((left, right) => {
+    const result = compareOrganizations(left, right, sort.key)
+    return sort.direction === "asc" ? result : -result
+  })
+  const filtersActive = query.trim().length > 0 || statusFilter !== "all"
+
+  function hrefFor(row: OrganizationRow) {
+    return networkWorkspacePath({
+      networkId: row.network.id,
+      organizationId: row.organization.id,
+    })
+  }
+
+  const columns: DataTableColumn<OrganizationRow, OrganizationSortKey>[] = [
+    {
+      key: "name",
+      label: "Name",
+      render: (row) => (
+        <DataTableCellLink
+          to={hrefFor(row)}
+          className="max-w-[22rem] font-medium"
+        >
+          {row.organization.name}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <DataTableCellLink
+          to={hrefFor(row)}
+          className="inline-flex items-center gap-1.5"
+        >
+          <StatusBadge status={row.organization.status} />
+          <span className="text-muted-foreground">
+            {row.organization.status}
+          </span>
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "type",
+      label: "Type",
+      className: "text-muted-foreground",
+      render: (row) => (
+        <DataTableCellLink to={hrefFor(row)}>
+          {row.organization.type || "—"}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "location",
+      label: "Location",
+      className: "text-muted-foreground",
+      render: (row) => (
+        <DataTableCellLink to={hrefFor(row)}>
+          {row.organization.location || "—"}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "network",
+      label: "Network",
+      className: "text-muted-foreground",
+      render: (row) => (
+        <DataTableCellLink to={hrefFor(row)}>
+          {row.network.name}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "members",
+      label: "Members",
+      className: "tabular-nums text-muted-foreground",
+      render: (row) => (
+        <DataTableCellLink to={hrefFor(row)}>
+          {row.organization.members}
+        </DataTableCellLink>
+      ),
+    },
+  ]
+
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            All Organizations
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Organizations belong to a network. They can use shared network
-            schemas and define their own. Open a card to inspect a member, or
-            view the full organization.
-          </p>
-        </div>
+    <DataTablePage
+      title="All Organizations"
+      description="Organizations belong to a network. They can use shared network schemas and define their own."
+      action={
         <Button onClick={() => openCreateOrganization()}>
           <PlusIcon />
           Create an organization
         </Button>
-      </div>
-
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">
-          Loading organizations...
-        </p>
-      ) : isError ? (
+      }
+    >
+      <DataTableToolbar
+        query={query}
+        onQueryChange={setQuery}
+        searchPlaceholder="Search organizations..."
+        filters={
+          <DataTableFilter
+            label="Filter by status"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            className="sm:w-40"
+            options={[
+              { value: "all", label: "All statuses" },
+              { value: "Active", label: "Active" },
+              { value: "Draft", label: "Draft" },
+            ]}
+          />
+        }
+        count={dataTableCount({
+          isLoading,
+          loadingLabel: "Loading organizations...",
+          visible: rows.length,
+          total: items.length,
+          singular: "organization",
+        })}
+      />
+      {isError ? (
         <p className="text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load organizations")}
         </p>
-      ) : items.length === 0 ? (
-        <div className="rounded-2xl bg-card p-6 text-sm text-muted-foreground shadow-xs ring-1 ring-foreground/10">
-          You do not have any organizations yet. Create one to get started.
-        </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          {items.map(({ organization, network }) => (
-            <OrganizationSection
-              key={organization.id}
-              organization={organization}
-              network={network}
-            />
-          ))}
-        </div>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          sort={sort}
+          onSort={(key) => setSort((current) => toggleSort(current, key))}
+          getRowId={(row) => row.organization.id}
+          empty={
+            isLoading
+              ? "Loading organizations..."
+              : filtersActive
+                ? "No organizations match this view."
+                : "You do not have any organizations yet. Create one to get started."
+          }
+        />
       )}
-    </div>
+    </DataTablePage>
+  )
+}
+
+function compareOrganizations(
+  left: OrganizationRow,
+  right: OrganizationRow,
+  key: OrganizationSortKey
+) {
+  if (key === "network") {
+    return compareText(left.network.name, right.network.name)
+  }
+  if (key === "members") {
+    return left.organization.members - right.organization.members
+  }
+  return compareText(
+    String(left.organization[key] ?? ""),
+    String(right.organization[key] ?? "")
   )
 }

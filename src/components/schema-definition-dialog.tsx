@@ -1,14 +1,27 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react"
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react"
 import { useNavigate } from "react-router"
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  CopyPlusIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
-import { ColorPicker } from "@/components/color-picker"
+import {
+  DefinitionDialogBody,
+  DefinitionJsonPane,
+  definitionDialogClassName,
+} from "@/components/definition-dialog-layout"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -30,7 +43,6 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import type { JsonSchemaPropertySpec } from "@/data/define-records"
 import { getSchema, updateSchema } from "@/data/networks"
-import { type BadgeColor } from "@/lib/badge"
 import {
   getJsonSchemaProperties,
   parseJsonObject,
@@ -45,6 +57,7 @@ import {
   workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
 import { slugifyId, toFieldName } from "@/lib/slug"
+import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import {
   useCreateSchemaMutation,
@@ -60,7 +73,29 @@ const propertyTypes = [
   "object",
 ] as const
 
+const propertyTypeLabels: Record<(typeof propertyTypes)[number], string> = {
+  string: "Text",
+  number: "Number",
+  integer: "Integer",
+  boolean: "Yes / No",
+  array: "List",
+  object: "Object",
+}
+
 const formatOptions = ["", "date", "date-time", "email", "uri", "file"] as const
+
+const formatLabels: Record<
+  Exclude<(typeof formatOptions)[number], "">,
+  string
+> = {
+  date: "Date",
+  "date-time": "Date & time",
+  email: "Email",
+  uri: "URL",
+  file: "File",
+}
+
+const itemTypes = ["string", "number", "integer", "boolean"] as const
 
 type PropertyType = (typeof propertyTypes)[number]
 type PropertyFormat = (typeof formatOptions)[number]
@@ -73,19 +108,23 @@ type PropertyDraft = {
   description: string
   format: PropertyFormat
   enumText: string
-  itemsType: "string" | "number" | "integer" | "boolean"
+  itemsType: (typeof itemTypes)[number]
 }
 
-function emptyProperty(index: number): PropertyDraft {
+function emptyProperty(
+  key: string,
+  defaults?: Partial<PropertyDraft>
+): PropertyDraft {
   return {
-    key: `property-${index}`,
-    name: index === 1 ? "id" : `field${index}`,
+    key,
+    name: "",
     type: "string",
-    required: index === 1,
+    required: false,
     description: "",
     format: "",
     enumText: "",
     itemsType: "string",
+    ...defaults,
   }
 }
 
@@ -205,7 +244,7 @@ function toSchemaInput(properties: PropertyDraft[]) {
       description: property.description.trim() || name,
     }
 
-    if (property.format) {
+    if (property.format && property.type === "string") {
       spec.format = property.format
     }
 
@@ -256,6 +295,7 @@ export function SchemaDefinitionDialog({
   const editing = Boolean(schemaId)
   const lockNetwork = Boolean(networkId)
   const lockOrganization = Boolean(organizationId)
+  const propertyKeyRef = useRef(1)
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? existing?.network.id ?? networks[0]?.id ?? ""
   )
@@ -266,18 +306,26 @@ export function SchemaDefinitionDialog({
   const [slug, setSlug] = useState("")
   const [slugTouched, setSlugTouched] = useState(false)
   const [description, setDescription] = useState("")
-  const [color, setColor] = useState<BadgeColor>("purple")
   const [active, setActive] = useState(false)
-  const [internal, setInternal] = useState(false)
-  const [properties, setProperties] = useState<PropertyDraft[]>([
-    emptyProperty(1),
+  const [properties, setProperties] = useState<PropertyDraft[]>(() => [
+    emptyProperty("property-1", { name: "id", required: true }),
   ])
+  const [focusKey, setFocusKey] = useState<string | null>(null)
   const [definitionBase, setDefinitionBase] = useState<JsonObject | undefined>()
   const [jsonText, setJsonText] = useState("")
   const [jsonError, setJsonError] = useState<string | null>(null)
   const jsonSourceRef = useRef<"builder" | "json">("builder")
 
   const firstNetworkId = networks[0]?.id ?? ""
+
+  function nextPropertyKey() {
+    propertyKeyRef.current += 1
+    return `property-${propertyKeyRef.current}`
+  }
+
+  function createProperty(defaults?: Partial<PropertyDraft>) {
+    return emptyProperty(nextPropertyKey(), defaults)
+  }
 
   useEffect(() => {
     if (open) {
@@ -305,16 +353,16 @@ export function SchemaDefinitionDialog({
         ? current.definition.description
         : ""
     )
-    setColor(current?.color ?? "purple")
     setActive(current?.active ?? false)
-    setInternal(current?.internal ?? false)
     jsonSourceRef.current = "builder"
     setDefinitionBase(current?.definition)
     setJsonError(null)
+    setFocusKey(null)
+    propertyKeyRef.current = 1
     setProperties(
       current
         ? draftsFromProperties(getJsonSchemaProperties(current.definition))
-        : [emptyProperty(1)]
+        : [emptyProperty("property-1", { name: "id", required: true })]
     )
   }, [apiSchemaQuery.data, open, schemaId])
 
@@ -357,6 +405,9 @@ export function SchemaDefinitionDialog({
   const networkOrganizations = organizations.filter(
     (organization) => organization.networkId === selectedNetworkId
   )
+  const requiredCount = properties.filter(
+    (property) => property.required
+  ).length
 
   const generatedDefinition = useMemo(
     () =>
@@ -432,9 +483,13 @@ export function SchemaDefinitionDialog({
 
   function updateProperty(key: string, patch: Partial<PropertyDraft>) {
     markBuilderSource()
+    const nextPatch =
+      patch.type && patch.type !== "string"
+        ? { ...patch, format: "" as const, enumText: "" }
+        : patch
     setProperties((current) =>
       current.map((property) =>
-        property.key === key ? { ...property, ...patch } : property
+        property.key === key ? { ...property, ...nextPatch } : property
       )
     )
   }
@@ -454,6 +509,31 @@ export function SchemaDefinitionDialog({
     })
   }
 
+  function addProperty() {
+    markBuilderSource()
+    const next = createProperty()
+    setProperties((current) => [...current, next])
+    setFocusKey(next.key)
+  }
+
+  function duplicateProperty(index: number) {
+    markBuilderSource()
+    const source = properties[index]
+    if (!source) {
+      return
+    }
+    const copy = createProperty({
+      ...source,
+      name: source.name ? `${source.name}Copy` : "",
+    })
+    setProperties((current) => {
+      const next = [...current]
+      next.splice(index + 1, 0, copy)
+      return next
+    })
+    setFocusKey(copy.key)
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!name.trim() || !selectedNetworkId || jsonError) {
@@ -464,9 +544,7 @@ export function SchemaDefinitionDialog({
       name,
       slug: slugTouched ? slug : slugifyId(name),
       description,
-      color,
       active,
-      internal,
       ...toSchemaInput(properties),
     }
 
@@ -502,7 +580,7 @@ export function SchemaDefinitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="full">
+      <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
             {editing ? "Edit schema" : "Create a schema"}
@@ -519,55 +597,69 @@ export function SchemaDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-            <FieldGroup>
+          <DefinitionDialogBody
+            json={
+              <DefinitionJsonPane
+                id={`${formId}-json`}
+                title="JSON Schema"
+                description="Updates as you edit fields. Paste a schema to fill the builder."
+                value={jsonText}
+                onChange={handleJsonChange}
+                onBlur={handleJsonBlur}
+                error={jsonError}
+              />
+            }
+          >
+            <FieldGroup className="gap-4">
               {networks.length > 0 && !editing ? (
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
-                  <NativeSelect
-                    id={`${formId}-network`}
-                    value={selectedNetworkId}
-                    disabled={lockNetwork || isLoading}
-                    onChange={(event) => {
-                      setSelectedNetworkId(event.target.value)
-                      setSelectedOrganizationId("")
-                    }}
-                    required
-                  >
-                    {networks.map((network) => (
-                      <NativeSelectOption key={network.id} value={network.id}>
-                        {network.name}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor={`${formId}-network`}>
+                      Network
+                    </FieldLabel>
+                    <NativeSelect
+                      id={`${formId}-network`}
+                      value={selectedNetworkId}
+                      disabled={lockNetwork || isLoading}
+                      onChange={(event) => {
+                        setSelectedNetworkId(event.target.value)
+                        setSelectedOrganizationId("")
+                      }}
+                      required
+                    >
+                      {networks.map((network) => (
+                        <NativeSelectOption key={network.id} value={network.id}>
+                          {network.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor={`${formId}-organization`}>
+                      Organization
+                    </FieldLabel>
+                    <NativeSelect
+                      id={`${formId}-organization`}
+                      value={selectedOrganizationId}
+                      disabled={lockOrganization || isLoading}
+                      onChange={(event) =>
+                        setSelectedOrganizationId(event.target.value)
+                      }
+                    >
+                      <NativeSelectOption value="">
+                        Entire network
                       </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
-              ) : null}
-              {networks.length > 0 && !editing ? (
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-organization`}>
-                    Organization
-                  </FieldLabel>
-                  <NativeSelect
-                    id={`${formId}-organization`}
-                    value={selectedOrganizationId}
-                    disabled={lockOrganization || isLoading}
-                    onChange={(event) =>
-                      setSelectedOrganizationId(event.target.value)
-                    }
-                  >
-                    <NativeSelectOption value="">
-                      Entire network
-                    </NativeSelectOption>
-                    {networkOrganizations.map((organization) => (
-                      <NativeSelectOption
-                        key={organization.id}
-                        value={organization.id}
-                      >
-                        {organization.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
+                      {networkOrganizations.map((organization) => (
+                        <NativeSelectOption
+                          key={organization.id}
+                          value={organization.id}
+                        >
+                          {organization.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                </div>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
@@ -606,37 +698,28 @@ export function SchemaDefinitionDialog({
                   />
                 </Field>
               </div>
-              <Field>
-                <FieldLabel htmlFor={`${formId}-description`}>
-                  Description
-                </FieldLabel>
-                <Textarea
-                  id={`${formId}-description`}
-                  value={description}
-                  onChange={(event) => {
-                    markBuilderSource()
-                    setDescription(event.target.value)
-                  }}
-                  placeholder="What this schema represents for partner records."
-                />
-              </Field>
-              <div className="flex flex-wrap items-center gap-5">
-                <Field className="w-auto">
-                  <FieldLabel>Color</FieldLabel>
-                  <ColorPicker value={color} onChange={setColor} />
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <Field>
+                  <FieldLabel htmlFor={`${formId}-description`}>
+                    Description
+                  </FieldLabel>
+                  <Textarea
+                    id={`${formId}-description`}
+                    value={description}
+                    onChange={(event) => {
+                      markBuilderSource()
+                      setDescription(event.target.value)
+                    }}
+                    placeholder="What this schema represents for partner records."
+                    className="min-h-16"
+                  />
                 </Field>
-                <div className="flex flex-col gap-2">
+                <div className="pb-2">
                   <CheckboxField
                     id={`${formId}-active`}
                     checked={active}
                     onChange={setActive}
                     label="Published"
-                  />
-                  <CheckboxField
-                    id={`${formId}-internal`}
-                    checked={internal}
-                    onChange={setInternal}
-                    label="Internal"
                   />
                 </div>
               </div>
@@ -646,226 +729,83 @@ export function SchemaDefinitionDialog({
             </FieldGroup>
 
             <div className="flex flex-col gap-2">
-              <div>
-                <h3 className="text-sm font-medium">Properties</h3>
-                <p className="text-xs text-muted-foreground">
-                  Each property becomes a JSON Schema field and a records
-                  column.
-                </p>
-              </div>
-              {properties.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No properties yet. Paste a JSON Schema below or add a field.
-                </p>
-              ) : null}
-              {properties.map((property, index) => (
-                <div
-                  key={property.key}
-                  className="flex flex-col gap-3 rounded-xl border bg-background p-3"
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium">Properties</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {properties.length === 0
+                      ? "Add fields that become records columns."
+                      : `${properties.length} ${properties.length === 1 ? "field" : "fields"}${
+                          requiredCount > 0
+                            ? ` · ${requiredCount} required`
+                            : ""
+                        }`}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addProperty}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {index + 1}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        disabled={index === 0}
-                        onClick={() => moveProperty(index, -1)}
-                      >
-                        <ChevronUpIcon />
-                        <span className="sr-only">Move up</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        disabled={index === properties.length - 1}
-                        onClick={() => moveProperty(index, 1)}
-                      >
-                        <ChevronDownIcon />
-                        <span className="sr-only">Move down</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={() => {
-                          markBuilderSource()
-                          setProperties((current) =>
-                            current.filter((item) => item.key !== property.key)
-                          )
-                        }}
-                      >
-                        <Trash2Icon />
-                        <span className="sr-only">Remove property</span>
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <Field>
-                      <FieldLabel>Name</FieldLabel>
-                      <Input
-                        value={property.name}
-                        onChange={(event) =>
-                          updateProperty(property.key, {
-                            name: event.target.value,
-                          })
-                        }
-                        placeholder="shipmentId"
-                        className="font-mono"
-                        required
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel>Type</FieldLabel>
-                      <NativeSelect
-                        value={property.type}
-                        onChange={(event) =>
-                          updateProperty(property.key, {
-                            type: asPropertyType(event.target.value),
-                          })
-                        }
-                      >
-                        {propertyTypes.map((type) => (
-                          <NativeSelectOption key={type} value={type}>
-                            {type}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </Field>
-                    <Field>
-                      <FieldLabel>Format</FieldLabel>
-                      <NativeSelect
-                        value={property.format}
-                        onChange={(event) =>
-                          updateProperty(property.key, {
-                            format: asFormat(event.target.value),
-                          })
-                        }
-                      >
-                        <NativeSelectOption value="">None</NativeSelectOption>
-                        {formatOptions.filter(Boolean).map((format) => (
-                          <NativeSelectOption key={format} value={format}>
-                            {format}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </Field>
-                    {property.type === "array" ? (
-                      <Field>
-                        <FieldLabel>Item type</FieldLabel>
-                        <NativeSelect
-                          value={property.itemsType}
-                          onChange={(event) =>
-                            updateProperty(property.key, {
-                              itemsType: event.target
-                                .value as PropertyDraft["itemsType"],
-                            })
-                          }
-                        >
-                          {["string", "number", "integer", "boolean"].map(
-                            (type) => (
-                              <NativeSelectOption key={type} value={type}>
-                                {type}
-                              </NativeSelectOption>
-                            )
-                          )}
-                        </NativeSelect>
-                      </Field>
-                    ) : (
-                      <div className="flex items-end pb-1">
-                        <CheckboxField
-                          checked={property.required}
-                          onChange={(checked) =>
-                            updateProperty(property.key, { required: checked })
-                          }
-                          label="Required"
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {property.type === "array" ? (
-                    <CheckboxField
-                      checked={property.required}
-                      onChange={(checked) =>
-                        updateProperty(property.key, { required: checked })
-                      }
-                      label="Required"
-                    />
-                  ) : null}
-                  <Field>
-                    <FieldLabel>Description</FieldLabel>
-                    <Input
-                      value={property.description}
-                      onChange={(event) =>
-                        updateProperty(property.key, {
-                          description: event.target.value,
-                        })
-                      }
-                      placeholder="What this field stores"
-                    />
-                  </Field>
-                  {property.type === "string" ? (
-                    <Field>
-                      <FieldLabel>Enum values</FieldLabel>
-                      <Input
-                        value={property.enumText}
-                        onChange={(event) =>
-                          updateProperty(property.key, {
-                            enumText: event.target.value,
-                          })
-                        }
-                        placeholder="draft, published, archived"
-                      />
-                    </Field>
-                  ) : null}
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="self-start"
-                onClick={() => {
-                  markBuilderSource()
-                  setProperties((current) => [
-                    ...current,
-                    emptyProperty(current.length + 1),
-                  ])
-                }}
-              >
-                <PlusIcon />
-                Add property
-              </Button>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border bg-muted/30">
-              <div className="border-b px-3 py-2">
-                <p className="text-xs font-medium">JSONB preview</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Paste a JSON Schema to fill the builder, or edit properties
-                  above to update this definition.
-                </p>
+                  <PlusIcon />
+                  Add field
+                </Button>
               </div>
-              <Textarea
-                id={`${formId}-json`}
-                value={jsonText}
-                onChange={(event) => handleJsonChange(event.target.value)}
-                onBlur={handleJsonBlur}
-                spellCheck={false}
-                aria-invalid={jsonError ? true : undefined}
-                className="max-h-64 min-h-48 resize-y rounded-none border-0 bg-transparent font-mono text-[12px] leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
-              />
-              {jsonError ? (
-                <div className="border-t px-3 py-2">
-                  <FieldError>{jsonError}</FieldError>
+
+              {properties.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={addProperty}
+                  className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                >
+                  <PlusIcon className="size-4" />
+                  Add a field, or paste a JSON Schema on the right.
+                </button>
+              ) : (
+                <div className="overflow-hidden rounded-xl border bg-background">
+                  <div className="hidden grid-cols-[minmax(0,1.3fr)_8.5rem_minmax(7rem,0.9fr)_4.75rem_auto] gap-2 border-b bg-muted/40 px-3 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase sm:grid">
+                    <span>Name</span>
+                    <span>Type</span>
+                    <span>Options</span>
+                    <span>Required</span>
+                    <span className="sr-only">Actions</span>
+                  </div>
+                  {properties.map((property, index) => (
+                    <PropertyRow
+                      key={property.key}
+                      property={property}
+                      index={index}
+                      total={properties.length}
+                      focus={property.key === focusKey}
+                      onUpdate={(patch) => updateProperty(property.key, patch)}
+                      onMove={(offset) => moveProperty(index, offset)}
+                      onDuplicate={() => duplicateProperty(index)}
+                      onRemove={() => {
+                        markBuilderSource()
+                        setProperties((current) =>
+                          current.filter((item) => item.key !== property.key)
+                        )
+                      }}
+                      onNameEnter={() => {
+                        if (index === properties.length - 1) {
+                          addProperty()
+                        }
+                      }}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addProperty}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                  >
+                    <PlusIcon className="size-3.5" />
+                    Add field
+                  </button>
                 </div>
-              ) : null}
+              )}
             </div>
-          </div>
+          </DefinitionDialogBody>
           <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={isLoading} />}
@@ -891,5 +831,183 @@ export function SchemaDefinitionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function PropertyRow({
+  property,
+  index,
+  total,
+  focus,
+  onUpdate,
+  onMove,
+  onDuplicate,
+  onRemove,
+  onNameEnter,
+}: {
+  property: PropertyDraft
+  index: number
+  total: number
+  focus: boolean
+  onUpdate: (patch: Partial<PropertyDraft>) => void
+  onMove: (offset: number) => void
+  onDuplicate: () => void
+  onRemove: () => void
+  onNameEnter: () => void
+}) {
+  function handleNameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") {
+      return
+    }
+    event.preventDefault()
+    onNameEnter()
+  }
+
+  return (
+    <div className="border-b last:border-b-0">
+      <div className="grid gap-2 px-3 pt-2.5 pb-2 sm:grid-cols-[minmax(0,1.3fr)_8.5rem_minmax(7rem,0.9fr)_4.75rem_auto] sm:items-center">
+        <Field className="gap-1">
+          <FieldLabel className="sm:sr-only">Name</FieldLabel>
+          <Input
+            value={property.name}
+            onChange={(event) => onUpdate({ name: event.target.value })}
+            onKeyDown={handleNameKeyDown}
+            placeholder="fieldName"
+            className="font-mono"
+            autoFocus={focus}
+            required
+            aria-label={`Property ${index + 1} name`}
+          />
+        </Field>
+        <Field className="gap-1">
+          <FieldLabel className="sm:sr-only">Type</FieldLabel>
+          <NativeSelect
+            value={property.type}
+            aria-label={`Property ${index + 1} type`}
+            onChange={(event) =>
+              onUpdate({ type: asPropertyType(event.target.value) })
+            }
+          >
+            {propertyTypes.map((type) => (
+              <NativeSelectOption key={type} value={type}>
+                {propertyTypeLabels[type]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field className="gap-1">
+          <FieldLabel className="sm:sr-only">
+            {property.type === "array" ? "Item type" : "Format"}
+          </FieldLabel>
+          {property.type === "string" ? (
+            <NativeSelect
+              value={property.format}
+              aria-label={`Property ${index + 1} format`}
+              onChange={(event) =>
+                onUpdate({ format: asFormat(event.target.value) })
+              }
+            >
+              <NativeSelectOption value="">No format</NativeSelectOption>
+              {(["date", "date-time", "email", "uri", "file"] as const).map(
+                (format) => (
+                  <NativeSelectOption key={format} value={format}>
+                    {formatLabels[format]}
+                  </NativeSelectOption>
+                )
+              )}
+            </NativeSelect>
+          ) : property.type === "array" ? (
+            <NativeSelect
+              value={property.itemsType}
+              aria-label={`Property ${index + 1} item type`}
+              onChange={(event) =>
+                onUpdate({
+                  itemsType: event.target.value as PropertyDraft["itemsType"],
+                })
+              }
+            >
+              {itemTypes.map((type) => (
+                <NativeSelectOption key={type} value={type}>
+                  {propertyTypeLabels[type]} items
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          ) : (
+            <p className="flex h-8 items-center text-xs text-muted-foreground">
+              —
+            </p>
+          )}
+        </Field>
+        <div className="flex h-8 items-center">
+          <CheckboxField
+            checked={property.required}
+            onChange={(checked) => onUpdate({ required: checked })}
+            label={<span className="sm:sr-only">Required</span>}
+          />
+        </div>
+        <div className="flex items-center justify-end gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={index === 0}
+            onClick={() => onMove(-1)}
+          >
+            <ChevronUpIcon />
+            <span className="sr-only">Move up</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={index === total - 1}
+            onClick={() => onMove(1)}
+          >
+            <ChevronDownIcon />
+            <span className="sr-only">Move down</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={onDuplicate}
+          >
+            <CopyPlusIcon />
+            <span className="sr-only">Duplicate</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={onRemove}
+          >
+            <Trash2Icon />
+            <span className="sr-only">Remove property</span>
+          </Button>
+        </div>
+      </div>
+      <div
+        className={cn(
+          "grid gap-2 px-3 pb-2.5 sm:grid-cols-2 sm:pr-[calc(4.75rem+5.5rem)]"
+        )}
+      >
+        <Input
+          value={property.description}
+          onChange={(event) => onUpdate({ description: event.target.value })}
+          placeholder="Description"
+          aria-label={`Property ${index + 1} description`}
+        />
+        {property.type === "string" ? (
+          <Input
+            value={property.enumText}
+            onChange={(event) => onUpdate({ enumText: event.target.value })}
+            placeholder="Enum values: draft, published"
+            aria-label={`Property ${index + 1} enum values`}
+          />
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+      </div>
+    </div>
   )
 }

@@ -208,11 +208,25 @@ function ActionCard({
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-background p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex size-7 items-center justify-center rounded-md bg-muted font-mono text-xs">
+      <div className="flex items-center gap-2">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted font-mono text-xs">
           {index + 1}
         </span>
-        <div className="flex items-center gap-1">
+        <NativeSelect
+          value={action.type}
+          aria-label={`Action ${index + 1} type`}
+          onChange={(event) => {
+            const type = event.target.value as WorkflowActionType
+            onChange({ type })
+          }}
+        >
+          {workflowActionTypes.map((type) => (
+            <NativeSelectOption key={type} value={type}>
+              {actionTypeLabels[type]}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+        <div className="ml-auto flex items-center gap-0.5">
           <Button
             type="button"
             variant="ghost"
@@ -245,25 +259,9 @@ function ActionCard({
           </Button>
         </div>
       </div>
-      <Field>
-        <FieldLabel>Action</FieldLabel>
-        <NativeSelect
-          value={action.type}
-          onChange={(event) => {
-            const type = event.target.value as WorkflowActionType
-            onChange({ type })
-          }}
-        >
-          {workflowActionTypes.map((type) => (
-            <NativeSelectOption key={type} value={type}>
-              {actionTypeLabels[type]}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        <p className="text-xs text-muted-foreground">
-          {actionTypeDescriptions[action.type]}
-        </p>
-      </Field>
+      <p className="text-xs text-muted-foreground">
+        {actionTypeDescriptions[action.type]}
+      </p>
       {needsSchema ? (
         <Field>
           <FieldLabel>Create on schema</FieldLabel>
@@ -404,16 +402,14 @@ export function WorkflowActionsBuilder({
           }
         />
       ))}
-      <Button
+      <button
         type="button"
-        variant="outline"
-        size="sm"
-        className="self-start"
         onClick={() => onChange([...value, emptyAction()])}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
       >
-        <PlusIcon />
+        <PlusIcon className="size-3.5" />
         Add action
-      </Button>
+      </button>
     </div>
   )
 }

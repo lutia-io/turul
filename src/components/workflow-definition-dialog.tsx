@@ -1,8 +1,20 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react"
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react"
 import { useNavigate } from "react-router"
 
 import { CheckboxField } from "@/components/checkbox-field"
 import { Button } from "@/components/ui/button"
+import {
+  DefinitionDialogBody,
+  DefinitionJsonPane,
+  definitionDialogClassName,
+} from "@/components/definition-dialog-layout"
 import {
   Dialog,
   DialogClose,
@@ -20,7 +32,6 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { Textarea } from "@/components/ui/textarea"
 import { WorkflowActionsBuilder } from "@/components/workflow-actions-builder"
 import { WorkflowCriteriaBuilder } from "@/components/workflow-criteria-builder"
 import {
@@ -322,7 +333,7 @@ export function WorkflowDefinitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="full">
+      <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
             {editing ? "Edit workflow" : "Create a workflow"}
@@ -338,33 +349,103 @@ export function WorkflowDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-            <FieldGroup>
+          <DefinitionDialogBody
+            json={
+              <DefinitionJsonPane
+                id={`${formId}-json`}
+                title="JSON definition"
+                description="Updates as you edit conditions and actions. Paste a definition to fill the builder."
+                value={jsonText}
+                onChange={handleJsonChange}
+                onBlur={handleJsonBlur}
+                error={jsonError}
+              />
+            }
+          >
+            <FieldGroup className="gap-4">
               {networks.length > 0 && !editing ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor={`${formId}-network`}>
+                      Network
+                    </FieldLabel>
+                    <NativeSelect
+                      id={`${formId}-network`}
+                      value={selectedNetworkId}
+                      disabled={lockNetwork || isLoading}
+                      onChange={(event) => {
+                        const nextId = event.target.value
+                        setSelectedNetworkId(nextId)
+                        const nextSchema = schemas.find(
+                          (schema) => schema.networkId === nextId
+                        )
+                        setSchemaId(nextSchema?.id ?? "")
+                      }}
+                      required
+                    >
+                      {networks.map((network) => (
+                        <NativeSelectOption key={network.id} value={network.id}>
+                          {network.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor={`${formId}-schema`}>
+                      Start from records of
+                    </FieldLabel>
+                    {networkSchemas.length > 0 ? (
+                      <NativeSelect
+                        id={`${formId}-schema`}
+                        value={schemaId}
+                        onChange={(event) => setSchemaId(event.target.value)}
+                        required
+                        disabled={isLoading}
+                      >
+                        {networkSchemas.map((schema) => (
+                          <NativeSelectOption key={schema.id} value={schema.id}>
+                            {schema.name}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Create a schema in this network before adding a
+                        workflow.
+                      </p>
+                    )}
+                  </Field>
+                </div>
+              ) : (
                 <Field>
-                  <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
-                  <NativeSelect
-                    id={`${formId}-network`}
-                    value={selectedNetworkId}
-                    disabled={lockNetwork || isLoading}
-                    onChange={(event) => {
-                      const nextId = event.target.value
-                      setSelectedNetworkId(nextId)
-                      const nextSchema = schemas.find(
-                        (schema) => schema.networkId === nextId
-                      )
-                      setSchemaId(nextSchema?.id ?? "")
-                    }}
-                    required
-                  >
-                    {networks.map((network) => (
-                      <NativeSelectOption key={network.id} value={network.id}>
-                        {network.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                  <FieldLabel htmlFor={`${formId}-schema`}>
+                    Start from records of
+                  </FieldLabel>
+                  {networkSchemas.length > 0 ? (
+                    <NativeSelect
+                      id={`${formId}-schema`}
+                      value={schemaId}
+                      onChange={(event) => setSchemaId(event.target.value)}
+                      required
+                      disabled={isLoading}
+                    >
+                      {networkSchemas.map((schema) => (
+                        <NativeSelectOption key={schema.id} value={schema.id}>
+                          {schema.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Create a schema in this network before adding a workflow.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    The workflow watches new records on this schema and uses its
+                    fields in conditions.
+                  </p>
                 </Field>
-              ) : null}
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
@@ -401,34 +482,6 @@ export function WorkflowDefinitionDialog({
                   />
                 </Field>
               </div>
-              <Field>
-                <FieldLabel htmlFor={`${formId}-schema`}>
-                  Start from records of
-                </FieldLabel>
-                {networkSchemas.length > 0 ? (
-                  <NativeSelect
-                    id={`${formId}-schema`}
-                    value={schemaId}
-                    onChange={(event) => setSchemaId(event.target.value)}
-                    required
-                    disabled={isLoading}
-                  >
-                    {networkSchemas.map((schema) => (
-                      <NativeSelectOption key={schema.id} value={schema.id}>
-                        {schema.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Create a schema in this network before adding a workflow.
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  The workflow watches new records on this schema and uses its
-                  fields in conditions.
-                </p>
-              </Field>
               <CheckboxField
                 id={`${formId}-active`}
                 checked={active}
@@ -458,31 +511,7 @@ export function WorkflowDefinitionDialog({
                 setActions(next)
               }}
             />
-
-            <div className="overflow-hidden rounded-xl border bg-muted/30">
-              <div className="border-b px-3 py-2">
-                <p className="text-xs font-medium">JSONB preview</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Paste a workflow definition to fill the builder, or edit
-                  conditions and actions above to update this JSON.
-                </p>
-              </div>
-              <Textarea
-                id={`${formId}-json`}
-                value={jsonText}
-                onChange={(event) => handleJsonChange(event.target.value)}
-                onBlur={handleJsonBlur}
-                spellCheck={false}
-                aria-invalid={jsonError ? true : undefined}
-                className="max-h-64 min-h-48 resize-y rounded-none border-0 bg-transparent font-mono text-[12px] leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
-              />
-              {jsonError ? (
-                <div className="border-t px-3 py-2">
-                  <FieldError>{jsonError}</FieldError>
-                </div>
-              ) : null}
-            </div>
-          </div>
+          </DefinitionDialogBody>
           <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={isLoading} />}

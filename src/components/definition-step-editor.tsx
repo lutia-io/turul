@@ -78,97 +78,105 @@ export function DefinitionStepEditor({
     onChange(next)
   }
 
+  function addStep() {
+    onChange([...steps, newFlowStep(typeOptions[0] ?? "transform", "", steps)])
+  }
+
+  if (steps.length === 0) {
+    return (
+      <button
+        type="button"
+        onClick={addStep}
+        className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+      >
+        <PlusIcon className="size-4" />
+        Add a {noun}.
+      </button>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="overflow-hidden rounded-xl border bg-background">
+      <div className="hidden grid-cols-[minmax(0,1.4fr)_8.5rem_minmax(7rem,0.9fr)_auto] gap-2 border-b bg-muted/40 px-3 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase sm:grid">
+        <span>Name</span>
+        <span>Type</span>
+        <span>ID</span>
+        <span className="sr-only">Actions</span>
+      </div>
       {steps.map((step, index) => (
         <div
           key={step.key}
-          className="flex flex-col gap-2 rounded-xl border bg-background p-3"
+          className="grid gap-2 border-b px-3 py-2 sm:grid-cols-[minmax(0,1.4fr)_8.5rem_minmax(7rem,0.9fr)_auto] sm:items-center"
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex size-7 items-center justify-center rounded-md bg-muted font-mono text-xs">
-              {index + 1}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                disabled={index === 0}
-                onClick={() => move(index, -1)}
-              >
-                <ChevronUpIcon />
-                <span className="sr-only">Move up</span>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                disabled={index === steps.length - 1}
-                onClick={() => move(index, 1)}
-              >
-                <ChevronDownIcon />
-                <span className="sr-only">Move down</span>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                onClick={() =>
-                  onChange(steps.filter((item) => item.key !== step.key))
-                }
-              >
-                <Trash2Icon />
-                <span className="sr-only">Remove {noun}</span>
-              </Button>
-            </div>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_8rem_8rem]">
-            <Input
-              value={step.name}
-              onChange={(event) =>
-                update(step.key, { name: event.target.value })
-              }
-              placeholder={`${noun[0].toUpperCase()}${noun.slice(1)} name`}
-              required
-            />
-            <NativeSelect
-              value={step.type}
-              onChange={(event) =>
-                update(step.key, { type: event.target.value })
+          <Input
+            value={step.name}
+            onChange={(event) => update(step.key, { name: event.target.value })}
+            placeholder={`${noun[0].toUpperCase()}${noun.slice(1)} name`}
+            required
+            aria-label={`${noun} ${index + 1} name`}
+          />
+          <NativeSelect
+            value={step.type}
+            aria-label={`${noun} ${index + 1} type`}
+            onChange={(event) => update(step.key, { type: event.target.value })}
+          >
+            {typeOptions.map((type) => (
+              <NativeSelectOption key={type} value={type}>
+                {type}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <Input
+            value={step.id}
+            onChange={(event) => update(step.key, { id: event.target.value })}
+            placeholder="id"
+            className="font-mono"
+            required
+            aria-label={`${noun} ${index + 1} id`}
+          />
+          <div className="flex items-center justify-end gap-0.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              disabled={index === 0}
+              onClick={() => move(index, -1)}
+            >
+              <ChevronUpIcon />
+              <span className="sr-only">Move up</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              disabled={index === steps.length - 1}
+              onClick={() => move(index, 1)}
+            >
+              <ChevronDownIcon />
+              <span className="sr-only">Move down</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={() =>
+                onChange(steps.filter((item) => item.key !== step.key))
               }
             >
-              {typeOptions.map((type) => (
-                <NativeSelectOption key={type} value={type}>
-                  {type}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-            <Input
-              value={step.id}
-              onChange={(event) => update(step.key, { id: event.target.value })}
-              placeholder="id"
-              className="font-mono"
-              required
-            />
+              <Trash2Icon />
+              <span className="sr-only">Remove {noun}</span>
+            </Button>
           </div>
         </div>
       ))}
-      <Button
+      <button
         type="button"
-        variant="outline"
-        size="sm"
-        className="self-start"
-        onClick={() =>
-          onChange([
-            ...steps,
-            newFlowStep(typeOptions[0] ?? "transform", "", steps),
-          ])
-        }
+        onClick={addStep}
+        className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
       >
-        <PlusIcon />
+        <PlusIcon className="size-3.5" />
         Add {noun}
-      </Button>
+      </button>
     </div>
   )
 }

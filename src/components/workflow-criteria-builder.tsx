@@ -152,26 +152,14 @@ function LeafEditor({
   const field = fields.find((item) => item.name === leaf.field)
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-background p-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-medium text-muted-foreground">If</p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          disabled={!canRemove}
-          onClick={onRemove}
-        >
-          <Trash2Icon />
-          <span className="sr-only">Remove condition</span>
-        </Button>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        <Field>
-          <FieldLabel>Field</FieldLabel>
+    <div className="flex flex-col gap-2 rounded-lg border bg-background px-3 py-2">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
+        <Field className="gap-1">
+          <FieldLabel className="sm:sr-only">Field</FieldLabel>
           {fields.length > 0 ? (
             <NativeSelect
               value={selectedField}
+              aria-label="Condition field"
               onChange={(event) => {
                 const next = event.target.value
                 if (next === CUSTOM_FIELD) {
@@ -205,10 +193,11 @@ function LeafEditor({
             />
           )}
         </Field>
-        <Field>
-          <FieldLabel>Operator</FieldLabel>
+        <Field className="gap-1">
+          <FieldLabel className="sm:sr-only">Operator</FieldLabel>
           <NativeSelect
             value={leaf.operator}
+            aria-label="Condition operator"
             onChange={(event) =>
               onChange({ operator: event.target.value as CompareOperator })
             }
@@ -220,27 +209,39 @@ function LeafEditor({
             ))}
           </NativeSelect>
         </Field>
-        <Field>
-          <FieldLabel>{leaf.operator === "in" ? "Values" : "Value"}</FieldLabel>
+        <Field className="gap-1">
+          <FieldLabel className="sm:sr-only">
+            {leaf.operator === "in" ? "Values" : "Value"}
+          </FieldLabel>
           <ConditionValueInput
             leaf={leaf}
             field={field}
             onChange={(value) => onChange({ value })}
           />
         </Field>
+        <div className="flex h-8 items-center justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={!canRemove}
+            onClick={onRemove}
+          >
+            <Trash2Icon />
+            <span className="sr-only">Remove condition</span>
+          </Button>
+        </div>
       </div>
       {isCustom && fields.length > 0 ? (
-        <Field>
-          <FieldLabel>Custom field name</FieldLabel>
-          <Input
-            value={leaf.field}
-            onChange={(event) =>
-              onChange({ field: event.target.value, customField: true })
-            }
-            placeholder="address.city"
-            className="font-mono"
-          />
-        </Field>
+        <Input
+          value={leaf.field}
+          onChange={(event) =>
+            onChange({ field: event.target.value, customField: true })
+          }
+          placeholder="Custom field name, e.g. address.city"
+          className="font-mono"
+          aria-label="Custom field name"
+        />
       ) : null}
     </div>
   )
@@ -376,13 +377,15 @@ export function WorkflowCriteriaBuilder({
           these conditions.
         </p>
       </div>
-      <GroupEditor
-        group={value}
-        fields={fields}
-        depth={0}
-        canRemove={false}
-        onChange={onChange}
-      />
+      <div className="overflow-hidden rounded-xl border bg-background p-3">
+        <GroupEditor
+          group={value}
+          fields={fields}
+          depth={0}
+          canRemove={false}
+          onChange={onChange}
+        />
+      </div>
     </div>
   )
 }

@@ -48,10 +48,12 @@ export function JsonDefinitionCard({
   definition,
   label = "JSONB definition",
   description = "Stored as JSONB on the definition column.",
+  className,
 }: {
   definition: JsonObject
   label?: string
   description?: string
+  className?: string
 }) {
   const json = stringifyDefinition(definition)
   const [copied, setCopied] = useState(false)
@@ -67,7 +69,12 @@ export function JsonDefinitionCard({
   }
 
   return (
-    <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
+    <section
+      className={cn(
+        "flex min-w-0 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10",
+        className
+      )}
+    >
       <div className="flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
         <div>
           <h2 className="text-sm font-medium">{label}</h2>
@@ -78,7 +85,7 @@ export function JsonDefinitionCard({
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <pre className="max-h-[32rem] overflow-auto bg-muted/30 p-4 font-mono text-[13px] leading-relaxed sm:p-5">
+      <pre className="max-h-[32rem] min-h-0 flex-1 overflow-auto bg-muted/30 p-4 font-mono text-[13px] leading-relaxed sm:p-5">
         {json}
       </pre>
     </section>

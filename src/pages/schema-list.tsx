@@ -1,69 +1,166 @@
-import { Link } from "react-router"
-import { ChevronRightIcon, FileJsonIcon, PlusIcon } from "lucide-react"
+import { useMemo, useState } from "react"
+import { PlusIcon } from "lucide-react"
 
+import {
+  DataTable,
+  DataTableCellLink,
+  DataTableFilter,
+  DataTablePage,
+  DataTableToolbar,
+  compareText,
+  dataTableCount,
+  matchesQuery,
+  toggleSort,
+  type DataTableColumn,
+  type DataTableSort,
+} from "@/components/data-table"
+import { StatusBadge } from "@/components/json-definition-card"
 import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
-import { jsonSchemaPropertyCount } from "@/lib/json-definition"
+import type { Schema } from "@/data/networks"
+import {
+  definitionDescription,
+  jsonSchemaPropertyCount,
+  publicationStatus,
+} from "@/lib/json-definition"
 import {
   schemaScopeLabel,
   useNetworkWorkspace,
+  useWorkspaceNetworks,
   useWorkspaceOrganizations,
   useWorkspaceSchemas,
 } from "@/lib/network-workspace"
-import { Card, CardDescription, CardTitle } from "@/components/ui/card"
-import type { Schema } from "@/data/networks"
 import { getHumaErrorMessage } from "@/store/api"
 
-function SchemaCard({
-  schema,
-  to,
-  scope,
-}: {
-  schema: Schema
-  to: string
-  scope: string
-}) {
-  return (
-    <Link to={to} className="block">
-      <Card className="flex-row items-center px-4 transition-colors hover:bg-muted/50">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <FileJsonIcon className="size-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <CardTitle>{schema.name}</CardTitle>
-          <CardDescription>
-            {scope} · {schema.slug} ·{" "}
-            {jsonSchemaPropertyCount(schema.definition)} properties
-          </CardDescription>
-        </div>
-        <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-      </Card>
-    </Link>
-  )
-}
+type SchemaSortKey = "name" | "slug" | "scope" | "properties" | "status"
 
 export default function SchemaList() {
   const { network, organization, organizationId, href } = useNetworkWorkspace()
   const { openCreateSchema } = useCreateEntity()
+  const { networks } = useWorkspaceNetworks()
   const { organizations } = useWorkspaceOrganizations()
   const { schemas, isLoading, isError, error } = useWorkspaceSchemas()
+  const [query, setQuery] = useState("")
+  const [scopeFilter, setScopeFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [sort, setSort] = useState<DataTableSort<SchemaSortKey>>({
+    key: "name",
+    direction: "asc",
+  })
   const items = network ? network.schemas : schemas
-  const networkSchemas = items.filter((schema) => !schema.organizationId)
-  const organizationSchemas = items.filter((schema) => schema.organizationId)
+  const networksById = useMemo(
+    () => new Map(networks.map((item) => [item.id, item])),
+    [networks]
+  )
+  const filtered = items.filter((schema) => {
+    if (scopeFilter === "network" && schema.organizationId) {
+      return false
+    }
+    if (scopeFilter === "organization" && !schema.organizationId) {
+      return false
+    }
+    if (statusFilter === "published" && !schema.active) {
+      return false
+    }
+    if (statusFilter === "draft" && schema.active) {
+      return false
+    }
+
+    return matchesQuery(query, [
+      schema.name,
+      schema.slug,
+      schemaScopeLabel(schema, organizations),
+      schema.networkId ? networksById.get(schema.networkId)?.name : "",
+      definitionDescription(schema.definition),
+      schema.id,
+    ])
+  })
+  const rows = [...filtered].sort((left, right) => {
+    const result = compareSchemas(left, right, sort.key, organizations)
+    return sort.direction === "asc" ? result : -result
+  })
+  const filtersActive =
+    query.trim().length > 0 ||
+    scopeFilter !== "all" ||
+    statusFilter !== "all"
+
+  function hrefFor(schema: Schema) {
+    return network ? href(`schemas/${schema.id}`) : `/app/schemas/${schema.id}`
+  }
+
+  const columns: DataTableColumn<Schema, SchemaSortKey>[] = [
+    {
+      key: "name",
+      label: "Name",
+      className: "font-medium",
+      render: (schema) => (
+        <DataTableCellLink
+          to={hrefFor(schema)}
+          className="max-w-[22rem] font-medium"
+        >
+          {schema.name}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "slug",
+      label: "Slug",
+      className: "font-mono text-muted-foreground",
+      render: (schema) => (
+        <DataTableCellLink to={hrefFor(schema)}>
+          {schema.slug}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "scope",
+      label: "Scope",
+      className: "text-muted-foreground",
+      render: (schema) => (
+        <DataTableCellLink to={hrefFor(schema)}>
+          {schemaScopeLabel(schema, organizations)}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "properties",
+      label: "Properties",
+      className: "tabular-nums text-muted-foreground",
+      render: (schema) => (
+        <DataTableCellLink to={hrefFor(schema)}>
+          {jsonSchemaPropertyCount(schema.definition)}
+        </DataTableCellLink>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (schema) => {
+        const status = publicationStatus(schema.active)
+        return (
+          <DataTableCellLink
+            to={hrefFor(schema)}
+            className="inline-flex items-center gap-1.5"
+          >
+            <StatusBadge status={status} />
+            <span className="text-muted-foreground">{status}</span>
+          </DataTableCellLink>
+        )
+      },
+    },
+  ]
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Schemas</h1>
-          <p className="text-sm text-muted-foreground">
-            {organization
-              ? `Network-wide schemas shared with ${organization.name}, plus schemas that belong only to this organization.`
-              : network
-                ? `Network-wide schemas shared by every organization in ${network.name}, plus schemas owned by a single organization.`
-                : "Network-wide and organization schemas."}
-          </p>
-        </div>
+    <DataTablePage
+      title="Schemas"
+      description={
+        organization
+          ? `Network-wide schemas shared with ${organization.name}, plus schemas that belong only to this organization.`
+          : network
+            ? `JSON shapes used by records in ${network.name}.`
+            : "JSON shapes used by records across your networks."
+      }
+      action={
         <Button
           onClick={() =>
             openCreateSchema({
@@ -75,78 +172,90 @@ export default function SchemaList() {
           <PlusIcon />
           Create schema
         </Button>
-      </div>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading schemas...</p>
-      ) : isError ? (
+      }
+    >
+      <DataTableToolbar
+        query={query}
+        onQueryChange={setQuery}
+        searchPlaceholder="Search schemas..."
+        filters={
+          <>
+            <DataTableFilter
+              label="Filter by scope"
+              value={scopeFilter}
+              onChange={setScopeFilter}
+              className="sm:w-44"
+              options={[
+                { value: "all", label: "All scopes" },
+                { value: "network", label: "Network schemas" },
+                { value: "organization", label: "Organization schemas" },
+              ]}
+            />
+            <DataTableFilter
+              label="Filter by status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              className="sm:w-40"
+              options={[
+                { value: "all", label: "All statuses" },
+                { value: "published", label: "Published" },
+                { value: "draft", label: "Draft" },
+              ]}
+            />
+          </>
+        }
+        count={dataTableCount({
+          isLoading,
+          loadingLabel: "Loading schemas...",
+          visible: rows.length,
+          total: items.length,
+          singular: "schema",
+        })}
+      />
+      {isError ? (
         <p className="text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load schemas")}
         </p>
-      ) : items.length > 0 ? (
-        <div className="flex flex-col gap-6">
-          <section className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-sm font-medium">Network schemas</h2>
-              <p className="text-xs text-muted-foreground">
-                Shared across every organization in the network.
-              </p>
-            </div>
-            {networkSchemas.length > 0 ? (
-              networkSchemas.map((schema) => (
-                <SchemaCard
-                  key={schema.id}
-                  schema={schema}
-                  scope="Network"
-                  to={
-                    network
-                      ? href(`schemas/${schema.id}`)
-                      : `/app/schemas/${schema.id}`
-                  }
-                />
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No network-wide schemas yet.
-              </p>
-            )}
-          </section>
-          <section className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-sm font-medium">Organization schemas</h2>
-              <p className="text-xs text-muted-foreground">
-                {organization
-                  ? `Private to ${organization.name}.`
-                  : "Owned by a single organization in this network."}
-              </p>
-            </div>
-            {organizationSchemas.length > 0 ? (
-              organizationSchemas.map((schema) => (
-                <SchemaCard
-                  key={schema.id}
-                  schema={schema}
-                  scope={schemaScopeLabel(schema, organizations)}
-                  to={
-                    network
-                      ? href(`schemas/${schema.id}`)
-                      : `/app/schemas/${schema.id}`
-                  }
-                />
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No organization schemas yet.
-                {organization
-                  ? " Create one to define a shape that only this organization uses."
-                  : ""}
-              </p>
-            )}
-          </section>
-        </div>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          No schemas yet. Create one to define the JSONB shape of records.
-        </p>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          sort={sort}
+          onSort={(key) => setSort((current) => toggleSort(current, key))}
+          getRowId={(schema) => schema.id}
+          empty={
+            isLoading
+              ? "Loading schemas..."
+              : filtersActive
+                ? "No schemas match this view."
+                : "No schemas yet. Create one to define the JSONB shape of records."
+          }
+        />
       )}
-    </div>
+    </DataTablePage>
   )
+}
+
+function compareSchemas(
+  left: Schema,
+  right: Schema,
+  key: SchemaSortKey,
+  organizations: Parameters<typeof schemaScopeLabel>[1]
+) {
+  if (key === "properties") {
+    return (
+      jsonSchemaPropertyCount(left.definition) -
+      jsonSchemaPropertyCount(right.definition)
+    )
+  }
+  if (key === "status") {
+    return Number(left.active) - Number(right.active)
+  }
+  if (key === "scope") {
+    return compareText(
+      schemaScopeLabel(left, organizations),
+      schemaScopeLabel(right, organizations)
+    )
+  }
+  return compareText(String(left[key]), String(right[key]))
 }

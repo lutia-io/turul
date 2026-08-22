@@ -7,6 +7,11 @@ import {
   newFlowStep,
   type FlowStepDraft,
 } from "@/components/definition-step-editor"
+import {
+  DefinitionDialogBody,
+  DefinitionJsonPane,
+  definitionDialogClassName,
+} from "@/components/definition-dialog-layout"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -166,7 +171,7 @@ export function PipelineDefinitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="full">
+      <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
             {editing
@@ -183,8 +188,17 @@ export function PipelineDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-            <FieldGroup>
+          <DefinitionDialogBody
+            json={
+              <DefinitionJsonPane
+                title="JSON definition"
+                description="Updates as you edit the source and stages."
+                value={preview}
+                readOnly
+              />
+            }
+          >
+            <FieldGroup className="gap-4">
               {!editing ? (
                 <Field>
                   <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
@@ -287,7 +301,9 @@ export function PipelineDefinitionDialog({
               <div>
                 <h3 className="text-sm font-medium">Stages</h3>
                 <p className="text-xs text-muted-foreground">
-                  Ordered stages stored on the definition.
+                  {stages.length === 0
+                    ? "Add ordered stages stored on the definition."
+                    : `${stages.length} ${stages.length === 1 ? "stage" : "stages"}`}
                 </p>
               </div>
               <DefinitionStepEditor
@@ -297,16 +313,7 @@ export function PipelineDefinitionDialog({
                 onChange={setStages}
               />
             </div>
-
-            <div className="overflow-hidden rounded-xl border bg-muted/30">
-              <div className="border-b px-3 py-2">
-                <p className="text-xs font-medium">JSONB preview</p>
-              </div>
-              <pre className="max-h-40 overflow-auto p-3 font-mono text-[12px] leading-relaxed">
-                {preview}
-              </pre>
-            </div>
-          </div>
+          </DefinitionDialogBody>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>
               Cancel
