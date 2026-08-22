@@ -24,47 +24,70 @@ import {
   useWorkspaceNetworks,
 } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
-import { useCreateOrganizationMutation } from "@/store/organization-slice"
+import {
+  useCreateOrganizationMutation,
+  useGetOrganizationQuery,
+  useUpdateOrganizationMutation,
+} from "@/store/organization-slice"
 
 export function CreateOrganizationDialog({
   open,
   onOpenChange,
   networkId,
+  organizationId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
+  organizationId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworks()
-  const lockNetwork = Boolean(networkId)
+  const editing = Boolean(organizationId)
+  const lockNetwork = Boolean(networkId) || editing
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? networks[0]?.id ?? ""
   )
   const [name, setName] = useState("")
-  const [createOrganization, { isLoading, error, reset }] =
-    useCreateOrganizationMutation()
+  const [createOrganization, createState] = useCreateOrganizationMutation()
+  const [updateOrganization, updateState] = useUpdateOrganizationMutation()
+  const isLoading = createState.isLoading || updateState.isLoading
+  const error = createState.error ?? updateState.error
+  const existingQuery = useGetOrganizationQuery(organizationId ?? "", {
+    skip: !open || !organizationId,
+  })
   const firstNetworkId = networks[0]?.id ?? ""
 
   useEffect(() => {
-    if (open) {
-      setName("")
-      reset()
+    if (!open) {
+      return
     }
-  }, [open, reset])
+    createState.reset()
+    updateState.reset()
+    setName(organizationId ? (existingQuery.data?.name ?? "") : "")
+  }, [
+    createState.reset,
+    existingQuery.data?.name,
+    open,
+    organizationId,
+    updateState.reset,
+  ])
 
   useEffect(() => {
     if (!open) {
       return
     }
     setSelectedNetworkId((current) => {
+      if (existingQuery.data?.networkId) {
+        return existingQuery.data.networkId
+      }
       if (networkId) {
         return networkId
       }
       return current || firstNetworkId
     })
-  }, [firstNetworkId, networkId, open])
+  }, [existingQuery.data?.networkId, firstNetworkId, networkId, open])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -74,6 +97,15 @@ export function CreateOrganizationDialog({
     }
 
     try {
+      if (editing) {
+        await updateOrganization({
+          id: organizationId!,
+          name: trimmed,
+        }).unwrap()
+        onOpenChange(false)
+        return
+      }
+
       const organization = await createOrganization({
         name: trimmed,
         networkId: selectedNetworkId,
@@ -94,7 +126,9 @@ export function CreateOrganizationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create an organization</DialogTitle>
+          <DialogTitle>
+            {editing ? "Edit organization" : "Create an organization"}
+          </DialogTitle>
           <DialogDescription>
             Organizations belong to a network. They can use shared network
             schemas and define their own.
@@ -149,7 +183,13 @@ export function CreateOrganizationDialog({
             form={formId}
             disabled={isLoading || !name.trim() || !selectedNetworkId}
           >
-            {isLoading ? "Creating..." : "Create organization"}
+            {isLoading
+              ? editing
+                ? "Saving..."
+                : "Creating..."
+              : editing
+                ? "Save organization"
+                : "Create organization"}
           </Button>
         </DialogFooter>
       </DialogContent>

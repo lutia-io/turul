@@ -18,6 +18,15 @@ export type CreateNetworkResponse = {
   id: string
 }
 
+export type UpdateNetworkRequest = {
+  id: string
+  name: string
+}
+
+export type UpdateNetworkResponse = {
+  id: string
+}
+
 const networkApi = api.injectEndpoints({
   endpoints: (build) => ({
     listNetworks: build.query<ApiNetwork[], void>({
@@ -54,6 +63,17 @@ const networkApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: "Network", id: "LIST" }],
     }),
+    updateNetwork: build.mutation<UpdateNetworkResponse, UpdateNetworkRequest>({
+      query: ({ id, ...body }) => ({
+        url: `/network/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Network", id },
+        { type: "Network", id: "LIST" },
+      ],
+    }),
   }),
 })
 
@@ -61,4 +81,5 @@ export const {
   useListNetworksQuery,
   useGetNetworkQuery,
   useCreateNetworkMutation,
+  useUpdateNetworkMutation,
 } = networkApi

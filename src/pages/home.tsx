@@ -15,8 +15,9 @@ import {
 } from "lucide-react"
 
 import { type Network } from "@/data/networks"
-import { Button } from "@/components/ui/button"
 import { useCreateEntity } from "@/components/create-entity"
+import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -368,14 +369,37 @@ export default function Home() {
   const {
     networks,
     isLoading: isNetworksLoading,
+    isFetching: isNetworksFetching,
     isError: isNetworksError,
     error: networksError,
+    refetch: refetchNetworks,
   } = useWorkspaceNetworks()
-  const { records } = useWorkspaceRecords()
-  const { files } = useWorkspaceFiles()
-  const { runs: workflowRuns } = useWorkspaceWorkflowRuns()
+  const {
+    records,
+    refetch: refetchRecords,
+    isFetching: isRecordsFetching,
+  } = useWorkspaceRecords()
+  const {
+    files,
+    refetch: refetchFiles,
+    isFetching: isFilesFetching,
+  } = useWorkspaceFiles()
+  const {
+    runs: workflowRuns,
+    refetch: refetchRuns,
+    isFetching: isRunsFetching,
+  } = useWorkspaceWorkflowRuns()
   const greeting = greetingForHour(new Date().getHours())
   const currentNetwork = networks[0]
+  const isRefreshing =
+    isNetworksFetching || isRecordsFetching || isFilesFetching || isRunsFetching
+
+  function refreshHome() {
+    void refetchNetworks()
+    void refetchRecords()
+    void refetchFiles()
+    void refetchRuns()
+  }
   const workspaceHref = (rest = "") =>
     currentNetwork
       ? networkWorkspacePath({ networkId: currentNetwork.id, rest })
@@ -448,76 +472,85 @@ export default function Home() {
                   : "You do not have any networks yet. Create one to get started."}
           </p>
         </div>
-        <Button onClick={openCreateNetwork}>
-          <PlusIcon />
-          Create a network
-        </Button>
+        <div className="flex items-center gap-2">
+          <RefreshButton
+            onRefresh={refreshHome}
+            isRefreshing={isRefreshing}
+            size="icon"
+          />
+          <Button onClick={openCreateNetwork}>
+            <PlusIcon />
+            Create a network
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <StatCard
-          to="/app/networks"
-          label="Networks"
-          value={networks.length}
-          live={networkCounts.live}
-          draft={networkCounts.draft}
-          liveLabel="active"
-          color="purple"
-          icon={ListIcon}
-        />
-        <StatCard
-          to={workspaceHref()}
-          label="Organizations"
-          value={organizations.length}
-          live={organizationCounts.live}
-          draft={organizationCounts.draft}
-          liveLabel="active"
-          color="orange"
-          icon={Building2Icon}
-        />
-        <StatCard
-          to={workspaceHref("records")}
-          label="Records"
-          value={records.length}
-          live={records.length}
-          draft={0}
-          liveLabel="rows"
-          color="blue"
-          icon={TableIcon}
-        />
-        <StatCard
-          to={workspaceHref("files")}
-          label="Files"
-          value={files.length}
-          live={files.length}
-          draft={0}
-          liveLabel="uploaded"
-          color="orange"
-          icon={FileIcon}
-        />
-        <StatCard
-          to={workspaceHref("workflows")}
-          label="Workflows"
-          value={runningWorkflows + queuedWorkflows}
-          live={runningWorkflows}
-          draft={queuedWorkflows}
-          liveLabel="running"
-          draftLabel="queued"
-          color="teal"
-          icon={WorkflowIcon}
-        />
-        <StatCard
-          to={workspaceHref("pipelines")}
-          label="Pipelines"
-          value={runningPipelines + queuedPipelines}
-          live={runningPipelines}
-          draft={queuedPipelines}
-          liveLabel="running"
-          draftLabel="queued"
-          color="pink"
-          icon={LayersIcon}
-        />
-      </div>
+      <LoadingFrame isLoading={isRefreshing} className="rounded-xl">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <StatCard
+            to="/app/networks"
+            label="Networks"
+            value={networks.length}
+            live={networkCounts.live}
+            draft={networkCounts.draft}
+            liveLabel="active"
+            color="purple"
+            icon={ListIcon}
+          />
+          <StatCard
+            to={workspaceHref()}
+            label="Organizations"
+            value={organizations.length}
+            live={organizationCounts.live}
+            draft={organizationCounts.draft}
+            liveLabel="active"
+            color="orange"
+            icon={Building2Icon}
+          />
+          <StatCard
+            to={workspaceHref("records")}
+            label="Records"
+            value={records.length}
+            live={records.length}
+            draft={0}
+            liveLabel="rows"
+            color="blue"
+            icon={TableIcon}
+          />
+          <StatCard
+            to={workspaceHref("files")}
+            label="Files"
+            value={files.length}
+            live={files.length}
+            draft={0}
+            liveLabel="uploaded"
+            color="orange"
+            icon={FileIcon}
+          />
+          <StatCard
+            to={workspaceHref("workflows")}
+            label="Workflows"
+            value={runningWorkflows + queuedWorkflows}
+            live={runningWorkflows}
+            draft={queuedWorkflows}
+            liveLabel="running"
+            draftLabel="queued"
+            color="teal"
+            icon={WorkflowIcon}
+          />
+          <StatCard
+            to={workspaceHref("pipelines")}
+            label="Pipelines"
+            value={runningPipelines + queuedPipelines}
+            live={runningPipelines}
+            draft={queuedPipelines}
+            liveLabel="running"
+            draftLabel="queued"
+            color="pink"
+            icon={LayersIcon}
+          />
+        </div>
+      </LoadingFrame>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="flex flex-col gap-3">
@@ -531,64 +564,89 @@ export default function Home() {
                 definitions.
               </p>
             </div>
-            <Link
-              to="/app/networks"
-              className="hidden shrink-0 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-flex sm:items-center sm:gap-1"
-            >
-              View all
-              <ArrowRightIcon className="size-3.5" />
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <RefreshButton
+                onRefresh={refetchNetworks}
+                isRefreshing={isNetworksFetching}
+              />
+              <Link
+                to="/app/networks"
+                className="hidden shrink-0 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-flex sm:items-center sm:gap-1"
+              >
+                View all
+                <ArrowRightIcon className="size-3.5" />
+              </Link>
+            </div>
           </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {isNetworksLoading ? (
-              <p className="text-sm text-muted-foreground">
-                Loading networks...
-              </p>
-            ) : isNetworksError ? (
-              <p className="text-sm text-destructive">
-                {getHumaErrorMessage(networksError, "Failed to load networks")}
-              </p>
-            ) : networks.length > 0 ? (
-              networks.map((network) => (
-                <NetworkCard key={network.id} network={network} />
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                You do not have any networks yet.
-              </p>
-            )}
-          </div>
+          <LoadingFrame
+            isLoading={isNetworksFetching}
+            className="min-h-24 rounded-xl"
+          >
+            <div className="grid gap-3 lg:grid-cols-2">
+              {isNetworksLoading ? (
+                <p className="text-sm text-muted-foreground">
+                  Loading networks...
+                </p>
+              ) : isNetworksError ? (
+                <p className="text-sm text-destructive">
+                  {getHumaErrorMessage(
+                    networksError,
+                    "Failed to load networks"
+                  )}
+                </p>
+              ) : networks.length > 0 ? (
+                networks.map((network) => (
+                  <NetworkCard key={network.id} network={network} />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  You do not have any networks yet.
+                </p>
+              )}
+            </div>
+          </LoadingFrame>
         </section>
 
         <aside className="flex flex-col gap-6">
           <section className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold tracking-tight">
-                Needs attention
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Draft definitions that are not yet published.
-              </p>
-            </div>
-            {attentionItems.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                {attentionItems.map((item) => (
-                  <AttentionCard
-                    key={item.id}
-                    to={item.to}
-                    name={item.name}
-                    kind={item.kind}
-                    networkName={item.networkName}
-                    color={item.color}
-                    icon={item.icon}
-                  />
-                ))}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">
+                  Needs attention
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Draft definitions that are not yet published.
+                </p>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nothing waiting on review.
-              </p>
-            )}
+              <RefreshButton
+                onRefresh={refetchNetworks}
+                isRefreshing={isNetworksFetching}
+              />
+            </div>
+            <LoadingFrame
+              isLoading={isNetworksFetching}
+              className="min-h-24 rounded-xl"
+            >
+              {attentionItems.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {attentionItems.map((item) => (
+                    <AttentionCard
+                      key={item.id}
+                      to={item.to}
+                      name={item.name}
+                      kind={item.kind}
+                      networkName={item.networkName}
+                      color={item.color}
+                      icon={item.icon}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nothing waiting on review.
+                </p>
+              )}
+            </LoadingFrame>
           </section>
 
           <section className="flex flex-col gap-3">

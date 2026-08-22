@@ -34,10 +34,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { WorkflowActionsBuilder } from "@/components/workflow-actions-builder"
 import { WorkflowCriteriaBuilder } from "@/components/workflow-criteria-builder"
-import {
-  getWorkflowDefinition,
-  updateWorkflowDefinition,
-} from "@/data/networks"
+import { getWorkflowDefinition } from "@/data/networks"
 import {
   parseJsonObject,
   stringifyDefinition,
@@ -68,6 +65,7 @@ import { getHumaErrorMessage } from "@/store/api"
 import {
   useCreateWorkflowDefinitionMutation,
   useGetWorkflowDefinitionQuery,
+  useUpdateWorkflowDefinitionMutation,
 } from "@/store/workflow-slice"
 
 function workflowDefinitionError(text: string) {
@@ -101,8 +99,10 @@ export function WorkflowDefinitionDialog({
   const { networks } = useWorkspaceNetworks()
   const { schemas } = useWorkspaceSchemas()
   const { organizationId } = useNetworkWorkspace()
-  const [createWorkflow, { isLoading, error, reset }] =
-    useCreateWorkflowDefinitionMutation()
+  const [createWorkflow, createState] = useCreateWorkflowDefinitionMutation()
+  const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
+  const isLoading = createState.isLoading || updateState.isLoading
+  const error = createState.error ?? updateState.error
   const apiWorkflowQuery = useGetWorkflowDefinitionQuery(
     workflowDefinitionId ?? "",
     { skip: !open || !workflowDefinitionId }
@@ -136,9 +136,10 @@ export function WorkflowDefinitionDialog({
 
   useEffect(() => {
     if (open) {
-      reset()
+      createState.reset()
+      updateState.reset()
     }
-  }, [open, reset])
+  }, [createState.reset, open, updateState.reset])
 
   useEffect(() => {
     if (!open) {
@@ -289,28 +290,23 @@ export function WorkflowDefinitionDialog({
       return
     }
 
-    if (editing) {
-      if (existing) {
-        updateWorkflowDefinition(workflowDefinitionId!, {
-          name,
-          slug: slugTouched ? slug : slugifyId(name),
-          schemaId,
-          triggerType: "record",
-          triggerEvent: `${slugifyId(name)}.created`,
-          steps: [],
-          active,
-          internal: existing.workflowDefinition.internal,
-        })
-      }
-      onOpenChange(false)
-      return
-    }
-
-    void submitCreate(body)
+    void submitDefinition(body)
   }
 
-  async function submitCreate(body: WorkflowDefinitionBody) {
+  async function submitDefinition(body: WorkflowDefinitionBody) {
     try {
+      if (editing) {
+        await updateWorkflow({
+          id: workflowDefinitionId!,
+          name: name.trim(),
+          active,
+          definition: body,
+          schemaId,
+        }).unwrap()
+        onOpenChange(false)
+        return
+      }
+
       const workflow = await createWorkflow({
         name: name.trim(),
         active,
@@ -523,7 +519,9 @@ export function WorkflowDefinitionDialog({
               disabled={isLoading || !canSubmit || Boolean(jsonError)}
             >
               {isLoading
-                ? "Creating..."
+                ? editing
+                  ? "Saving..."
+                  : "Creating..."
                 : editing
                   ? "Save workflow"
                   : "Create workflow"}

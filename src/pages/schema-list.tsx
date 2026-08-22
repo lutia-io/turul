@@ -39,7 +39,8 @@ export default function SchemaList() {
   const { openCreateSchema } = useCreateEntity()
   const { networks } = useWorkspaceNetworks()
   const { organizations } = useWorkspaceOrganizations()
-  const { schemas, isLoading, isError, error } = useWorkspaceSchemas()
+  const { schemas, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceSchemas()
   const [query, setQuery] = useState("")
   const [scopeFilter, setScopeFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -80,9 +81,7 @@ export default function SchemaList() {
     return sort.direction === "asc" ? result : -result
   })
   const filtersActive =
-    query.trim().length > 0 ||
-    scopeFilter !== "all" ||
-    statusFilter !== "all"
+    query.trim().length > 0 || scopeFilter !== "all" || statusFilter !== "all"
 
   function hrefFor(schema: Schema) {
     return network ? href(`schemas/${schema.id}`) : `/app/schemas/${schema.id}`
@@ -211,6 +210,8 @@ export default function SchemaList() {
           total: items.length,
           singular: "schema",
         })}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
@@ -223,6 +224,7 @@ export default function SchemaList() {
           sort={sort}
           onSort={(key) => setSort((current) => toggleSort(current, key))}
           getRowId={(schema) => schema.id}
+          isRefreshing={isFetching}
           empty={
             isLoading
               ? "Loading schemas..."

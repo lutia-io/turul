@@ -25,25 +25,32 @@ import {
   useWorkspaceOrganizations,
 } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
-import { useCreateOrganizationUserMutation } from "@/store/organization-user-slice"
+import {
+  useCreateOrganizationUserMutation,
+  useGetOrganizationUserQuery,
+  useUpdateOrganizationUserMutation,
+} from "@/store/organization-user-slice"
 
 export function CreateOrganizationUserDialog({
   open,
   onOpenChange,
   networkId,
   organizationId,
+  organizationUserId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
   organizationId?: string
+  organizationUserId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworks()
   const { organizations } = useWorkspaceOrganizations()
-  const lockNetwork = Boolean(networkId)
-  const lockOrganization = Boolean(organizationId)
+  const editing = Boolean(organizationUserId)
+  const lockNetwork = Boolean(networkId) || editing
+  const lockOrganization = Boolean(organizationId) || editing
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? networks[0]?.id ?? ""
   )
@@ -54,8 +61,15 @@ export function CreateOrganizationUserDialog({
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [createOrganizationUser, { isLoading, error, reset }] =
+  const [createOrganizationUser, createState] =
     useCreateOrganizationUserMutation()
+  const [updateOrganizationUser, updateState] =
+    useUpdateOrganizationUserMutation()
+  const isLoading = createState.isLoading || updateState.isLoading
+  const error = createState.error ?? updateState.error
+  const existingQuery = useGetOrganizationUserQuery(organizationUserId ?? "", {
+    skip: !open || !organizationUserId,
+  })
   const firstNetworkId = networks[0]?.id ?? ""
   const networkOrganizations = useMemo(
     () =>
@@ -67,32 +81,48 @@ export function CreateOrganizationUserDialog({
   const firstOrganizationId = networkOrganizations[0]?.id ?? ""
 
   useEffect(() => {
-    if (open) {
-      setFirstName("")
-      setLastName("")
-      setEmail("")
-      setPassword("")
-      reset()
+    if (!open) {
+      return
     }
-  }, [open, reset])
+    createState.reset()
+    updateState.reset()
+    setFirstName(existingQuery.data?.firstName ?? "")
+    setLastName(existingQuery.data?.lastName ?? "")
+    setEmail(existingQuery.data?.email ?? "")
+    setPassword("")
+  }, [
+    createState.reset,
+    existingQuery.data?.email,
+    existingQuery.data?.firstName,
+    existingQuery.data?.lastName,
+    open,
+    organizationUserId,
+    updateState.reset,
+  ])
 
   useEffect(() => {
     if (!open) {
       return
     }
     setSelectedNetworkId((current) => {
+      if (existingQuery.data?.networkId) {
+        return existingQuery.data.networkId
+      }
       if (networkId) {
         return networkId
       }
       return current || firstNetworkId
     })
-  }, [firstNetworkId, networkId, open])
+  }, [existingQuery.data?.networkId, firstNetworkId, networkId, open])
 
   useEffect(() => {
     if (!open) {
       return
     }
     setSelectedOrganizationId((current) => {
+      if (existingQuery.data?.organizationId) {
+        return existingQuery.data.organizationId
+      }
       if (organizationId) {
         return organizationId
       }
@@ -101,7 +131,13 @@ export function CreateOrganizationUserDialog({
       }
       return firstOrganizationId
     })
-  }, [firstOrganizationId, networkOrganizations, open, organizationId])
+  }, [
+    existingQuery.data?.organizationId,
+    firstOrganizationId,
+    networkOrganizations,
+    open,
+    organizationId,
+  ])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -112,7 +148,7 @@ export function CreateOrganizationUserDialog({
       !trimmedFirstName ||
       !trimmedLastName ||
       !trimmedEmail ||
-      !password ||
+      (!editing && !password) ||
       !selectedNetworkId ||
       !selectedOrganizationId
     ) {
@@ -120,6 +156,18 @@ export function CreateOrganizationUserDialog({
     }
 
     try {
+      if (editing) {
+        await updateOrganizationUser({
+          id: organizationUserId!,
+          firstName: trimmedFirstName,
+          lastName: trimmedLastName,
+          email: trimmedEmail,
+          password: password || undefined,
+        }).unwrap()
+        onOpenChange(false)
+        return
+      }
+
       const organizationUser = await createOrganizationUser({
         firstName: trimmedFirstName,
         lastName: trimmedLastName,
@@ -145,7 +193,9 @@ export function CreateOrganizationUserDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create an organization user</DialogTitle>
+          <DialogTitle>
+            {editing ? "Edit organization user" : "Create an organization user"}
+          </DialogTitle>
           <DialogDescription>
             Organization users sign in to a specific organization in a network.
           </DialogDescription>
@@ -215,7 +265,9 @@ export function CreateOrganizationUserDialog({
                 />
               </Field>
               <Field data-invalid={error ? true : undefined}>
-                <FieldLabel htmlFor={`${formId}-last-name`}>Last name</FieldLabel>
+                <FieldLabel htmlFor={`${formId}-last-name`}>
+                  Last name
+                </FieldLabel>
                 <Input
                   id={`${formId}-last-name`}
                   value={lastName}
@@ -242,16 +294,23 @@ export function CreateOrganizationUserDialog({
               />
             </Field>
             <Field data-invalid={error ? true : undefined}>
-              <FieldLabel htmlFor={`${formId}-password`}>Password</FieldLabel>
+              <FieldLabel htmlFor={`${formId}-password`}>
+                {editing ? "New password" : "Password"}
+              </FieldLabel>
               <Input
                 id={`${formId}-password`}
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="new-password"
-                required
+                required={!editing}
                 disabled={isLoading}
                 aria-invalid={error ? true : undefined}
+                placeholder={
+                  editing
+                    ? "Leave blank to keep the current password"
+                    : undefined
+                }
               />
             </Field>
             {error ? (
@@ -273,12 +332,18 @@ export function CreateOrganizationUserDialog({
               !firstName.trim() ||
               !lastName.trim() ||
               !email.trim() ||
-              !password ||
+              (!editing && !password) ||
               !selectedNetworkId ||
               !selectedOrganizationId
             }
           >
-            {isLoading ? "Creating..." : "Create organization user"}
+            {isLoading
+              ? editing
+                ? "Saving..."
+                : "Creating..."
+              : editing
+                ? "Save organization user"
+                : "Create organization user"}
           </Button>
         </DialogFooter>
       </DialogContent>

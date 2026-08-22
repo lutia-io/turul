@@ -42,7 +42,7 @@ export default function OrganizationUserList() {
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateOrganizationUser } = useCreateEntity()
   const { organizations } = useWorkspaceOrganizations()
-  const { organizationUsers, isLoading, isError, error } =
+  const { organizationUsers, isLoading, isFetching, isError, error, refetch } =
     useWorkspaceOrganizationUsers()
   const [query, setQuery] = useState("")
   const [orgFilter, setOrgFilter] = useState("all")
@@ -189,6 +189,8 @@ export default function OrganizationUserList() {
           total: scoped.length,
           singular: "user",
         })}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
@@ -203,6 +205,7 @@ export default function OrganizationUserList() {
             setSort((current) => toggleSort(current, key, ["createdAt"]))
           }
           getRowId={(user) => user.id}
+          isRefreshing={isFetching}
           empty={
             isLoading
               ? "Loading organization users..."

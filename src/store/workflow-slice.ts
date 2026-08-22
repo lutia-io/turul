@@ -29,6 +29,18 @@ export type CreateWorkflowDefinitionResponse = {
   id: string
 }
 
+export type UpdateWorkflowDefinitionRequest = {
+  id: string
+  name: string
+  active: boolean
+  definition: WorkflowDefinitionBody
+  schemaId: string
+}
+
+export type UpdateWorkflowDefinitionResponse = {
+  id: string
+}
+
 export type ApiWorkflowStatus = "pending" | "running" | "completed" | "failed"
 
 export type ApiWorkflow = {
@@ -113,6 +125,20 @@ const workflowApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: "WorkflowDefinition", id: "LIST" }],
     }),
+    updateWorkflowDefinition: build.mutation<
+      UpdateWorkflowDefinitionResponse,
+      UpdateWorkflowDefinitionRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/workflow-definition/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "WorkflowDefinition", id },
+        { type: "WorkflowDefinition", id: "LIST" },
+      ],
+    }),
     listWorkflows: build.query<ApiWorkflow[], void>({
       query: () => "/workflow",
       providesTags: (result) =>
@@ -175,6 +201,7 @@ export const {
   useListWorkflowDefinitionsQuery,
   useGetWorkflowDefinitionQuery,
   useCreateWorkflowDefinitionMutation,
+  useUpdateWorkflowDefinitionMutation,
   useListWorkflowsQuery,
   useGetWorkflowQuery,
   useListWorkflowActionsQuery,

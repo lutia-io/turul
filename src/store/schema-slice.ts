@@ -28,6 +28,17 @@ export type CreateSchemaResponse = {
   id: string
 }
 
+export type UpdateSchemaRequest = {
+  id: string
+  name: string
+  active: boolean
+  definition: JsonObject
+}
+
+export type UpdateSchemaResponse = {
+  id: string
+}
+
 const schemaApi = api.injectEndpoints({
   endpoints: (build) => ({
     listSchemas: build.query<ApiSchema[], void>({
@@ -62,6 +73,17 @@ const schemaApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: "Schema", id: "LIST" }],
     }),
+    updateSchema: build.mutation<UpdateSchemaResponse, UpdateSchemaRequest>({
+      query: ({ id, ...body }) => ({
+        url: `/schema/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Schema", id },
+        { type: "Schema", id: "LIST" },
+      ],
+    }),
   }),
 })
 
@@ -69,4 +91,5 @@ export const {
   useListSchemasQuery,
   useGetSchemaQuery,
   useCreateSchemaMutation,
+  useUpdateSchemaMutation,
 } = schemaApi

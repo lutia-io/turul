@@ -103,6 +103,7 @@ export default function WorkflowDefinitionDetail() {
             </div>
             <Button
               variant="outline"
+              disabled={visibleWorkflow.internal}
               onClick={() => openEditWorkflow(visibleWorkflow.id)}
             >
               <PencilIcon />

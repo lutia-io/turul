@@ -71,6 +71,8 @@ export function ExecutionListPage({
   emptyLabel,
   showNetwork = true,
   showOrganization = true,
+  onRefresh,
+  isRefreshing,
 }: {
   title: string
   description: string
@@ -81,6 +83,8 @@ export function ExecutionListPage({
   emptyLabel: string
   showNetwork?: boolean
   showOrganization?: boolean
+  onRefresh?: () => void
+  isRefreshing?: boolean
 }) {
   const [filter, setFilter] = useState<RunFilter>("active")
   const [query, setQuery] = useState("")
@@ -184,17 +188,10 @@ export function ExecutionListPage({
       key: "progress",
       label: "Progress",
       render: (item) => {
-        const progress = runProgress(
-          item.currentIndex,
-          item.total,
-          item.status
-        )
+        const progress = runProgress(item.currentIndex, item.total, item.status)
         const tone = getBadgeColor(item.color)
         return (
-          <DataTableCellLink
-            to={item.href}
-            className="flex items-center gap-2"
-          >
+          <DataTableCellLink to={item.href} className="flex items-center gap-2">
             <span className="flex h-1.5 w-16 overflow-hidden rounded-full bg-muted">
               <span
                 className={cn(
@@ -259,6 +256,8 @@ export function ExecutionListPage({
           total: items.length,
           singular: itemLabel,
         })}
+        onRefresh={onRefresh}
+        isRefreshing={isRefreshing}
       />
       <DataTable
         columns={columns}
@@ -271,6 +270,7 @@ export function ExecutionListPage({
         }
         getRowId={(item) => item.id}
         empty={emptyLabel}
+        isRefreshing={isRefreshing}
       />
     </DataTablePage>
   )

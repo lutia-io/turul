@@ -11,30 +11,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { getHumaErrorMessage } from "@/store/api"
-import { useCreateNetworkMutation } from "@/store/network-slice"
+import {
+  useCreateNetworkMutation,
+  useGetNetworkQuery,
+  useUpdateNetworkMutation,
+} from "@/store/network-slice"
 
 export function CreateNetworkDialog({
   open,
   onOpenChange,
+  networkId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  networkId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
+  const editing = Boolean(networkId)
   const [name, setName] = useState("")
-  const [createNetwork, { isLoading, error, reset }] =
-    useCreateNetworkMutation()
+  const [createNetwork, createState] = useCreateNetworkMutation()
+  const [updateNetwork, updateState] = useUpdateNetworkMutation()
+  const isLoading = createState.isLoading || updateState.isLoading
+  const error = createState.error ?? updateState.error
+  const existingQuery = useGetNetworkQuery(networkId ?? "", {
+    skip: !open || !networkId,
+  })
 
   useEffect(() => {
-    if (open) {
-      setName("")
-      reset()
+    if (!open) {
+      return
     }
-  }, [open, reset])
+    createState.reset()
+    updateState.reset()
+    setName(networkId ? (existingQuery.data?.name ?? "") : "")
+  }, [
+    createState.reset,
+    existingQuery.data?.name,
+    networkId,
+    open,
+    updateState.reset,
+  ])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -44,6 +69,12 @@ export function CreateNetworkDialog({
     }
 
     try {
+      if (editing) {
+        await updateNetwork({ id: networkId!, name: trimmed }).unwrap()
+        onOpenChange(false)
+        return
+      }
+
       const network = await createNetwork({ name: trimmed }).unwrap()
       onOpenChange(false)
       navigate(`/app/networks/${network.id}`)
@@ -56,7 +87,9 @@ export function CreateNetworkDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create a network</DialogTitle>
+          <DialogTitle>
+            {editing ? "Edit network" : "Create a network"}
+          </DialogTitle>
           <DialogDescription>
             Networks group organizations and the schemas, workflows, and
             pipelines they share.
@@ -83,7 +116,9 @@ export function CreateNetworkDialog({
           </FieldGroup>
         </form>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" disabled={isLoading} />}>
+          <DialogClose
+            render={<Button variant="outline" disabled={isLoading} />}
+          >
             Cancel
           </DialogClose>
           <Button
@@ -91,7 +126,13 @@ export function CreateNetworkDialog({
             form={formId}
             disabled={isLoading || !name.trim()}
           >
-            {isLoading ? "Creating..." : "Create network"}
+            {isLoading
+              ? editing
+                ? "Saving..."
+                : "Creating..."
+              : editing
+                ? "Save network"
+                : "Create network"}
           </Button>
         </DialogFooter>
       </DialogContent>

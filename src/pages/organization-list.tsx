@@ -25,12 +25,7 @@ import {
 import { getHumaErrorMessage } from "@/store/api"
 
 type OrganizationSortKey =
-  | "name"
-  | "status"
-  | "type"
-  | "location"
-  | "network"
-  | "members"
+  "name" | "status" | "type" | "location" | "network" | "members"
 
 type OrganizationRow = {
   organization: Organization
@@ -39,7 +34,8 @@ type OrganizationRow = {
 
 export default function OrganizationList() {
   const { openCreateOrganization } = useCreateEntity()
-  const { networks, isLoading, isError, error } = useWorkspaceNetworks()
+  const { networks, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceNetworks()
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sort, setSort] = useState<DataTableSort<OrganizationSortKey>>({
@@ -185,6 +181,8 @@ export default function OrganizationList() {
           total: items.length,
           singular: "organization",
         })}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
@@ -197,6 +195,7 @@ export default function OrganizationList() {
           sort={sort}
           onSort={(key) => setSort((current) => toggleSort(current, key))}
           getRowId={(row) => row.organization.id}
+          isRefreshing={isFetching}
           empty={
             isLoading
               ? "Loading organizations..."

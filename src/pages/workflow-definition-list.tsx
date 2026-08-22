@@ -34,8 +34,14 @@ export default function WorkflowDefinitionList() {
   const { network, href } = useNetworkWorkspace()
   const { openCreateWorkflow } = useCreateEntity()
   const { networks } = useWorkspaceNetworks()
-  const { schemas, isLoading: isSchemasLoading } = useWorkspaceSchemas()
-  const { workflows, isLoading, isError, error } = useWorkspaceWorkflows()
+  const {
+    schemas,
+    isLoading: isSchemasLoading,
+    isFetching: isSchemasFetching,
+    refetch: refetchSchemas,
+  } = useWorkspaceSchemas()
+  const { workflows, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceWorkflows()
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sort, setSort] = useState<DataTableSort<WorkflowSortKey>>({
@@ -193,6 +199,11 @@ export default function WorkflowDefinitionList() {
           total: items.length,
           singular: "workflow",
         })}
+        onRefresh={() => {
+          void refetch()
+          void refetchSchemas()
+        }}
+        isRefreshing={isFetching || isSchemasFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
@@ -205,6 +216,7 @@ export default function WorkflowDefinitionList() {
           sort={sort}
           onSort={(key) => setSort((current) => toggleSort(current, key))}
           getRowId={(workflow) => workflow.id}
+          isRefreshing={isFetching || isSchemasFetching}
           empty={
             loading
               ? "Loading workflows..."

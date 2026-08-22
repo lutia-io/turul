@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 
 import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
+import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -56,6 +57,8 @@ export function SchemaRecordsTable({
   recordHref,
   fileHref,
   showOrganization = true,
+  onRefresh,
+  isRefreshing,
 }: {
   schema: Schema
   records: StoredRecord[]
@@ -64,6 +67,8 @@ export function SchemaRecordsTable({
   recordHref: (record: StoredRecord) => string
   fileHref: (fileId: string) => string
   showOrganization?: boolean
+  onRefresh?: () => void
+  isRefreshing?: boolean
 }) {
   const properties = getJsonSchemaProperties(schema.definition)
   const [query, setQuery] = useState("")
@@ -187,92 +192,108 @@ export function SchemaRecordsTable({
             className="h-8 bg-background pl-8"
           />
         </div>
-        <p className="text-sm text-muted-foreground tabular-nums">
-          {rows.length === records.length
-            ? `${records.length} records`
-            : `${rows.length} of ${records.length} records`}
-          {activeFilterCount > 0 ? ` · ${activeFilterCount} filters` : ""}
-        </p>
+        <div className="flex items-center gap-2">
+          {onRefresh ? (
+            <RefreshButton
+              onRefresh={onRefresh}
+              isRefreshing={isRefreshing}
+              size="icon"
+            />
+          ) : null}
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {rows.length === records.length
+              ? `${records.length} records`
+              : `${rows.length} of ${records.length} records`}
+            {activeFilterCount > 0 ? ` · ${activeFilterCount} filters` : ""}
+          </p>
+        </div>
       </div>
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              {showOrganization ? (
-                <SortableHead
-                  label="Organization"
-                  sortKey="organization"
-                  sort={sort}
-                  onSort={toggleSort}
-                />
-              ) : null}
-              {properties.map((property) => (
-                <SortableHead
-                  key={property.name}
-                  label={propertyLabel(property.name)}
-                  description={property.description}
-                  sortKey={property.name}
-                  sort={sort}
-                  onSort={toggleSort}
-                  filterValues={uniqueColumnValues(
-                    searched,
-                    property,
-                    filesById
-                  )}
-                  selectedFilters={columnFilters[property.name] ?? []}
-                  onToggleFilter={(value) => toggleFilter(property.name, value)}
-                  onClearFilter={() =>
-                    setColumnFilters((current) => ({
-                      ...current,
-                      [property.name]: [],
-                    }))
-                  }
-                />
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length > 0 ? (
-              rows.map((row) => (
-                <TableRow key={row.id} className="group">
-                  {showOrganization ? (
-                    <TableCell className="py-2.5">
-                      <Link
-                        to={recordHref(row)}
-                        className="block min-w-[9rem] truncate text-muted-foreground"
-                      >
-                        {organizationsById.get(row.organizationId)?.name ??
-                          row.organizationId}
-                      </Link>
-                    </TableCell>
-                  ) : null}
-                  {properties.map((property) => (
-                    <TableCell key={property.name} className="py-2.5">
-                      <RecordCell
-                        record={row}
-                        property={property}
-                        filesById={filesById}
-                        href={recordHref(row)}
-                        onPreviewFile={setPreviewFileId}
-                      />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
+      <LoadingFrame
+        isLoading={isRefreshing}
+        className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10"
+      >
+        <div className="h-full min-h-0 overflow-auto">
+          <Table>
+            <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableCell
-                  colSpan={properties.length + (showOrganization ? 1 : 0)}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No records match this view.
-                </TableCell>
+                {showOrganization ? (
+                  <SortableHead
+                    label="Organization"
+                    sortKey="organization"
+                    sort={sort}
+                    onSort={toggleSort}
+                  />
+                ) : null}
+                {properties.map((property) => (
+                  <SortableHead
+                    key={property.name}
+                    label={propertyLabel(property.name)}
+                    description={property.description}
+                    sortKey={property.name}
+                    sort={sort}
+                    onSort={toggleSort}
+                    filterValues={uniqueColumnValues(
+                      searched,
+                      property,
+                      filesById
+                    )}
+                    selectedFilters={columnFilters[property.name] ?? []}
+                    onToggleFilter={(value) =>
+                      toggleFilter(property.name, value)
+                    }
+                    onClearFilter={() =>
+                      setColumnFilters((current) => ({
+                        ...current,
+                        [property.name]: [],
+                      }))
+                    }
+                  />
+                ))}
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {rows.length > 0 ? (
+                rows.map((row) => (
+                  <TableRow key={row.id} className="group">
+                    {showOrganization ? (
+                      <TableCell className="py-2.5">
+                        <Link
+                          to={recordHref(row)}
+                          className="block min-w-[9rem] truncate text-muted-foreground"
+                        >
+                          {organizationsById.get(row.organizationId)?.name ??
+                            row.organizationId}
+                        </Link>
+                      </TableCell>
+                    ) : null}
+                    {properties.map((property) => (
+                      <TableCell key={property.name} className="py-2.5">
+                        <RecordCell
+                          record={row}
+                          property={property}
+                          filesById={filesById}
+                          href={recordHref(row)}
+                          onPreviewFile={setPreviewFileId}
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={properties.length + (showOrganization ? 1 : 0)}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No records match this view.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </LoadingFrame>
 
       <FilePreviewDialog
         file={previewFile}

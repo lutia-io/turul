@@ -7,6 +7,7 @@ import {
   SearchIcon,
 } from "lucide-react"
 
+import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
@@ -131,12 +132,16 @@ export function DataTableToolbar({
   searchPlaceholder,
   filters,
   count,
+  onRefresh,
+  isRefreshing,
 }: {
   query: string
   onQueryChange: (query: string) => void
   searchPlaceholder: string
   filters?: ReactNode
   count: string
+  onRefresh?: () => void
+  isRefreshing?: boolean
 }) {
   return (
     <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -153,7 +158,16 @@ export function DataTableToolbar({
         </div>
         {filters}
       </div>
-      <p className="text-sm text-muted-foreground tabular-nums">{count}</p>
+      <div className="flex items-center gap-2">
+        {onRefresh ? (
+          <RefreshButton
+            onRefresh={onRefresh}
+            isRefreshing={isRefreshing}
+            size="icon"
+          />
+        ) : null}
+        <p className="text-sm text-muted-foreground tabular-nums">{count}</p>
+      </div>
     </div>
   )
 }
@@ -243,6 +257,7 @@ export function DataTable<T, K extends string>({
   onSort,
   getRowId,
   empty,
+  isRefreshing,
 }: {
   columns: DataTableColumn<T, K>[]
   rows: T[]
@@ -250,50 +265,56 @@ export function DataTable<T, K extends string>({
   onSort: (key: K) => void
   getRowId: (row: T) => string
   empty: string
+  isRefreshing?: boolean
 }) {
   return (
-    <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-xl border bg-background shadow-xs">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            {columns.map((column) =>
-              column.sortable === false ? (
-                <TableHead key={column.key}>{column.label}</TableHead>
-              ) : (
-                <DataTableHead
-                  key={column.key}
-                  label={column.label}
-                  sortKey={column.key}
-                  sort={sort}
-                  onSort={onSort}
-                />
-              )
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length > 0 ? (
-            rows.map((row) => (
-              <TableRow key={getRowId(row)}>
-                {columns.map((column) => (
-                  <TableCell key={column.key} className={column.className}>
-                    {column.render(row)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : (
+    <LoadingFrame
+      isLoading={isRefreshing}
+      className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border bg-background shadow-xs"
+    >
+      <div className="h-full min-h-0 overflow-auto">
+        <Table>
+          <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableCell
-                colSpan={Math.max(columns.length, 1)}
-                className="h-24 text-center text-muted-foreground"
-              >
-                {empty}
-              </TableCell>
+              {columns.map((column) =>
+                column.sortable === false ? (
+                  <TableHead key={column.key}>{column.label}</TableHead>
+                ) : (
+                  <DataTableHead
+                    key={column.key}
+                    label={column.label}
+                    sortKey={column.key}
+                    sort={sort}
+                    onSort={onSort}
+                  />
+                )
+              )}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {rows.length > 0 ? (
+              rows.map((row) => (
+                <TableRow key={getRowId(row)}>
+                  {columns.map((column) => (
+                    <TableCell key={column.key} className={column.className}>
+                      {column.render(row)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={Math.max(columns.length, 1)}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  {empty}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </LoadingFrame>
   )
 }

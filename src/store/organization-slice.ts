@@ -20,6 +20,15 @@ export type CreateOrganizationResponse = {
   id: string
 }
 
+export type UpdateOrganizationRequest = {
+  id: string
+  name: string
+}
+
+export type UpdateOrganizationResponse = {
+  id: string
+}
+
 const organizationApi = api.injectEndpoints({
   endpoints: (build) => ({
     listOrganizations: build.query<ApiOrganization[], void>({
@@ -27,7 +36,10 @@ const organizationApi = api.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "Organization" as const, id })),
+              ...result.map(({ id }) => ({
+                type: "Organization" as const,
+                id,
+              })),
               { type: "Organization", id: "LIST" },
             ]
           : [{ type: "Organization", id: "LIST" }],
@@ -63,6 +75,20 @@ const organizationApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: "Organization", id: "LIST" }],
     }),
+    updateOrganization: build.mutation<
+      UpdateOrganizationResponse,
+      UpdateOrganizationRequest
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/organization/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Organization", id },
+        { type: "Organization", id: "LIST" },
+      ],
+    }),
   }),
 })
 
@@ -70,4 +96,5 @@ export const {
   useListOrganizationsQuery,
   useGetOrganizationQuery,
   useCreateOrganizationMutation,
+  useUpdateOrganizationMutation,
 } = organizationApi

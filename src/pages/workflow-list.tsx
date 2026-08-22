@@ -1,4 +1,5 @@
 import { ExecutionListPage } from "@/components/execution-list-page"
+import { RefreshButton } from "@/components/refresh-button"
 import {
   apiWorkflowCurrentStep,
   apiWorkflowStatus,
@@ -19,7 +20,8 @@ export default function WorkflowList() {
   const { network, organizationId } = useNetworkWorkspace()
   const { workflows } = useWorkspaceWorkflows()
   const { organizations } = useWorkspaceOrganizations()
-  const { runs, isLoading, isError, error } = useWorkspaceWorkflowRuns()
+  const { runs, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceWorkflowRuns()
   const items = runs
     .filter((run) => matchesWorkflowScope(run, network?.id, organizationId))
     .flatMap((run) => {
@@ -73,9 +75,16 @@ export default function WorkflowList() {
   if (isError) {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {network ? `${network.name} workflows` : "Workflows"}
-        </h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {network ? `${network.name} workflows` : "Workflows"}
+          </h1>
+          <RefreshButton
+            onRefresh={refetch}
+            isRefreshing={isFetching}
+            size="icon"
+          />
+        </div>
         <p className="text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load workflows")}
         </p>
@@ -98,6 +107,8 @@ export default function WorkflowList() {
       emptyLabel="No workflows match this filter."
       showNetwork={!network}
       showOrganization={!organizationId}
+      onRefresh={refetch}
+      isRefreshing={isFetching}
     />
   )
 }

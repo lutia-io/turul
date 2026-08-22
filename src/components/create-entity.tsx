@@ -14,12 +14,13 @@ import { SchemaDefinitionDialog } from "@/components/schema-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
 
 type CreateState =
-  | { kind: "network" }
-  | { kind: "organization"; networkId?: string }
+  | { kind: "network"; networkId?: string }
+  | { kind: "organization"; networkId?: string; organizationId?: string }
   | {
       kind: "organizationUser"
       networkId?: string
       organizationId?: string
+      organizationUserId?: string
     }
   | {
       kind: "schema"
@@ -33,11 +34,14 @@ type CreateState =
 
 type CreateEntityContextValue = {
   openCreateNetwork: () => void
+  openEditNetwork: (networkId: string) => void
   openCreateOrganization: (networkId?: string) => void
+  openEditOrganization: (organizationId: string) => void
   openCreateOrganizationUser: (scope?: {
     networkId?: string
     organizationId?: string
   }) => void
+  openEditOrganizationUser: (organizationUserId: string) => void
   openCreateSchema: (scope?: {
     networkId?: string
     organizationId?: string
@@ -59,11 +63,20 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       openCreateNetwork() {
         setState({ kind: "network" })
       },
+      openEditNetwork(networkId) {
+        setState({ kind: "network", networkId })
+      },
       openCreateOrganization(networkId) {
         setState({ kind: "organization", networkId })
       },
+      openEditOrganization(organizationId) {
+        setState({ kind: "organization", organizationId })
+      },
       openCreateOrganizationUser(scope) {
         setState({ kind: "organizationUser", ...scope })
+      },
+      openEditOrganizationUser(organizationUserId) {
+        setState({ kind: "organizationUser", organizationUserId })
       },
       openCreateSchema(scope) {
         setState({ kind: "schema", ...scope })
@@ -101,6 +114,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
             close()
           }
         }}
+        networkId={state?.kind === "network" ? state.networkId : undefined}
       />
       <CreateOrganizationDialog
         open={state?.kind === "organization"}
@@ -110,6 +124,9 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           }
         }}
         networkId={state?.kind === "organization" ? state.networkId : undefined}
+        organizationId={
+          state?.kind === "organization" ? state.organizationId : undefined
+        }
       />
       <CreateOrganizationUserDialog
         open={state?.kind === "organizationUser"}
@@ -123,6 +140,11 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
         organizationId={
           state?.kind === "organizationUser" ? state.organizationId : undefined
+        }
+        organizationUserId={
+          state?.kind === "organizationUser"
+            ? state.organizationUserId
+            : undefined
         }
       />
       <SchemaDefinitionDialog

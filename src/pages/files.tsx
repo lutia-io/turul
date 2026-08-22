@@ -67,7 +67,8 @@ function formatCreatedAt(value: string) {
 export default function FilesPage() {
   const { network, organizationId } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
-  const { files, isLoading, isError, error } = useWorkspaceFiles()
+  const { files, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceFiles()
   const [query, setQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [previewFileId, setPreviewFileId] = useState<string>()
@@ -77,7 +78,9 @@ export default function FilesPage() {
   })
   const organizationsById = useMemo(
     () =>
-      new Map(organizations.map((organization) => [organization.id, organization])),
+      new Map(
+        organizations.map((organization) => [organization.id, organization])
+      ),
     [organizations]
   )
   const scoped = files.filter((file) => {
@@ -222,6 +225,8 @@ export default function FilesPage() {
           total: scoped.length,
           singular: "file",
         })}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
@@ -238,6 +243,7 @@ export default function FilesPage() {
             )
           }
           getRowId={(file) => file.id}
+          isRefreshing={isFetching}
           empty={
             isLoading
               ? "Loading files..."

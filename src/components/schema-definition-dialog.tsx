@@ -42,7 +42,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import type { JsonSchemaPropertySpec } from "@/data/define-records"
-import { getSchema, updateSchema } from "@/data/networks"
+import { getSchema } from "@/data/networks"
 import {
   getJsonSchemaProperties,
   parseJsonObject,
@@ -62,6 +62,7 @@ import { getHumaErrorMessage } from "@/store/api"
 import {
   useCreateSchemaMutation,
   useGetSchemaQuery,
+  useUpdateSchemaMutation,
 } from "@/store/schema-slice"
 
 const propertyTypes = [
@@ -287,7 +288,10 @@ export function SchemaDefinitionDialog({
   const formId = useId()
   const { networks } = useWorkspaceNetworks()
   const { organizations } = useWorkspaceOrganizations()
-  const [createSchema, { isLoading, error, reset }] = useCreateSchemaMutation()
+  const [createSchema, createState] = useCreateSchemaMutation()
+  const [updateSchema, updateState] = useUpdateSchemaMutation()
+  const isLoading = createState.isLoading || updateState.isLoading
+  const error = createState.error ?? updateState.error
   const apiSchemaQuery = useGetSchemaQuery(schemaId ?? "", {
     skip: !open || !schemaId,
   })
@@ -329,10 +333,11 @@ export function SchemaDefinitionDialog({
 
   useEffect(() => {
     if (open) {
-      reset()
+      createState.reset()
+      updateState.reset()
       setSelectedOrganizationId(organizationId ?? "")
     }
-  }, [open, organizationId, reset])
+  }, [createState.reset, open, organizationId, updateState.reset])
 
   useEffect(() => {
     if (!open) {
@@ -540,24 +545,20 @@ export function SchemaDefinitionDialog({
       return
     }
 
-    const input = {
-      name,
-      slug: slugTouched ? slug : slugifyId(name),
-      description,
-      active,
-      ...toSchemaInput(properties),
-    }
-
-    if (editing) {
-      if (existing) {
-        updateSchema(schemaId!, input)
-      }
-      onOpenChange(false)
-      return
-    }
+    const definition = parseJsonObject(jsonText) ?? generatedDefinition
 
     try {
-      const definition = parseJsonObject(jsonText) ?? generatedDefinition
+      if (editing) {
+        await updateSchema({
+          id: schemaId!,
+          name: name.trim(),
+          active,
+          definition,
+        }).unwrap()
+        onOpenChange(false)
+        return
+      }
+
       const schema = await createSchema({
         name: name.trim(),
         active,
@@ -822,7 +823,9 @@ export function SchemaDefinitionDialog({
               }
             >
               {isLoading
-                ? "Creating..."
+                ? editing
+                  ? "Saving..."
+                  : "Creating..."
                 : editing
                   ? "Save schema"
                   : "Create schema"}

@@ -22,16 +22,12 @@ import { useWorkspaceNetworks } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
 
 type NetworkSortKey =
-  | "name"
-  | "status"
-  | "industry"
-  | "headquarters"
-  | "organizations"
-  | "schemas"
+  "name" | "status" | "industry" | "headquarters" | "organizations" | "schemas"
 
 export default function NetworkList() {
   const { openCreateNetwork } = useCreateEntity()
-  const { networks, isLoading, isError, error } = useWorkspaceNetworks()
+  const { networks, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceNetworks()
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sort, setSort] = useState<DataTableSort<NetworkSortKey>>({
@@ -162,6 +158,8 @@ export default function NetworkList() {
           total: networks.length,
           singular: "network",
         })}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
@@ -174,6 +172,7 @@ export default function NetworkList() {
           sort={sort}
           onSort={(key) => setSort((current) => toggleSort(current, key))}
           getRowId={(network) => network.id}
+          isRefreshing={isFetching}
           empty={
             isLoading
               ? "Loading networks..."

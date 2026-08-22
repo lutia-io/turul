@@ -6,6 +6,7 @@ import {
   SchemaRecordsTable,
   SchemaSheetTabs,
 } from "@/components/schema-records-table"
+import { RefreshButton } from "@/components/refresh-button"
 import { type Network } from "@/data/networks"
 import { getBadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
@@ -21,10 +22,19 @@ import { getHumaErrorMessage } from "@/store/api"
 
 export default function RecordsPage() {
   const { network, organizationId } = useNetworkWorkspace()
-  const { networks: workspaceNetworks } = useWorkspaceNetworks()
+  const {
+    networks: workspaceNetworks,
+    refetch: refetchNetworks,
+    isFetching: isNetworksFetching,
+  } = useWorkspaceNetworks()
   const { organizations } = useWorkspaceOrganizations()
-  const { records, isLoading, isError, error } = useWorkspaceRecords()
-  const { files } = useWorkspaceFiles()
+  const { records, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceRecords()
+  const {
+    files,
+    refetch: refetchFiles,
+    isFetching: isFilesFetching,
+  } = useWorkspaceFiles()
   const [params, setParams] = useSearchParams()
   const networks = network ? [network] : workspaceNetworks
   const requestedNetworkId = params.get("network")
@@ -41,7 +51,10 @@ export default function RecordsPage() {
     [files]
   )
   const organizationsById = useMemo(
-    () => new Map(organizations.map((organization) => [organization.id, organization])),
+    () =>
+      new Map(
+        organizations.map((organization) => [organization.id, organization])
+      ),
     [organizations]
   )
   const visibleRecords = records.filter((record) => {
@@ -74,6 +87,14 @@ export default function RecordsPage() {
 
     setParams(nextParams, { replace: true })
   }
+
+  function refreshRecords() {
+    void refetch()
+    void refetchFiles()
+    void refetchNetworks()
+  }
+
+  const isRefreshing = isFetching || isFilesFetching || isNetworksFetching
 
   return (
     <div className="flex h-[calc(100svh-var(--app-header-height))] min-h-0 flex-col gap-4 overflow-hidden bg-muted/40 p-4 sm:p-6">
@@ -111,9 +132,16 @@ export default function RecordsPage() {
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading records...</p>
       ) : isError ? (
-        <p className="text-sm text-destructive">
-          {getHumaErrorMessage(error, "Failed to load records")}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-destructive">
+            {getHumaErrorMessage(error, "Failed to load records")}
+          </p>
+          <RefreshButton
+            onRefresh={refreshRecords}
+            isRefreshing={isRefreshing}
+            size="icon"
+          />
+        </div>
       ) : activeSchema ? (
         <SchemaRecordsTable
           schema={activeSchema}
@@ -121,6 +149,8 @@ export default function RecordsPage() {
           filesById={filesById}
           organizationsById={organizationsById}
           showOrganization={!organizationId}
+          onRefresh={refreshRecords}
+          isRefreshing={isRefreshing}
           recordHref={(record) =>
             networkWorkspacePath({
               networkId: record.networkId,

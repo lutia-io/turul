@@ -22,6 +22,15 @@ export type CreateRecordResponse = {
   id: string
 }
 
+export type UpdateRecordRequest = {
+  id: string
+  data: JsonObject
+}
+
+export type UpdateRecordResponse = {
+  id: string
+}
+
 const recordApi = api.injectEndpoints({
   endpoints: (build) => ({
     listRecords: build.query<ApiRecord[], void>({
@@ -56,6 +65,17 @@ const recordApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: "Record", id: "LIST" }],
     }),
+    updateRecord: build.mutation<UpdateRecordResponse, UpdateRecordRequest>({
+      query: ({ id, ...body }) => ({
+        url: `/record/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: "Record", id },
+        { type: "Record", id: "LIST" },
+      ],
+    }),
   }),
 })
 
@@ -63,4 +83,5 @@ export const {
   useListRecordsQuery,
   useGetRecordQuery,
   useCreateRecordMutation,
+  useUpdateRecordMutation,
 } = recordApi

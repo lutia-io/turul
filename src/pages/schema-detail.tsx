@@ -155,6 +155,7 @@ export default function SchemaDetail() {
             </div>
             <Button
               variant="outline"
+              disabled={visibleSchema.internal}
               onClick={() => openEditSchema(visibleSchema.id)}
             >
               <PencilIcon />

@@ -1,5 +1,13 @@
 import { Link, useParams } from "react-router"
-import { Building2Icon, GalleryVerticalEndIcon, UsersIcon } from "lucide-react"
+import {
+  Building2Icon,
+  GalleryVerticalEndIcon,
+  PencilIcon,
+  UsersIcon,
+} from "lucide-react"
+
+import { useCreateEntity } from "@/components/create-entity"
+import { Button } from "@/components/ui/button"
 
 import { formatRelativeTime } from "@/lib/runs"
 import {
@@ -19,6 +27,7 @@ export default function OrganizationUserDetail() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network: workspaceNetwork, organizationId } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
+  const { openEditOrganizationUser } = useCreateEntity()
   const organizationUserQuery = useGetOrganizationUserQuery(
     organizationUserId ?? "",
     { skip: !isAuthenticated || !organizationUserId }
@@ -73,11 +82,20 @@ export default function OrganizationUserDetail() {
               <h1 className="text-2xl font-semibold tracking-tight">
                 {organizationUserName(visibleUser)}
               </h1>
-              <p className="text-sm text-muted-foreground">{visibleUser.email}</p>
+              <p className="text-sm text-muted-foreground">
+                {visibleUser.email}
+              </p>
               <p className="text-xs text-muted-foreground">
                 Created {formatRelativeTime(visibleUser.createdAt)}
               </p>
             </div>
+            <Button
+              variant="outline"
+              onClick={() => openEditOrganizationUser(visibleUser.id)}
+            >
+              <PencilIcon />
+              Edit
+            </Button>
           </div>
 
           {organization ? (
