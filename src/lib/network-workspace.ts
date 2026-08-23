@@ -154,7 +154,7 @@ export function workspaceOrganizationFromApi(
     members: 0,
     description: "",
     status: "Active",
-    color: "orange",
+    color: "cyan",
     networkId: organization.networkId,
   }
 }
