@@ -167,7 +167,6 @@ function StatCard({
   detail,
   color,
   icon: Icon,
-  iconClassName,
 }: {
   to: string
   label: string
@@ -175,7 +174,6 @@ function StatCard({
   detail: string
   color: BadgeColor
   icon: LucideIcon
-  iconClassName?: string
 }) {
   const tone = getBadgeColor(color)
 
@@ -192,8 +190,7 @@ function StatCard({
               className={cn(
                 "flex size-9 items-center justify-center rounded-lg",
                 tone.bg,
-                tone.text,
-                iconClassName
+                tone.text
               )}
             >
               <Icon className="size-4" />
@@ -857,7 +854,6 @@ export default function Home() {
                 }
                 color="cyan"
                 icon={Building2Icon}
-                iconClassName="text-white"
               />
               <StatCard
                 to={workspaceHref("records")}

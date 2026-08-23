@@ -41,7 +41,7 @@ export const badgeColors = {
   },
   cyan: {
     bg: "bg-cyan-500",
-    text: "text-cyan-950",
+    text: "text-white",
     fg: "text-cyan-600 dark:text-cyan-400",
   },
   teal: {
