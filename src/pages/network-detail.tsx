@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 import { Link } from "react-router"
 import {
   ArrowRightIcon,
@@ -21,6 +21,12 @@ import { useCreateEntity } from "@/components/create-entity"
 import { StatusBadge } from "@/components/json-definition-card"
 import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { ActivityChart, RunStatusChart } from "@/components/workspace-charts"
+import {
+  ACTIVITY_DAYS,
+  bucketActivity,
+  summarizeActivity,
+} from "@/lib/activity"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
   getPipelineStages,
@@ -353,6 +359,67 @@ export default function NetworkDetail() {
     isFilesFetching ||
     isRunsFetching
 
+  const scopedRecords = useMemo(
+    () =>
+      records.filter((record) => {
+        if (!network || record.networkId !== network.id) {
+          return false
+        }
+        return !organizationId || record.organizationId === organizationId
+      }),
+    [network, organizationId, records]
+  )
+  const scopedFiles = useMemo(
+    () =>
+      files.filter((file) => {
+        if (!network || file.networkId !== network.id) {
+          return false
+        }
+        return !organizationId || file.organizationId === organizationId
+      }),
+    [files, network, organizationId]
+  )
+  const scopedWorkflows = useMemo(
+    () =>
+      network
+        ? workflowRuns.filter((run) =>
+            matchesWorkflowScope(run, network.id, organizationId)
+          )
+        : [],
+    [network, organizationId, workflowRuns]
+  )
+  const runningWorkflows = scopedWorkflows.filter(
+    (run) => run.status === "running"
+  ).length
+  const queuedWorkflows = scopedWorkflows.filter(
+    (run) => run.status === "pending"
+  ).length
+  const completedWorkflows = scopedWorkflows.filter(
+    (run) => run.status === "completed"
+  ).length
+  const failedWorkflows = scopedWorkflows.filter(
+    (run) => run.status === "failed"
+  ).length
+  const activity = useMemo(
+    () =>
+      bucketActivity({
+        records: scopedRecords,
+        files: scopedFiles,
+        runs: scopedWorkflows,
+      }),
+    [scopedFiles, scopedRecords, scopedWorkflows]
+  )
+  const activityTotals = useMemo(() => summarizeActivity(activity), [activity])
+  const runStatusData = useMemo(
+    () => [
+      { status: "running" as const, value: runningWorkflows },
+      { status: "pending" as const, value: queuedWorkflows },
+      { status: "completed" as const, value: completedWorkflows },
+      { status: "failed" as const, value: failedWorkflows },
+    ],
+    [completedWorkflows, failedWorkflows, queuedWorkflows, runningWorkflows]
+  )
+
   if (!network) {
     return (
       <div className="flex flex-1 flex-col gap-2 p-4">
@@ -380,31 +447,10 @@ export default function NetworkDetail() {
   const accentColor = organization?.color ?? network.color
   const tone = getBadgeColor(accentColor)
   const HeaderIcon = organization ? Building2Icon : GalleryVerticalEndIcon
-  const scopedRecords = records.filter((record) => {
-    if (record.networkId !== network.id) {
-      return false
-    }
-    return !organizationId || record.organizationId === organizationId
-  })
-  const scopedFiles = files.filter((file) => {
-    if (file.networkId !== network.id) {
-      return false
-    }
-    return !organizationId || file.organizationId === organizationId
-  })
-  const scopedWorkflows = workflowRuns.filter((run) =>
-    matchesWorkflowScope(run, network.id, organizationId)
-  )
   const pipelineViews = listPipelineRunViews({
     networkId: network.id,
     organizationId,
   })
-  const runningWorkflows = scopedWorkflows.filter(
-    (run) => run.status === "running"
-  ).length
-  const queuedWorkflows = scopedWorkflows.filter(
-    (run) => run.status === "pending"
-  ).length
   const runningPipelines = pipelineViews.filter(
     (view) => view.run.status === "Running"
   ).length
@@ -580,69 +626,86 @@ export default function NetworkDetail() {
       </div>
 
       <LoadingFrame isLoading={isRefreshing} className="rounded-xl">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          <StatCard
-            to="#organizations"
-            label="Organizations"
-            value={network.organizations.length}
-            live={organizationCounts.live}
-            draft={organizationCounts.draft}
-            liveLabel="active"
-            color={accentColor}
-            icon={Building2Icon}
-          />
-          <StatCard
-            to={href("schemas")}
-            label="Schemas"
-            value={network.schemas.length}
-            live={schemaCounts.live}
-            draft={schemaCounts.draft}
-            liveLabel="published"
-            color={accentColor}
-            icon={FileJsonIcon}
-          />
-          <StatCard
-            to={href("records")}
-            label="Records"
-            value={scopedRecords.length}
-            live={scopedRecords.length}
-            draft={0}
-            liveLabel="rows"
-            color={accentColor}
-            icon={TableIcon}
-          />
-          <StatCard
-            to={href("files")}
-            label="Files"
-            value={scopedFiles.length}
-            live={scopedFiles.length}
-            draft={0}
-            liveLabel="uploaded"
-            color={accentColor}
-            icon={FileIcon}
-          />
-          <StatCard
-            to={href("workflows")}
-            label="Workflows"
-            value={runningWorkflows + queuedWorkflows}
-            live={runningWorkflows}
-            draft={queuedWorkflows}
-            liveLabel="running"
-            draftLabel="queued"
-            color={accentColor}
-            icon={PlayIcon}
-          />
-          <StatCard
-            to={href("pipelines")}
-            label="Pipelines"
-            value={runningPipelines + queuedPipelines}
-            live={runningPipelines}
-            draft={queuedPipelines}
-            liveLabel="running"
-            draftLabel="queued"
-            color={accentColor}
-            icon={LayersIcon}
-          />
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <StatCard
+              to="#organizations"
+              label="Organizations"
+              value={network.organizations.length}
+              live={organizationCounts.live}
+              draft={organizationCounts.draft}
+              liveLabel="active"
+              color={accentColor}
+              icon={Building2Icon}
+            />
+            <StatCard
+              to={href("schemas")}
+              label="Schemas"
+              value={network.schemas.length}
+              live={schemaCounts.live}
+              draft={schemaCounts.draft}
+              liveLabel="published"
+              color={accentColor}
+              icon={FileJsonIcon}
+            />
+            <StatCard
+              to={href("records")}
+              label="Records"
+              value={scopedRecords.length}
+              live={scopedRecords.length}
+              draft={0}
+              liveLabel="rows"
+              color={accentColor}
+              icon={TableIcon}
+            />
+            <StatCard
+              to={href("files")}
+              label="Files"
+              value={scopedFiles.length}
+              live={scopedFiles.length}
+              draft={0}
+              liveLabel="uploaded"
+              color={accentColor}
+              icon={FileIcon}
+            />
+            <StatCard
+              to={href("workflows")}
+              label="Workflows"
+              value={runningWorkflows + queuedWorkflows}
+              live={runningWorkflows}
+              draft={queuedWorkflows}
+              liveLabel="running"
+              draftLabel="queued"
+              color={accentColor}
+              icon={PlayIcon}
+            />
+            <StatCard
+              to={href("pipelines")}
+              label="Pipelines"
+              value={runningPipelines + queuedPipelines}
+              live={runningPipelines}
+              draft={queuedPipelines}
+              liveLabel="running"
+              draftLabel="queued"
+              color={accentColor}
+              icon={LayersIcon}
+            />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_22rem]">
+            <ActivityChart
+              data={activity}
+              total={activityTotals.total}
+              change={activityTotals.change}
+              title="Network activity"
+              description={`Records, files, and workflow runs${scopeLabel} over the last ${ACTIVITY_DAYS} days.`}
+            />
+            <RunStatusChart
+              data={runStatusData}
+              total={scopedWorkflows.length}
+              description={`Run status${scopeLabel}.`}
+            />
+          </div>
         </div>
       </LoadingFrame>
 

@@ -1,15 +1,6 @@
 import { useMemo } from "react"
 import { Link } from "react-router"
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Label,
-  Pie,
-  PieChart,
-  XAxis,
-} from "recharts"
-import {
   ArrowRightIcon,
   Building2Icon,
   FileIcon,
@@ -18,8 +9,6 @@ import {
   ListIcon,
   PlusIcon,
   TableIcon,
-  TrendingDownIcon,
-  TrendingUpIcon,
   WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -39,15 +28,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ActivityChart, RunStatusChart } from "@/components/workspace-charts"
+import { bucketActivity, summarizeActivity } from "@/lib/activity"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
   networkWorkspacePath,
@@ -61,42 +44,6 @@ import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import { selectAuthEmail } from "@/store/auth-slice"
 import { useAppSelector } from "@/store/hooks"
-
-const ACTIVITY_DAYS = 14
-
-const activityChartConfig = {
-  records: {
-    label: "Records",
-    color: "var(--chart-1)",
-  },
-  files: {
-    label: "Files",
-    color: "var(--chart-2)",
-  },
-  runs: {
-    label: "Workflow runs",
-    color: "var(--chart-3)",
-  },
-} satisfies ChartConfig
-
-const runStatusChartConfig = {
-  running: {
-    label: "Running",
-    color: "oklch(0.72 0.12 215)",
-  },
-  pending: {
-    label: "Queued",
-    color: "oklch(0.83 0.14 85)",
-  },
-  completed: {
-    label: "Completed",
-    color: "oklch(0.7 0.15 155)",
-  },
-  failed: {
-    label: "Failed",
-    color: "oklch(0.64 0.22 27)",
-  },
-} satisfies ChartConfig
 
 function displayNameFromEmail(email: string | null) {
   if (!email) {
@@ -112,32 +59,6 @@ function greetingForHour(hour: number) {
   return "Good evening"
 }
 
-function dayKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-}
-
-function dayKeyFromIso(iso: string) {
-  return dayKey(new Date(iso))
-}
-
-function lastNDays(count: number, now = new Date()) {
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(start)
-    date.setDate(start.getDate() - (count - 1 - index))
-
-    return {
-      key: dayKey(date),
-      label: date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
-    }
-  })
-}
-
 function countByStatus<T>(items: T[], statusOf: (item: T) => string) {
   return items.reduce(
     (counts, item) => {
@@ -150,14 +71,6 @@ function countByStatus<T>(items: T[], statusOf: (item: T) => string) {
     },
     { live: 0, draft: 0 }
   )
-}
-
-function percentChange(current: number, previous: number) {
-  if (previous === 0) {
-    return current > 0 ? 100 : 0
-  }
-
-  return Math.round(((current - previous) / previous) * 100)
 }
 
 function StatCard({
@@ -330,198 +243,6 @@ function AttentionCard({
   )
 }
 
-function ActivityChart({
-  data,
-  total,
-  change,
-}: {
-  data: { label: string; records: number; files: number; runs: number }[]
-  total: number
-  change: number
-}) {
-  const TrendIcon = change < 0 ? TrendingDownIcon : TrendingUpIcon
-
-  return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>Workspace activity</CardTitle>
-        <CardDescription>
-          Records, files, and workflow runs over the last {ACTIVITY_DAYS} days.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer
-          config={activityChartConfig}
-          className="aspect-auto h-[220px] w-full"
-        >
-          <AreaChart
-            accessibilityLayer
-            data={data}
-            margin={{ left: 8, right: 8, top: 8 }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="label"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              interval="equidistantPreserveStart"
-              minTickGap={24}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={<ChartTooltipContent indicator="line" />}
-            />
-            <ChartLegend content={<ChartLegendContent />} />
-            <Area
-              dataKey="records"
-              type="monotone"
-              fill="var(--color-records)"
-              fillOpacity={0.35}
-              stroke="var(--color-records)"
-              strokeWidth={1.5}
-              stackId="activity"
-            />
-            <Area
-              dataKey="files"
-              type="monotone"
-              fill="var(--color-files)"
-              fillOpacity={0.35}
-              stroke="var(--color-files)"
-              strokeWidth={1.5}
-              stackId="activity"
-            />
-            <Area
-              dataKey="runs"
-              type="monotone"
-              fill="var(--color-runs)"
-              fillOpacity={0.4}
-              stroke="var(--color-runs)"
-              strokeWidth={1.5}
-              stackId="activity"
-            />
-          </AreaChart>
-        </ChartContainer>
-      </CardContent>
-      <CardFooter className="gap-2 text-sm">
-        {total === 0 ? (
-          <span className="text-muted-foreground">
-            No records, files, or runs in this window.
-          </span>
-        ) : (
-          <>
-            <TrendIcon className="size-4" />
-            <span className="font-medium tabular-nums">
-              {total.toLocaleString()} events
-            </span>
-            <span className="text-muted-foreground">
-              {change === 0
-                ? "even with the prior 7 days"
-                : `${Math.abs(change)}% ${change > 0 ? "up" : "down"} from the prior 7 days`}
-            </span>
-          </>
-        )}
-      </CardFooter>
-    </Card>
-  )
-}
-
-function RunStatusChart({
-  data,
-  total,
-}: {
-  data: { status: keyof typeof runStatusChartConfig; value: number }[]
-  total: number
-}) {
-  const slices = data.filter((item) => item.value > 0)
-
-  return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>Workflow health</CardTitle>
-        <CardDescription>Run status across the workspace.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col justify-center">
-        {total === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            No workflow runs yet.
-          </p>
-        ) : (
-          <ChartContainer
-            config={runStatusChartConfig}
-            className="mx-auto aspect-square max-h-[220px]"
-          >
-            <PieChart>
-              <ChartTooltip
-                content={<ChartTooltipContent hideLabel nameKey="status" />}
-              />
-              <Pie
-                data={slices.map((item) => ({
-                  ...item,
-                  fill: `var(--color-${item.status})`,
-                }))}
-                dataKey="value"
-                nameKey="status"
-                innerRadius={62}
-                strokeWidth={5}
-              >
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                      return (
-                        <text
-                          x={viewBox.cx}
-                          y={viewBox.cy}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                        >
-                          <tspan
-                            x={viewBox.cx}
-                            y={viewBox.cy}
-                            className="fill-foreground text-3xl font-semibold"
-                          >
-                            {total.toLocaleString()}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy ?? 0) + 22}
-                            className="fill-muted-foreground text-xs"
-                          >
-                            runs
-                          </tspan>
-                        </text>
-                      )
-                    }
-                  }}
-                />
-              </Pie>
-            </PieChart>
-          </ChartContainer>
-        )}
-      </CardContent>
-      <CardFooter className="flex-col items-stretch gap-2">
-        {data.map((item) => (
-          <div
-            key={item.status}
-            className="flex items-center justify-between gap-3 text-sm"
-          >
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <span
-                className="size-2 rounded-full"
-                style={{
-                  backgroundColor: runStatusChartConfig[item.status].color,
-                }}
-              />
-              {runStatusChartConfig[item.status].label}
-            </span>
-            <span className="font-medium tabular-nums">{item.value}</span>
-          </div>
-        ))}
-      </CardFooter>
-    </Card>
-  )
-}
-
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-6">
@@ -617,66 +338,24 @@ export default function Home() {
     (run) => run.status === "completed"
   ).length
 
-  const activity = useMemo(() => {
-    const days = lastNDays(ACTIVITY_DAYS)
-    const counts = new Map(
-      days.map((day) => [day.key, { records: 0, files: 0, runs: 0 }])
-    )
-
-    for (const record of records) {
-      const key = dayKeyFromIso(record.createdAt)
-      const bucket = counts.get(key)
-      if (bucket) bucket.records += 1
-    }
-
-    for (const file of files) {
-      const key = dayKeyFromIso(file.createdAt)
-      const bucket = counts.get(key)
-      if (bucket) bucket.files += 1
-    }
-
-    for (const run of workflowRuns) {
-      const key = dayKeyFromIso(run.createdAt)
-      const bucket = counts.get(key)
-      if (bucket) bucket.runs += 1
-    }
-
-    return days.map((day) => ({
-      label: day.label,
-      ...counts.get(day.key)!,
-    }))
-  }, [files, records, workflowRuns])
-
-  const activityTotals = useMemo(() => {
-    const sum = (slice: typeof activity, key: "records" | "files" | "runs") =>
-      slice.reduce((total, day) => total + day[key], 0)
-    const recent = activity.slice(-7)
-    const previous = activity.slice(0, 7)
-    const recentTotal =
-      sum(recent, "records") + sum(recent, "files") + sum(recent, "runs")
-    const previousTotal =
-      sum(previous, "records") + sum(previous, "files") + sum(previous, "runs")
-
-    return {
-      total:
-        sum(activity, "records") +
-        sum(activity, "files") +
-        sum(activity, "runs"),
-      change: percentChange(recentTotal, previousTotal),
-    }
-  }, [activity])
+  const activity = useMemo(
+    () =>
+      bucketActivity({
+        records,
+        files,
+        runs: workflowRuns,
+      }),
+    [files, records, workflowRuns]
+  )
+  const activityTotals = useMemo(() => summarizeActivity(activity), [activity])
 
   const runStatusData = useMemo(
-    () =>
-      [
-        { status: "running" as const, value: runningWorkflows },
-        { status: "pending" as const, value: queuedWorkflows },
-        { status: "completed" as const, value: completedWorkflows },
-        { status: "failed" as const, value: failedWorkflows },
-      ] satisfies {
-        status: keyof typeof runStatusChartConfig
-        value: number
-      }[],
+    () => [
+      { status: "running" as const, value: runningWorkflows },
+      { status: "pending" as const, value: queuedWorkflows },
+      { status: "completed" as const, value: completedWorkflows },
+      { status: "failed" as const, value: failedWorkflows },
+    ],
     [completedWorkflows, failedWorkflows, queuedWorkflows, runningWorkflows]
   )
 
@@ -859,12 +538,7 @@ export default function Home() {
                 to={workspaceHref("records")}
                 label="Records"
                 value={records.length}
-                detail={`${activity
-                  .slice(-7)
-                  .reduce(
-                    (total, day) => total + day.records,
-                    0
-                  )} created this week`}
+                detail={`${activityTotals.recordsThisWeek} created this week`}
                 color="blue"
                 icon={TableIcon}
               />
@@ -872,12 +546,7 @@ export default function Home() {
                 to={workspaceHref("files")}
                 label="Files"
                 value={files.length}
-                detail={`${activity
-                  .slice(-7)
-                  .reduce(
-                    (total, day) => total + day.files,
-                    0
-                  )} uploaded this week`}
+                detail={`${activityTotals.filesThisWeek} uploaded this week`}
                 color="gray"
                 icon={FileIcon}
               />
