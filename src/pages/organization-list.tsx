@@ -1,184 +1,375 @@
-import { useMemo, useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Link } from "react-router"
+import { PencilIcon, PlusIcon, ViewIcon } from "lucide-react"
+import { useTable } from "@tanstack/react-table"
 
 import {
-  DataTable,
   DataTableCellLink,
-  DataTableFilter,
   DataTablePage,
   DataTableToolbar,
-  compareText,
-  dataTableCount,
-  matchesQuery,
-  toggleSort,
-  type DataTableColumn,
-  type DataTableSort,
+  dataTablePageSummary,
 } from "@/components/data-table"
-import { StatusBadge } from "@/components/json-definition-card"
+import {
+  createManagedColumnHelper,
+  DataTableActiveFilters,
+  DataTableColumnHeader,
+  DataTablePagination,
+  DataTableRowActions,
+  DataTableView,
+  DataTableViewOptions,
+  managedTableFeatures,
+  stringFilterOps,
+  type ColumnPinningState,
+  type DataTableActiveFilter,
+  type PaginationState,
+  type SortingState,
+  type StringFilterOp,
+} from "@/components/data-table-view"
 import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
-import type { Network, Organization } from "@/data/networks"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import {
   networkWorkspacePath,
-  useWorkspaceNetworks,
+  useNetworkWorkspace,
 } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
-
-type OrganizationSortKey =
-  "name" | "status" | "type" | "location" | "network" | "members"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import {
+  useListOrganizationsQuery,
+  type ApiOrganization,
+  type ListOrganizationsParams,
+  type OrganizationListSort,
+} from "@/store/organization-slice"
 
 type OrganizationRow = {
-  organization: Organization
-  network: Network
+  id: string
+  name: string
+  slug: string
+  networkId: string
+  createdAt: string
+  updatedAt: string
+}
+
+const helper = createManagedColumnHelper<OrganizationRow>()
+const EMPTY_ORGANIZATIONS: OrganizationRow[] = []
+
+type OrganizationColumnFilters = {
+  name?: { op: StringFilterOp; value: string }
+  slug?: { op: StringFilterOp; value: string }
+}
+
+const sortFields: OrganizationListSort[] = [
+  "name",
+  "slug",
+  "createdAt",
+  "updatedAt",
+  "network",
+]
+
+function isOrganizationSort(value: string): value is OrganizationListSort {
+  return sortFields.includes(value as OrganizationListSort)
+}
+
+function headerPin(column: {
+  getIsPinned: () => false | "start" | "end"
+  pin: (position: false | "start" | "end") => void
+}) {
+  return {
+    position: column.getIsPinned(),
+    onPin: (position: false | "start" | "end") => column.pin(position),
+  }
+}
+
+function organizationFromApi(organization: ApiOrganization): OrganizationRow {
+  return {
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    networkId: organization.networkId,
+    createdAt: organization.createdAt,
+    updatedAt: organization.updatedAt,
+  }
+}
+
+function formatCreatedAt(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value))
 }
 
 export default function OrganizationList() {
-  const { openCreateOrganization } = useCreateEntity()
-  const { networks, isLoading, isFetching, isError, error, refetch } =
-    useWorkspaceNetworks()
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const { network, organization, organizationId } = useNetworkWorkspace()
+  const { openCreateOrganization, openEditOrganization } = useCreateEntity()
   const [query, setQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [sort, setSort] = useState<DataTableSort<OrganizationSortKey>>({
-    key: "name",
-    direction: "asc",
-  })
-  const items = useMemo(
-    () =>
-      networks.flatMap((network) =>
-        network.organizations.map((organization) => ({ organization, network }))
-      ),
-    [networks]
+  const debouncedQuery = useDebouncedValue(query)
+  const [columnFilters, setColumnFilters] = useState<OrganizationColumnFilters>(
+    {}
   )
-  const filtered = items.filter(({ organization, network }) => {
-    if (statusFilter !== "all" && organization.status !== statusFilter) {
-      return false
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: false },
+  ])
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
+  })
+  const [columnVisibility, setColumnVisibility] = useState({})
+  const [columnSizing, setColumnSizing] = useState({})
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
+    start: [],
+    end: ["actions"],
+  })
+
+  useEffect(() => {
+    setPagination((current) => ({ ...current, pageIndex: 0 }))
+  }, [debouncedQuery, columnFilters, network?.id, organizationId])
+
+  const listParams = useMemo<ListOrganizationsParams>(() => {
+    const sort = sorting[0]
+    return {
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      q: debouncedQuery.trim() || undefined,
+      sort: sort && isOrganizationSort(sort.id) ? sort.id : "name",
+      order: sort?.desc ? "desc" : "asc",
+      networkId: network?.id,
+      name: columnFilters.name?.value,
+      nameOp: columnFilters.name?.op,
+      slug: columnFilters.slug?.value,
+      slugOp: columnFilters.slug?.op,
     }
+  }, [
+    columnFilters,
+    debouncedQuery,
+    network?.id,
+    pagination.pageIndex,
+    pagination.pageSize,
+    sorting,
+  ])
 
-    return matchesQuery(query, [
-      organization.name,
-      organization.status,
-      organization.type,
-      organization.location,
-      network.name,
-      organization.id,
-    ])
-  })
-  const rows = [...filtered].sort((left, right) => {
-    const result = compareOrganizations(left, right, sort.key)
-    return sort.direction === "asc" ? result : -result
-  })
-  const filtersActive = query.trim().length > 0 || statusFilter !== "all"
-
-  function hrefFor(row: OrganizationRow) {
-    return networkWorkspacePath({
-      networkId: row.network.id,
-      organizationId: row.organization.id,
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useListOrganizationsQuery(listParams, {
+      skip: !isAuthenticated,
     })
+  const dataRef = useRef(data)
+  if (data) {
+    dataRef.current = data
   }
+  const list = data ?? dataRef.current
+  const rows = useMemo(
+    () => list?.items.map(organizationFromApi) ?? EMPTY_ORGANIZATIONS,
+    [list]
+  )
+  const total = list?.total ?? 0
+  const filtersActive =
+    query.trim().length > 0 || Object.values(columnFilters).some(Boolean)
 
-  const columns: DataTableColumn<OrganizationRow, OrganizationSortKey>[] = [
-    {
-      key: "name",
-      label: "Name",
-      render: (row) => (
-        <DataTableCellLink
-          to={hrefFor(row)}
-          className="max-w-[22rem] font-medium"
-        >
-          {row.organization.name}
-        </DataTableCellLink>
-      ),
+  const hrefFor = useCallback((item: OrganizationRow) => {
+    return networkWorkspacePath({
+      networkId: item.networkId,
+      organizationId: item.id,
+    })
+  }, [])
+
+  const columns = useMemo(
+    () =>
+      helper.columns([
+        helper.accessor("name", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Name"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "text",
+                value: columnFilters.name,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({ ...current, name: value })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="font-medium"
+            >
+              {row.original.name}
+            </DataTableCellLink>
+          ),
+          size: 240,
+          enableHiding: false,
+        }),
+        helper.accessor("slug", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Slug"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "text",
+                value: columnFilters.slug,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({ ...current, slug: value })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="font-mono text-muted-foreground"
+            >
+              {row.original.slug}
+            </DataTableCellLink>
+          ),
+          size: 180,
+        }),
+        helper.accessor("createdAt", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Created"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="whitespace-nowrap text-muted-foreground"
+            >
+              {formatCreatedAt(row.original.createdAt)}
+            </DataTableCellLink>
+          ),
+          size: 140,
+        }),
+        helper.display({
+          id: "actions",
+          enableSorting: false,
+          enableHiding: false,
+          enableResizing: false,
+          size: 52,
+          minSize: 52,
+          maxSize: 52,
+          cell: ({ row }) => (
+            <DataTableRowActions
+              items={
+                <>
+                  <DropdownMenuItem
+                    render={<Link to={hrefFor(row.original)} />}
+                  >
+                    <ViewIcon />
+                    View
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => openEditOrganization(row.original.id)}
+                  >
+                    <PencilIcon />
+                    Edit
+                  </DropdownMenuItem>
+                </>
+              }
+            />
+          ),
+        }),
+      ]),
+    [columnFilters, hrefFor, openEditOrganization]
+  )
+
+  const table = useTable({
+    features: managedTableFeatures,
+    columns,
+    data: rows,
+    getRowId: (item) => item.id,
+    defaultColumn: {
+      minSize: 80,
+      size: 160,
+      maxSize: 480,
     },
-    {
-      key: "status",
-      label: "Status",
-      render: (row) => (
-        <DataTableCellLink
-          to={hrefFor(row)}
-          className="inline-flex items-center gap-1.5"
-        >
-          <StatusBadge status={row.organization.status} />
-          <span className="text-muted-foreground">
-            {row.organization.status}
-          </span>
-        </DataTableCellLink>
-      ),
+    manualPagination: true,
+    manualSorting: true,
+    autoResetPageIndex: false,
+    enableSortingRemoval: false,
+    enableMultiSort: false,
+    enableColumnResizing: true,
+    enableColumnPinning: true,
+    columnResizeMode: "onChange",
+    rowCount: total,
+    state: {
+      pagination,
+      sorting,
+      columnVisibility,
+      columnSizing,
+      columnPinning,
     },
-    {
-      key: "type",
-      label: "Type",
-      className: "text-muted-foreground",
-      render: (row) => (
-        <DataTableCellLink to={hrefFor(row)}>
-          {row.organization.type || "—"}
-        </DataTableCellLink>
-      ),
+    onPaginationChange: setPagination,
+    onSortingChange: (updater) => {
+      setSorting(updater)
+      setPagination((current) => ({ ...current, pageIndex: 0 }))
     },
-    {
-      key: "location",
-      label: "Location",
-      className: "text-muted-foreground",
-      render: (row) => (
-        <DataTableCellLink to={hrefFor(row)}>
-          {row.organization.location || "—"}
-        </DataTableCellLink>
-      ),
-    },
-    {
-      key: "network",
-      label: "Network",
-      className: "text-muted-foreground",
-      render: (row) => (
-        <DataTableCellLink to={hrefFor(row)}>
-          {row.network.name}
-        </DataTableCellLink>
-      ),
-    },
-    {
-      key: "members",
-      label: "Members",
-      className: "tabular-nums text-muted-foreground",
-      render: (row) => (
-        <DataTableCellLink to={hrefFor(row)}>
-          {row.organization.members}
-        </DataTableCellLink>
-      ),
-    },
-  ]
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnSizingChange: setColumnSizing,
+    onColumnPinningChange: setColumnPinning,
+  })
+
+  const activeFilters = useMemo<DataTableActiveFilter[]>(() => {
+    const chips: DataTableActiveFilter[] = []
+    if (columnFilters.name) {
+      chips.push({
+        id: "name",
+        label: "Name",
+        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, name: undefined })),
+      })
+    }
+    if (columnFilters.slug) {
+      chips.push({
+        id: "slug",
+        label: "Slug",
+        value: `${opLabel(columnFilters.slug.op)} “${columnFilters.slug.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, slug: undefined })),
+      })
+    }
+    return chips
+  }, [columnFilters])
 
   return (
     <DataTablePage
-      title="All Organizations"
-      description="Organizations belong to a network. They can use shared network schemas and define their own."
+      title="Organizations"
+      description={
+        organization
+          ? `Organizations in ${network?.name ?? "this network"}. You are currently viewing ${organization.name}.`
+          : network
+            ? `Organizations that belong to ${network.name}. They can use shared network schemas and define their own.`
+            : "Organizations belong to a network. They can use shared network schemas and define their own."
+      }
       action={
-        <Button onClick={() => openCreateOrganization()}>
+        <Button onClick={() => openCreateOrganization(network?.id)}>
           <PlusIcon />
-          Create an organization
+          Create organization
         </Button>
       }
     >
       <DataTableToolbar
         query={query}
         onQueryChange={setQuery}
-        searchPlaceholder="Search organizations..."
-        filters={
-          <DataTableFilter
-            label="Filter by status"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            className="sm:w-40"
-            options={[
-              { value: "all", label: "All statuses" },
-              { value: "Active", label: "Active" },
-              { value: "Draft", label: "Draft" },
-            ]}
-          />
-        }
-        count={dataTableCount({
+        searchPlaceholder="Search name or slug..."
+        searchClassName="sm:max-w-3xl"
+        chips={<DataTableActiveFilters filters={activeFilters} />}
+        trailing={<DataTableViewOptions table={table} />}
+        count={dataTablePageSummary({
           isLoading,
           loadingLabel: "Loading organizations...",
-          visible: rows.length,
-          total: items.length,
+          pageIndex: pagination.pageIndex,
+          pageSize: pagination.pageSize,
+          total,
           singular: "organization",
         })}
         onRefresh={refetch}
@@ -189,39 +380,25 @@ export default function OrganizationList() {
           {getHumaErrorMessage(error, "Failed to load organizations")}
         </p>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          sort={sort}
-          onSort={(key) => setSort((current) => toggleSort(current, key))}
-          getRowId={(row) => row.organization.id}
-          isRefreshing={isFetching}
-          empty={
-            isLoading
-              ? "Loading organizations..."
-              : filtersActive
-                ? "No organizations match this view."
-                : "You do not have any organizations yet. Create one to get started."
-          }
-        />
+        <>
+          <DataTableView
+            table={table}
+            isRefreshing={isFetching}
+            empty={
+              isLoading
+                ? "Loading organizations..."
+                : filtersActive
+                  ? "No organizations match this view."
+                  : "No organizations yet. Create one to start collaborating in this network."
+            }
+          />
+          <DataTablePagination table={table} />
+        </>
       )}
     </DataTablePage>
   )
 }
 
-function compareOrganizations(
-  left: OrganizationRow,
-  right: OrganizationRow,
-  key: OrganizationSortKey
-) {
-  if (key === "network") {
-    return compareText(left.network.name, right.network.name)
-  }
-  if (key === "members") {
-    return left.organization.members - right.organization.members
-  }
-  return compareText(
-    String(left.organization[key] ?? ""),
-    String(right.organization[key] ?? "")
-  )
+function opLabel(op: StringFilterOp) {
+  return stringFilterOps.find((item) => item.value === op)?.label ?? op
 }

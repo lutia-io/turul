@@ -106,6 +106,10 @@ export function networkSectionRest(rest: string) {
     return "pipelines"
   }
 
+  if (rest === "organizations" || rest.startsWith("organizations/")) {
+    return "organizations"
+  }
+
   if (rest === "organization-users" || rest.startsWith("organization-users/")) {
     return "organization-users"
   }
@@ -292,7 +296,7 @@ export function useWorkspaceOrganizations() {
 
   return {
     ...query,
-    organizations: (query.data ?? []).map(workspaceOrganizationFromApi),
+    organizations: (query.data?.items ?? []).map(workspaceOrganizationFromApi),
   }
 }
 
@@ -304,7 +308,9 @@ export function useWorkspaceOrganizationUsers() {
 
   return {
     ...query,
-    organizationUsers: (query.data ?? []).map(workspaceOrganizationUserFromApi),
+    organizationUsers: (query.data?.items ?? []).map(
+      workspaceOrganizationUserFromApi
+    ),
   }
 }
 
@@ -346,7 +352,7 @@ export function useWorkspaceWorkflows() {
 
   return {
     ...query,
-    workflows: (query.data ?? []).map(workspaceWorkflowFromApi),
+    workflows: (query.data?.items ?? []).map(workspaceWorkflowFromApi),
   }
 }
 

@@ -8,6 +8,7 @@ import {
   NetworkLayout,
   NetworkList,
   NetworkDetail,
+  OrganizationList,
   OrganizationUserList,
   OrganizationUserDetail,
   SchemaList,
@@ -52,6 +53,7 @@ function networkWorkspaceRoutes() {
       <Route path="workflows/:workflowRunId" element={<WorkflowRunDetail />} />
       <Route path="pipelines" element={<PipelineList />} />
       <Route path="pipelines/:pipelineRunId" element={<PipelineRunDetail />} />
+      <Route path="organizations" element={<OrganizationList />} />
       <Route path="organization-users" element={<OrganizationUserList />} />
       <Route
         path="organization-users/:organizationUserId"

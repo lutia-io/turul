@@ -629,7 +629,7 @@ export default function NetworkDetail() {
         <div className="flex flex-col gap-6">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <StatCard
-              to="#organizations"
+              to={href("organizations")}
               label="Organizations"
               value={network.organizations.length}
               live={organizationCounts.live}
@@ -721,6 +721,13 @@ export default function NetworkDetail() {
                     onRefresh={refetchOrganizations}
                     isRefreshing={isOrganizationsFetching}
                   />
+                  <Link
+                    to={href("organizations")}
+                    className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+                  >
+                    <ArrowRightIcon />
+                    <span className="sr-only">View all organizations</span>
+                  </Link>
                   <Button
                     variant="outline"
                     size="sm"

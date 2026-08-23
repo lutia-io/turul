@@ -29,14 +29,100 @@ export type UpdateOrganizationResponse = {
   id: string
 }
 
+export type StringFilterOp = "contains" | "eq" | "startsWith"
+export type OrganizationListSort =
+  | "name"
+  | "slug"
+  | "network"
+  | "createdAt"
+  | "updatedAt"
+
+export type ListOrganizationsParams = {
+  page?: number
+  pageSize?: number
+  q?: string
+  sort?: OrganizationListSort
+  order?: "asc" | "desc"
+  networkId?: string
+  organizationId?: string
+  name?: string
+  nameOp?: StringFilterOp
+  slug?: string
+  slugOp?: StringFilterOp
+  network?: string
+  networkOp?: StringFilterOp
+}
+
+export type ApiOrganizationList = {
+  items: ApiOrganization[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function listOrganizationQueryParams(params?: ListOrganizationsParams) {
+  if (!params) {
+    return undefined
+  }
+
+  const query: Record<string, string | number> = {}
+  if (params.page != null) {
+    query.page = params.page
+  }
+  if (params.pageSize != null) {
+    query.pageSize = params.pageSize
+  }
+  if (params.q) {
+    query.q = params.q
+  }
+  if (params.sort) {
+    query.sort = params.sort
+  }
+  if (params.order) {
+    query.order = params.order
+  }
+  if (params.networkId) {
+    query.networkId = params.networkId
+  }
+  if (params.organizationId) {
+    query.organizationId = params.organizationId
+  }
+  if (params.name) {
+    query.name = params.name
+    if (params.nameOp) {
+      query.nameOp = params.nameOp
+    }
+  }
+  if (params.slug) {
+    query.slug = params.slug
+    if (params.slugOp) {
+      query.slugOp = params.slugOp
+    }
+  }
+  if (params.network) {
+    query.network = params.network
+    if (params.networkOp) {
+      query.networkOp = params.networkOp
+    }
+  }
+
+  return query
+}
+
 const organizationApi = api.injectEndpoints({
   endpoints: (build) => ({
-    listOrganizations: build.query<ApiOrganization[], void>({
-      query: () => "/organization",
+    listOrganizations: build.query<
+      ApiOrganizationList,
+      ListOrganizationsParams | void
+    >({
+      query: (params) => ({
+        url: "/organization",
+        params: listOrganizationQueryParams(params ?? undefined),
+      }),
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({
+              ...result.items.map(({ id }) => ({
                 type: "Organization" as const,
                 id,
               })),
@@ -46,7 +132,7 @@ const organizationApi = api.injectEndpoints({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          for (const organization of data) {
+          for (const organization of data.items) {
             dispatch(
               api.util.upsertQueryData(
                 "getOrganization",

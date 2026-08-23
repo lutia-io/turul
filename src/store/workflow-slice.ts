@@ -41,6 +41,112 @@ export type UpdateWorkflowDefinitionResponse = {
   id: string
 }
 
+export type StringFilterOp = "contains" | "eq" | "startsWith"
+export type NumberFilterOp = "eq" | "gte" | "lte"
+export type WorkflowDefinitionListSort =
+  | "name"
+  | "slug"
+  | "status"
+  | "schema"
+  | "network"
+  | "actions"
+  | "createdAt"
+  | "updatedAt"
+
+export type ListWorkflowDefinitionsParams = {
+  page?: number
+  pageSize?: number
+  q?: string
+  sort?: WorkflowDefinitionListSort
+  order?: "asc" | "desc"
+  networkId?: string
+  organizationId?: string
+  active?: boolean
+  name?: string
+  nameOp?: StringFilterOp
+  slug?: string
+  slugOp?: StringFilterOp
+  schema?: string
+  schemaOp?: StringFilterOp
+  network?: string
+  networkOp?: StringFilterOp
+  actions?: number
+  actionsOp?: NumberFilterOp
+}
+
+export type ApiWorkflowDefinitionList = {
+  items: ApiWorkflowDefinition[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function listWorkflowDefinitionQueryParams(
+  params?: ListWorkflowDefinitionsParams
+) {
+  if (!params) {
+    return undefined
+  }
+
+  const query: Record<string, string | number> = {}
+  if (params.page != null) {
+    query.page = params.page
+  }
+  if (params.pageSize != null) {
+    query.pageSize = params.pageSize
+  }
+  if (params.q) {
+    query.q = params.q
+  }
+  if (params.sort) {
+    query.sort = params.sort
+  }
+  if (params.order) {
+    query.order = params.order
+  }
+  if (params.networkId) {
+    query.networkId = params.networkId
+  }
+  if (params.organizationId) {
+    query.organizationId = params.organizationId
+  }
+  if (params.active != null) {
+    query.active = String(params.active)
+  }
+  if (params.name) {
+    query.name = params.name
+    if (params.nameOp) {
+      query.nameOp = params.nameOp
+    }
+  }
+  if (params.slug) {
+    query.slug = params.slug
+    if (params.slugOp) {
+      query.slugOp = params.slugOp
+    }
+  }
+  if (params.schema) {
+    query.schema = params.schema
+    if (params.schemaOp) {
+      query.schemaOp = params.schemaOp
+    }
+  }
+  if (params.network) {
+    query.network = params.network
+    if (params.networkOp) {
+      query.networkOp = params.networkOp
+    }
+  }
+  if (params.actions != null) {
+    query.actions = params.actions
+    if (params.actionsOp) {
+      query.actionsOp = params.actionsOp
+    }
+  }
+
+  return query
+}
+
 export type ApiWorkflowStatus = "pending" | "running" | "completed" | "failed"
 
 export type ApiWorkflow = {
@@ -79,12 +185,18 @@ export type ApiWorkflowAction = {
 
 const workflowApi = api.injectEndpoints({
   endpoints: (build) => ({
-    listWorkflowDefinitions: build.query<ApiWorkflowDefinition[], void>({
-      query: () => "/workflow-definition",
+    listWorkflowDefinitions: build.query<
+      ApiWorkflowDefinitionList,
+      ListWorkflowDefinitionsParams | void
+    >({
+      query: (params) => ({
+        url: "/workflow-definition",
+        params: listWorkflowDefinitionQueryParams(params ?? undefined),
+      }),
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({
+              ...result.items.map(({ id }) => ({
                 type: "WorkflowDefinition" as const,
                 id,
               })),
@@ -94,7 +206,7 @@ const workflowApi = api.injectEndpoints({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          for (const workflow of data) {
+          for (const workflow of data.items) {
             dispatch(
               api.util.upsertQueryData(
                 "getWorkflowDefinition",

@@ -37,14 +37,100 @@ export type UpdateOrganizationUserResponse = {
   id: string
 }
 
+export type StringFilterOp = "contains" | "eq" | "startsWith"
+export type OrganizationUserListSort =
+  | "name"
+  | "email"
+  | "organization"
+  | "createdAt"
+  | "updatedAt"
+
+export type ListOrganizationUsersParams = {
+  page?: number
+  pageSize?: number
+  q?: string
+  sort?: OrganizationUserListSort
+  order?: "asc" | "desc"
+  networkId?: string
+  organizationId?: string
+  name?: string
+  nameOp?: StringFilterOp
+  email?: string
+  emailOp?: StringFilterOp
+  organization?: string
+  organizationOp?: StringFilterOp
+}
+
+export type ApiOrganizationUserList = {
+  items: ApiOrganizationUser[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function listOrganizationUserQueryParams(params?: ListOrganizationUsersParams) {
+  if (!params) {
+    return undefined
+  }
+
+  const query: Record<string, string | number> = {}
+  if (params.page != null) {
+    query.page = params.page
+  }
+  if (params.pageSize != null) {
+    query.pageSize = params.pageSize
+  }
+  if (params.q) {
+    query.q = params.q
+  }
+  if (params.sort) {
+    query.sort = params.sort
+  }
+  if (params.order) {
+    query.order = params.order
+  }
+  if (params.networkId) {
+    query.networkId = params.networkId
+  }
+  if (params.organizationId) {
+    query.organizationId = params.organizationId
+  }
+  if (params.name) {
+    query.name = params.name
+    if (params.nameOp) {
+      query.nameOp = params.nameOp
+    }
+  }
+  if (params.email) {
+    query.email = params.email
+    if (params.emailOp) {
+      query.emailOp = params.emailOp
+    }
+  }
+  if (params.organization) {
+    query.organization = params.organization
+    if (params.organizationOp) {
+      query.organizationOp = params.organizationOp
+    }
+  }
+
+  return query
+}
+
 const organizationUserApi = api.injectEndpoints({
   endpoints: (build) => ({
-    listOrganizationUsers: build.query<ApiOrganizationUser[], void>({
-      query: () => "/organization-user",
+    listOrganizationUsers: build.query<
+      ApiOrganizationUserList,
+      ListOrganizationUsersParams | void
+    >({
+      query: (params) => ({
+        url: "/organization-user",
+        params: listOrganizationUserQueryParams(params ?? undefined),
+      }),
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({
+              ...result.items.map(({ id }) => ({
                 type: "OrganizationUser" as const,
                 id,
               })),
@@ -54,7 +140,7 @@ const organizationUserApi = api.injectEndpoints({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          for (const organizationUser of data) {
+          for (const organizationUser of data.items) {
             dispatch(
               api.util.upsertQueryData(
                 "getOrganizationUser",

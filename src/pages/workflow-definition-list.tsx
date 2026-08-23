@@ -1,172 +1,546 @@
-import { useMemo, useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Link } from "react-router"
+import { PencilIcon, PlusIcon, ViewIcon } from "lucide-react"
+import { useTable } from "@tanstack/react-table"
 
 import {
-  DataTable,
   DataTableCellLink,
-  DataTableFilter,
   DataTablePage,
   DataTableToolbar,
-  compareText,
-  dataTableCount,
-  matchesQuery,
-  toggleSort,
-  type DataTableColumn,
-  type DataTableSort,
+  dataTablePageSummary,
 } from "@/components/data-table"
+import {
+  createManagedColumnHelper,
+  DataTableActiveFilters,
+  DataTableColumnHeader,
+  DataTablePagination,
+  DataTableRowActions,
+  DataTableView,
+  DataTableViewOptions,
+  managedTableFeatures,
+  numberFilterOps,
+  stringFilterOps,
+  type ColumnPinningState,
+  type DataTableActiveFilter,
+  type NumberFilterOp,
+  type PaginationState,
+  type SortingState,
+  type StringFilterOp,
+} from "@/components/data-table-view"
 import { StatusBadge } from "@/components/json-definition-card"
 import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import type { WorkflowDefinition } from "@/data/networks"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { publicationStatus } from "@/lib/json-definition"
 import {
+  networkWorkspacePath,
   useNetworkWorkspace,
-  useWorkspaceNetworks,
   useWorkspaceSchemas,
-  useWorkspaceWorkflows,
+  workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
-import { workflowSummary } from "@/lib/workflow-definition"
+import {
+  parseWorkflowDefinition,
+  workflowSummary,
+} from "@/lib/workflow-definition"
 import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useListNetworksQuery } from "@/store/network-slice"
+import {
+  useListWorkflowDefinitionsQuery,
+  type ListWorkflowDefinitionsParams,
+  type WorkflowDefinitionListSort,
+} from "@/store/workflow-slice"
 
-type WorkflowSortKey = "name" | "network" | "schema" | "summary" | "status"
+const helper = createManagedColumnHelper<WorkflowDefinition>()
+const EMPTY_WORKFLOWS: WorkflowDefinition[] = []
+
+type WorkflowColumnFilters = {
+  name?: { op: StringFilterOp; value: string }
+  slug?: { op: StringFilterOp; value: string }
+  network?: { op: StringFilterOp; value: string }
+  schema?: { op: StringFilterOp; value: string }
+  actions?: { op: NumberFilterOp; value: number }
+  status?: "published" | "draft"
+}
+
+const sortFields: WorkflowDefinitionListSort[] = [
+  "name",
+  "slug",
+  "status",
+  "schema",
+  "network",
+  "actions",
+]
+
+function isWorkflowSort(value: string): value is WorkflowDefinitionListSort {
+  return sortFields.includes(value as WorkflowDefinitionListSort)
+}
+
+function headerPin(column: {
+  getIsPinned: () => false | "start" | "end"
+  pin: (position: false | "start" | "end") => void
+}) {
+  return {
+    position: column.getIsPinned(),
+    onPin: (position: false | "start" | "end") => column.pin(position),
+  }
+}
+
+function workflowActionCount(workflow: WorkflowDefinition) {
+  return parseWorkflowDefinition(workflow.definition)?.actions.length ?? 0
+}
 
 export default function WorkflowDefinitionList() {
-  const { network, href } = useNetworkWorkspace()
-  const { openCreateWorkflow } = useCreateEntity()
-  const { networks } = useWorkspaceNetworks()
-  const {
-    schemas,
-    isLoading: isSchemasLoading,
-    isFetching: isSchemasFetching,
-    refetch: refetchSchemas,
-  } = useWorkspaceSchemas()
-  const { workflows, isLoading, isFetching, isError, error, refetch } =
-    useWorkspaceWorkflows()
-  const [query, setQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [sort, setSort] = useState<DataTableSort<WorkflowSortKey>>({
-    key: "name",
-    direction: "asc",
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const { network, organization, organizationId } = useNetworkWorkspace()
+  const { openCreateWorkflow, openEditWorkflow } = useCreateEntity()
+  const { schemas } = useWorkspaceSchemas()
+  const { data: networks } = useListNetworksQuery(undefined, {
+    skip: !isAuthenticated || Boolean(network),
   })
-  const items = network ? network.workflowDefinitions : workflows
+  const [query, setQuery] = useState("")
+  const debouncedQuery = useDebouncedValue(query)
+  const [columnFilters, setColumnFilters] = useState<WorkflowColumnFilters>({})
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: false },
+  ])
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
+  })
+  const [columnVisibility, setColumnVisibility] = useState({})
+  const [columnSizing, setColumnSizing] = useState({})
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
+    start: [],
+    end: ["rowActions"],
+  })
+
+  useEffect(() => {
+    setPagination((current) => ({ ...current, pageIndex: 0 }))
+  }, [debouncedQuery, columnFilters, network?.id, organizationId])
+
+  const listParams = useMemo<ListWorkflowDefinitionsParams>(() => {
+    const sort = sorting[0]
+    return {
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      q: debouncedQuery.trim() || undefined,
+      sort: sort && isWorkflowSort(sort.id) ? sort.id : "name",
+      order: sort?.desc ? "desc" : "asc",
+      networkId: network?.id,
+      organizationId,
+      active:
+        columnFilters.status === "published"
+          ? true
+          : columnFilters.status === "draft"
+            ? false
+            : undefined,
+      name: columnFilters.name?.value,
+      nameOp: columnFilters.name?.op,
+      slug: columnFilters.slug?.value,
+      slugOp: columnFilters.slug?.op,
+      schema: columnFilters.schema?.value,
+      schemaOp: columnFilters.schema?.op,
+      network: columnFilters.network?.value,
+      networkOp: columnFilters.network?.op,
+      actions: columnFilters.actions?.value,
+      actionsOp: columnFilters.actions?.op,
+    }
+  }, [
+    columnFilters,
+    debouncedQuery,
+    network?.id,
+    organizationId,
+    pagination.pageIndex,
+    pagination.pageSize,
+    sorting,
+  ])
+
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useListWorkflowDefinitionsQuery(listParams, {
+      skip: !isAuthenticated,
+    })
+  const dataRef = useRef(data)
+  if (data) {
+    dataRef.current = data
+  }
+  const list = data ?? dataRef.current
+  const rows = useMemo(
+    () => list?.items.map(workspaceWorkflowFromApi) ?? EMPTY_WORKFLOWS,
+    [list]
+  )
+  const total = list?.total ?? 0
+  const filtersActive =
+    query.trim().length > 0 || Object.values(columnFilters).some(Boolean)
   const schemasById = useMemo(
     () => new Map(schemas.map((schema) => [schema.id, schema])),
     [schemas]
   )
   const networksById = useMemo(
-    () => new Map(networks.map((item) => [item.id, item])),
+    () => new Map((networks ?? []).map((item) => [item.id, item])),
     [networks]
   )
-  const filtered = items.filter((workflow) => {
-    if (statusFilter === "published" && !workflow.active) {
-      return false
-    }
-    if (statusFilter === "draft" && workflow.active) {
-      return false
-    }
 
-    return matchesQuery(query, [
-      workflow.name,
-      workflow.slug,
-      schemasById.get(workflow.schemaId)?.name,
-      workflowSummary(workflow.definition),
-      workflow.networkId ? networksById.get(workflow.networkId)?.name : "",
-      workflow.id,
-    ])
-  })
-  const rows = [...filtered].sort((left, right) => {
-    const result = compareWorkflows(
-      left,
-      right,
-      sort.key,
-      schemasById,
-      networksById
-    )
-    return sort.direction === "asc" ? result : -result
-  })
-  const loading = isLoading || isSchemasLoading
-  const filtersActive = query.trim().length > 0 || statusFilter !== "all"
-
-  function hrefFor(workflow: WorkflowDefinition) {
-    return network
-      ? href(`workflow-definitions/${workflow.id}`)
-      : `/app/workflow-definitions/${workflow.id}`
-  }
-
-  const columns: DataTableColumn<WorkflowDefinition, WorkflowSortKey>[] = [
-    {
-      key: "name",
-      label: "Name",
-      render: (workflow) => (
-        <DataTableCellLink
-          to={hrefFor(workflow)}
-          className="max-w-[22rem] font-medium"
-        >
-          {workflow.name}
-        </DataTableCellLink>
-      ),
+  const hrefFor = useCallback(
+    (workflow: WorkflowDefinition) => {
+      return network?.id
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: `workflow-definitions/${workflow.id}`,
+          })
+        : `/app/workflow-definitions/${workflow.id}`
     },
-    ...(!network
-      ? [
+    [network?.id, organizationId]
+  )
+
+  const columns = useMemo(
+    () =>
+      helper.columns([
+        helper.accessor("name", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Name"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "text",
+                value: columnFilters.name,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({ ...current, name: value })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="font-medium"
+            >
+              {row.original.name}
+            </DataTableCellLink>
+          ),
+          size: 240,
+          enableHiding: false,
+        }),
+        helper.accessor("slug", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Slug"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "text",
+                value: columnFilters.slug,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({ ...current, slug: value })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="font-mono text-muted-foreground"
+            >
+              {row.original.slug}
+            </DataTableCellLink>
+          ),
+          size: 180,
+        }),
+        ...(!network
+          ? [
+              helper.accessor(
+                (workflow) =>
+                  workflow.networkId
+                    ? (networksById.get(workflow.networkId)?.name ?? "—")
+                    : "—",
+                {
+                  id: "network",
+                  header: ({ column }) => (
+                    <DataTableColumnHeader
+                      title="Network"
+                      sorted={column.getIsSorted()}
+                      onSort={column.getToggleSortingHandler()}
+                      pin={headerPin(column)}
+                      filter={{
+                        type: "text",
+                        value: columnFilters.network,
+                        onChange: (value) =>
+                          setColumnFilters((current) => ({
+                            ...current,
+                            network: value,
+                          })),
+                      }}
+                    />
+                  ),
+                  cell: ({ row }) => (
+                    <DataTableCellLink
+                      to={hrefFor(row.original)}
+                      className="text-muted-foreground"
+                    >
+                      {row.original.networkId
+                        ? (networksById.get(row.original.networkId)?.name ??
+                          "—")
+                        : "—"}
+                    </DataTableCellLink>
+                  ),
+                  size: 180,
+                }
+              ),
+            ]
+          : []),
+        helper.accessor(
+          (workflow) => schemasById.get(workflow.schemaId)?.name ?? "Record",
           {
-            key: "network" as const,
-            label: "Network",
-            className: "text-muted-foreground",
-            render: (workflow: WorkflowDefinition) => (
-              <DataTableCellLink to={hrefFor(workflow)}>
-                {workflow.networkId
-                  ? (networksById.get(workflow.networkId)?.name ?? "—")
-                  : "—"}
+            id: "schema",
+            header: ({ column }) => (
+              <DataTableColumnHeader
+                title="Starts from"
+                sorted={column.getIsSorted()}
+                onSort={column.getToggleSortingHandler()}
+                pin={headerPin(column)}
+                filter={{
+                  type: "text",
+                  value: columnFilters.schema,
+                  onChange: (value) =>
+                    setColumnFilters((current) => ({
+                      ...current,
+                      schema: value,
+                    })),
+                }}
+              />
+            ),
+            cell: ({ row }) => (
+              <DataTableCellLink
+                to={hrefFor(row.original)}
+                className="text-muted-foreground"
+              >
+                {schemasById.get(row.original.schemaId)?.name ?? "Record"}
               </DataTableCellLink>
             ),
+            size: 180,
+          }
+        ),
+        helper.accessor(workflowActionCount, {
+          id: "actions",
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Definition"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "number",
+                value: columnFilters.actions,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({
+                    ...current,
+                    actions: value,
+                  })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="text-muted-foreground"
+            >
+              {workflowSummary(row.original.definition)}
+            </DataTableCellLink>
+          ),
+          size: 280,
+        }),
+        helper.accessor((workflow) => publicationStatus(workflow.active), {
+          id: "status",
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Status"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "enum",
+                value: columnFilters.status,
+                options: [
+                  { value: "published", label: "Published" },
+                  { value: "draft", label: "Draft" },
+                ],
+                onChange: (value) =>
+                  setColumnFilters((current) => ({
+                    ...current,
+                    status: value as WorkflowColumnFilters["status"],
+                  })),
+              }}
+            />
+          ),
+          cell: ({ row }) => {
+            const status = publicationStatus(row.original.active)
+            return (
+              <DataTableCellLink
+                to={hrefFor(row.original)}
+                className="inline-flex items-center gap-1.5"
+              >
+                <StatusBadge status={status} />
+                <span className="text-muted-foreground">{status}</span>
+              </DataTableCellLink>
+            )
           },
-        ]
-      : []),
-    {
-      key: "schema",
-      label: "Starts from",
-      className: "text-muted-foreground",
-      render: (workflow) => (
-        <DataTableCellLink to={hrefFor(workflow)}>
-          {schemasById.get(workflow.schemaId)?.name ?? "Record"}
-        </DataTableCellLink>
-      ),
+          size: 140,
+        }),
+        helper.display({
+          id: "rowActions",
+          enableSorting: false,
+          enableHiding: false,
+          enableResizing: false,
+          size: 52,
+          minSize: 52,
+          maxSize: 52,
+          cell: ({ row }) => (
+            <DataTableRowActions
+              items={
+                <>
+                  <DropdownMenuItem
+                    render={<Link to={hrefFor(row.original)} />}
+                  >
+                    <ViewIcon />
+                    View
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => openEditWorkflow(row.original.id)}
+                  >
+                    <PencilIcon />
+                    Edit
+                  </DropdownMenuItem>
+                </>
+              }
+            />
+          ),
+        }),
+      ]),
+    [
+      columnFilters,
+      hrefFor,
+      network,
+      networksById,
+      openEditWorkflow,
+      schemasById,
+    ]
+  )
+
+  const table = useTable({
+    features: managedTableFeatures,
+    columns,
+    data: rows,
+    getRowId: (workflow) => workflow.id,
+    defaultColumn: {
+      minSize: 80,
+      size: 160,
+      maxSize: 480,
     },
-    {
-      key: "summary",
-      label: "Definition",
-      className: "text-muted-foreground",
-      render: (workflow) => (
-        <DataTableCellLink to={hrefFor(workflow)} className="max-w-[28rem]">
-          {workflowSummary(workflow.definition)}
-        </DataTableCellLink>
-      ),
+    manualPagination: true,
+    manualSorting: true,
+    autoResetPageIndex: false,
+    enableSortingRemoval: false,
+    enableMultiSort: false,
+    enableColumnResizing: true,
+    enableColumnPinning: true,
+    columnResizeMode: "onChange",
+    rowCount: total,
+    state: {
+      pagination,
+      sorting,
+      columnVisibility,
+      columnSizing,
+      columnPinning,
     },
-    {
-      key: "status",
-      label: "Status",
-      render: (workflow) => {
-        const status = publicationStatus(workflow.active)
-        return (
-          <DataTableCellLink
-            to={hrefFor(workflow)}
-            className="inline-flex items-center gap-1.5"
-          >
-            <StatusBadge status={status} />
-            <span className="text-muted-foreground">{status}</span>
-          </DataTableCellLink>
-        )
-      },
+    onPaginationChange: setPagination,
+    onSortingChange: (updater) => {
+      setSorting(updater)
+      setPagination((current) => ({ ...current, pageIndex: 0 }))
     },
-  ]
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnSizingChange: setColumnSizing,
+    onColumnPinningChange: setColumnPinning,
+  })
+
+  const activeFilters = useMemo<DataTableActiveFilter[]>(() => {
+    const chips: DataTableActiveFilter[] = []
+    if (columnFilters.name) {
+      chips.push({
+        id: "name",
+        label: "Name",
+        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, name: undefined })),
+      })
+    }
+    if (columnFilters.slug) {
+      chips.push({
+        id: "slug",
+        label: "Slug",
+        value: `${opLabel(columnFilters.slug.op)} “${columnFilters.slug.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, slug: undefined })),
+      })
+    }
+    if (columnFilters.network) {
+      chips.push({
+        id: "network",
+        label: "Network",
+        value: `${opLabel(columnFilters.network.op)} “${columnFilters.network.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, network: undefined })),
+      })
+    }
+    if (columnFilters.schema) {
+      chips.push({
+        id: "schema",
+        label: "Starts from",
+        value: `${opLabel(columnFilters.schema.op)} “${columnFilters.schema.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, schema: undefined })),
+      })
+    }
+    if (columnFilters.actions) {
+      const op = numberFilterOps.find(
+        (item) => item.value === columnFilters.actions?.op
+      )?.label
+      chips.push({
+        id: "actions",
+        label: "Definition",
+        value: `${op ?? "="} ${columnFilters.actions.value}`,
+        onRemove: () =>
+          setColumnFilters((current) => ({
+            ...current,
+            actions: undefined,
+          })),
+      })
+    }
+    if (columnFilters.status) {
+      chips.push({
+        id: "status",
+        label: "Status",
+        value: columnFilters.status === "published" ? "Published" : "Draft",
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, status: undefined })),
+      })
+    }
+    return chips
+  }, [columnFilters])
 
   return (
     <DataTablePage
       title="Workflow Definitions"
       description={
-        network
-          ? `When a record is created in ${network.name}, matching workflows run their actions.`
-          : "Workflows that run when a matching record is created."
+        organization
+          ? `When a matching record is created in ${organization.name}, these workflows run their actions.`
+          : network
+            ? `When a record is created in ${network.name}, matching workflows run their actions.`
+            : "Workflows that run when a matching record is created."
       }
       action={
         <Button onClick={() => openCreateWorkflow(network?.id)}>
@@ -178,85 +552,45 @@ export default function WorkflowDefinitionList() {
       <DataTableToolbar
         query={query}
         onQueryChange={setQuery}
-        searchPlaceholder="Search workflows..."
-        filters={
-          <DataTableFilter
-            label="Filter by status"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            className="sm:w-40"
-            options={[
-              { value: "all", label: "All statuses" },
-              { value: "published", label: "Published" },
-              { value: "draft", label: "Draft" },
-            ]}
-          />
-        }
-        count={dataTableCount({
-          isLoading: loading,
+        searchPlaceholder="Search name or slug..."
+        searchClassName="sm:max-w-3xl"
+        chips={<DataTableActiveFilters filters={activeFilters} />}
+        trailing={<DataTableViewOptions table={table} />}
+        count={dataTablePageSummary({
+          isLoading,
           loadingLabel: "Loading workflows...",
-          visible: rows.length,
-          total: items.length,
+          pageIndex: pagination.pageIndex,
+          pageSize: pagination.pageSize,
+          total,
           singular: "workflow",
         })}
-        onRefresh={() => {
-          void refetch()
-          void refetchSchemas()
-        }}
-        isRefreshing={isFetching || isSchemasFetching}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load workflows")}
         </p>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          sort={sort}
-          onSort={(key) => setSort((current) => toggleSort(current, key))}
-          getRowId={(workflow) => workflow.id}
-          isRefreshing={isFetching || isSchemasFetching}
-          empty={
-            loading
-              ? "Loading workflows..."
-              : filtersActive
-                ? "No workflows match this view."
-                : "No workflow definitions yet. Create one to automate what happens when a record is created."
-          }
-        />
+        <>
+          <DataTableView
+            table={table}
+            isRefreshing={isFetching}
+            empty={
+              isLoading
+                ? "Loading workflows..."
+                : filtersActive
+                  ? "No workflows match this view."
+                  : "No workflow definitions yet. Create one to automate what happens when a record is created."
+            }
+          />
+          <DataTablePagination table={table} />
+        </>
       )}
     </DataTablePage>
   )
 }
 
-function compareWorkflows(
-  left: WorkflowDefinition,
-  right: WorkflowDefinition,
-  key: WorkflowSortKey,
-  schemasById: Map<string, { name: string }>,
-  networksById: Map<string, { name: string }>
-) {
-  if (key === "network") {
-    return compareText(
-      left.networkId ? (networksById.get(left.networkId)?.name ?? "") : "",
-      right.networkId ? (networksById.get(right.networkId)?.name ?? "") : ""
-    )
-  }
-  if (key === "schema") {
-    return compareText(
-      schemasById.get(left.schemaId)?.name ?? "",
-      schemasById.get(right.schemaId)?.name ?? ""
-    )
-  }
-  if (key === "summary") {
-    return compareText(
-      workflowSummary(left.definition),
-      workflowSummary(right.definition)
-    )
-  }
-  if (key === "status") {
-    return Number(left.active) - Number(right.active)
-  }
-  return compareText(left.name, right.name)
+function opLabel(op: StringFilterOp) {
+  return stringFilterOps.find((item) => item.value === op)?.label ?? op
 }

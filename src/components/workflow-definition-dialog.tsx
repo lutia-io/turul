@@ -26,12 +26,19 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { WorkflowActionsBuilder } from "@/components/workflow-actions-builder"
 import { WorkflowCriteriaBuilder } from "@/components/workflow-criteria-builder"
 import { getWorkflowDefinition } from "@/data/networks"
@@ -270,6 +277,57 @@ export function WorkflowDefinitionDialog({
     setJsonText(stringifyDefinition(parsed))
   }
 
+  const chooseSchemaValue = "__choose_schema__"
+  const schemaField = (
+    <Field>
+      <FieldLabel htmlFor={`${formId}-schema`}>Record type</FieldLabel>
+      {networkSchemas.length > 0 ? (
+        <Select
+          value={schemaId || chooseSchemaValue}
+          disabled={isLoading}
+          required
+          modal={false}
+          items={[
+            { value: chooseSchemaValue, label: "Choose a record type" },
+            ...networkSchemas.map((schema) => ({
+              value: schema.id,
+              label: schema.name,
+            })),
+          ]}
+          onValueChange={(value) => {
+            if (!value || value === chooseSchemaValue) {
+              setSchemaId("")
+              return
+            }
+            setSchemaId(value)
+          }}
+        >
+          <SelectTrigger id={`${formId}-schema`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={chooseSchemaValue}>
+              Choose a record type
+            </SelectItem>
+            {networkSchemas.map((schema) => (
+              <SelectItem key={schema.id} value={schema.id}>
+                {schema.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Create a schema in this network before adding a workflow.
+        </p>
+      )}
+      <FieldDescription>
+        The workflow watches new records of this type and uses its fields in
+        conditions.
+      </FieldDescription>
+    </Field>
+  )
+
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(selectedNetworkId) &&
@@ -335,8 +393,9 @@ export function WorkflowDefinitionDialog({
             {editing ? "Edit workflow" : "Create a workflow"}
           </DialogTitle>
           <DialogDescription>
-            Pick the record type, describe when it should run, then choose what
-            happens next.
+            {triggerSchema
+              ? `When a matching ${triggerSchema.name} record is created, this workflow runs the actions you define.`
+              : "Pick a record type, add conditions for when it should run, then choose what happens next."}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -365,82 +424,42 @@ export function WorkflowDefinitionDialog({
                     <FieldLabel htmlFor={`${formId}-network`}>
                       Network
                     </FieldLabel>
-                    <NativeSelect
-                      id={`${formId}-network`}
+                    <Select
                       value={selectedNetworkId}
                       disabled={lockNetwork || isLoading}
-                      onChange={(event) => {
-                        const nextId = event.target.value
-                        setSelectedNetworkId(nextId)
+                      required
+                      modal={false}
+                      items={networks.map((network) => ({
+                        value: network.id,
+                        label: network.name,
+                      }))}
+                      onValueChange={(value) => {
+                        if (!value) {
+                          return
+                        }
+                        setSelectedNetworkId(value)
                         const nextSchema = schemas.find(
-                          (schema) => schema.networkId === nextId
+                          (schema) => schema.networkId === value
                         )
                         setSchemaId(nextSchema?.id ?? "")
                       }}
-                      required
                     >
-                      {networks.map((network) => (
-                        <NativeSelectOption key={network.id} value={network.id}>
-                          {network.name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor={`${formId}-schema`}>
-                      Start from records of
-                    </FieldLabel>
-                    {networkSchemas.length > 0 ? (
-                      <NativeSelect
-                        id={`${formId}-schema`}
-                        value={schemaId}
-                        onChange={(event) => setSchemaId(event.target.value)}
-                        required
-                        disabled={isLoading}
-                      >
-                        {networkSchemas.map((schema) => (
-                          <NativeSelectOption key={schema.id} value={schema.id}>
-                            {schema.name}
-                          </NativeSelectOption>
+                      <SelectTrigger id={`${formId}-network`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {networks.map((network) => (
+                          <SelectItem key={network.id} value={network.id}>
+                            {network.name}
+                          </SelectItem>
                         ))}
-                      </NativeSelect>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Create a schema in this network before adding a
-                        workflow.
-                      </p>
-                    )}
+                      </SelectContent>
+                    </Select>
                   </Field>
+                  {schemaField}
                 </div>
               ) : (
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-schema`}>
-                    Start from records of
-                  </FieldLabel>
-                  {networkSchemas.length > 0 ? (
-                    <NativeSelect
-                      id={`${formId}-schema`}
-                      value={schemaId}
-                      onChange={(event) => setSchemaId(event.target.value)}
-                      required
-                      disabled={isLoading}
-                    >
-                      {networkSchemas.map((schema) => (
-                        <NativeSelectOption key={schema.id} value={schema.id}>
-                          {schema.name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Create a schema in this network before adding a workflow.
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    The workflow watches new records on this schema and uses its
-                    fields in conditions.
-                  </p>
-                </Field>
+                schemaField
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
@@ -478,12 +497,18 @@ export function WorkflowDefinitionDialog({
                   />
                 </Field>
               </div>
-              <CheckboxField
-                id={`${formId}-active`}
-                checked={active}
-                onChange={setActive}
-                label="Turn this workflow on"
-              />
+              <Field>
+                <CheckboxField
+                  id={`${formId}-active`}
+                  checked={active}
+                  onChange={setActive}
+                  label="Published"
+                />
+                <FieldDescription>
+                  Published workflows run when a matching record is created.
+                  Drafts are saved but do not run.
+                </FieldDescription>
+              </Field>
               {error ? (
                 <FieldError>{getHumaErrorMessage(error)}</FieldError>
               ) : null}
