@@ -39,21 +39,118 @@ export type UpdateSchemaResponse = {
   id: string
 }
 
+export type StringFilterOp = "contains" | "eq" | "startsWith"
+export type NumberFilterOp = "eq" | "gte" | "lte"
+export type SchemaListSort =
+  | "name"
+  | "slug"
+  | "status"
+  | "scope"
+  | "properties"
+  | "createdAt"
+  | "updatedAt"
+
+export type ListSchemasParams = {
+  page?: number
+  pageSize?: number
+  q?: string
+  sort?: SchemaListSort
+  order?: "asc" | "desc"
+  networkId?: string
+  organizationId?: string
+  scope?: "network" | "organization"
+  active?: boolean
+  name?: string
+  nameOp?: StringFilterOp
+  slug?: string
+  slugOp?: StringFilterOp
+  properties?: number
+  propertiesOp?: NumberFilterOp
+}
+
+export type ApiSchemaList = {
+  items: ApiSchema[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function listSchemaQueryParams(params?: ListSchemasParams) {
+  if (!params) {
+    return undefined
+  }
+
+  const query: Record<string, string | number> = {}
+  if (params.page != null) {
+    query.page = params.page
+  }
+  if (params.pageSize != null) {
+    query.pageSize = params.pageSize
+  }
+  if (params.q) {
+    query.q = params.q
+  }
+  if (params.sort) {
+    query.sort = params.sort
+  }
+  if (params.order) {
+    query.order = params.order
+  }
+  if (params.networkId) {
+    query.networkId = params.networkId
+  }
+  if (params.organizationId) {
+    query.organizationId = params.organizationId
+  }
+  if (params.scope) {
+    query.scope = params.scope
+  }
+  if (params.active != null) {
+    query.active = String(params.active)
+  }
+  if (params.name) {
+    query.name = params.name
+    if (params.nameOp) {
+      query.nameOp = params.nameOp
+    }
+  }
+  if (params.slug) {
+    query.slug = params.slug
+    if (params.slugOp) {
+      query.slugOp = params.slugOp
+    }
+  }
+  if (params.properties != null) {
+    query.properties = params.properties
+    if (params.propertiesOp) {
+      query.propertiesOp = params.propertiesOp
+    }
+  }
+
+  return query
+}
+
 const schemaApi = api.injectEndpoints({
   endpoints: (build) => ({
-    listSchemas: build.query<ApiSchema[], void>({
-      query: () => "/schema",
+    listSchemas: build.query<ApiSchemaList, ListSchemasParams | void>({
+      query: (params) => ({
+        url: "/schema",
+        params: listSchemaQueryParams(params ?? undefined),
+      }),
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "Schema" as const, id })),
+              ...result.items.map(({ id }) => ({
+                type: "Schema" as const,
+                id,
+              })),
               { type: "Schema", id: "LIST" },
             ]
           : [{ type: "Schema", id: "LIST" }],
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          for (const schema of data) {
+          for (const schema of data.items) {
             dispatch(api.util.upsertQueryData("getSchema", schema.id, schema))
           }
         } catch {

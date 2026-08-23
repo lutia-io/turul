@@ -6,14 +6,17 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react"
 import { useNavigate } from "react-router"
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  CircleHelpIcon,
   CopyPlusIcon,
   PlusIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
@@ -34,13 +37,26 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { JsonSchemaPropertySpec } from "@/data/define-records"
 import { getSchema } from "@/data/networks"
 import {
@@ -98,6 +114,9 @@ const formatLabels: Record<
 
 const itemTypes = ["string", "number", "integer", "boolean"] as const
 
+const entireNetworkValue = "__network__"
+const anyFormatValue = "__any__"
+
 type PropertyType = (typeof propertyTypes)[number]
 type PropertyFormat = (typeof formatOptions)[number]
 
@@ -108,7 +127,7 @@ type PropertyDraft = {
   required: boolean
   description: string
   format: PropertyFormat
-  enumText: string
+  enumValues: string[]
   itemsType: (typeof itemTypes)[number]
 }
 
@@ -123,7 +142,7 @@ function emptyProperty(
     required: false,
     description: "",
     format: "",
-    enumText: "",
+    enumValues: [],
     itemsType: "string",
     ...defaults,
   }
@@ -151,7 +170,7 @@ function draftsFromProperties(
     required: property.required,
     description: property.description ?? "",
     format: asFormat(property.format),
-    enumText: property.enumValues?.join(", ") ?? "",
+    enumValues: property.enumValues ?? [],
     itemsType: asItemsType(property.itemsType),
   }))
 }
@@ -253,8 +272,7 @@ function toSchemaInput(properties: PropertyDraft[]) {
       spec.items = { type: property.itemsType }
     }
 
-    const enumValues = property.enumText
-      .split(",")
+    const enumValues = property.enumValues
       .map((value) => value.trim())
       .filter(Boolean)
 
@@ -413,6 +431,12 @@ export function SchemaDefinitionDialog({
   const requiredCount = properties.filter(
     (property) => property.required
   ).length
+  const propertyKeys = properties.map((property, index) =>
+    toFieldName(property.name || `field${index + 1}`)
+  )
+  const duplicateKeys = new Set(
+    propertyKeys.filter((key, index) => propertyKeys.indexOf(key) !== index)
+  )
 
   const generatedDefinition = useMemo(
     () =>
@@ -490,7 +514,7 @@ export function SchemaDefinitionDialog({
     markBuilderSource()
     const nextPatch =
       patch.type && patch.type !== "string"
-        ? { ...patch, format: "" as const, enumText: "" }
+        ? { ...patch, format: "" as const, enumValues: [] }
         : patch
     setProperties((current) =>
       current.map((property) =>
@@ -618,47 +642,78 @@ export function SchemaDefinitionDialog({
                     <FieldLabel htmlFor={`${formId}-network`}>
                       Network
                     </FieldLabel>
-                    <NativeSelect
-                      id={`${formId}-network`}
+                    <Select
                       value={selectedNetworkId}
                       disabled={lockNetwork || isLoading}
-                      onChange={(event) => {
-                        setSelectedNetworkId(event.target.value)
+                      required
+                      modal={false}
+                      items={networks.map((network) => ({
+                        value: network.id,
+                        label: network.name,
+                      }))}
+                      onValueChange={(value) => {
+                        if (!value) {
+                          return
+                        }
+                        setSelectedNetworkId(value)
                         setSelectedOrganizationId("")
                       }}
-                      required
                     >
-                      {networks.map((network) => (
-                        <NativeSelectOption key={network.id} value={network.id}>
-                          {network.name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
+                      <SelectTrigger id={`${formId}-network`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {networks.map((network) => (
+                          <SelectItem key={network.id} value={network.id}>
+                            {network.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </Field>
                   <Field>
                     <FieldLabel htmlFor={`${formId}-organization`}>
                       Organization
                     </FieldLabel>
-                    <NativeSelect
-                      id={`${formId}-organization`}
-                      value={selectedOrganizationId}
+                    <Select
+                      value={selectedOrganizationId || entireNetworkValue}
                       disabled={lockOrganization || isLoading}
-                      onChange={(event) =>
-                        setSelectedOrganizationId(event.target.value)
-                      }
+                      modal={false}
+                      items={[
+                        {
+                          value: entireNetworkValue,
+                          label: "Entire network",
+                        },
+                        ...networkOrganizations.map((organization) => ({
+                          value: organization.id,
+                          label: organization.name,
+                        })),
+                      ]}
+                      onValueChange={(value) => {
+                        if (!value || value === entireNetworkValue) {
+                          setSelectedOrganizationId("")
+                          return
+                        }
+                        setSelectedOrganizationId(value)
+                      }}
                     >
-                      <NativeSelectOption value="">
-                        Entire network
-                      </NativeSelectOption>
-                      {networkOrganizations.map((organization) => (
-                        <NativeSelectOption
-                          key={organization.id}
-                          value={organization.id}
-                        >
-                          {organization.name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
+                      <SelectTrigger id={`${formId}-organization`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={entireNetworkValue}>
+                          Entire network
+                        </SelectItem>
+                        {networkOrganizations.map((organization) => (
+                          <SelectItem
+                            key={organization.id}
+                            value={organization.id}
+                          >
+                            {organization.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </Field>
                 </div>
               ) : null}
@@ -729,83 +784,110 @@ export function SchemaDefinitionDialog({
               ) : null}
             </FieldGroup>
 
-            <div className="flex flex-col gap-2">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-medium">Properties</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {properties.length === 0
-                      ? "Add fields that become records columns."
-                      : `${properties.length} ${properties.length === 1 ? "field" : "fields"}${
-                          requiredCount > 0
-                            ? ` · ${requiredCount} required`
-                            : ""
-                        }`}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addProperty}
-                >
-                  <PlusIcon />
-                  Add field
-                </Button>
-              </div>
-
-              {properties.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={addProperty}
-                  className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                >
-                  <PlusIcon className="size-4" />
-                  Add a field, or paste a JSON Schema on the right.
-                </button>
-              ) : (
-                <div className="overflow-hidden rounded-xl border bg-background">
-                  <div className="hidden grid-cols-[minmax(0,1.3fr)_8.5rem_minmax(7rem,0.9fr)_4.75rem_auto] gap-2 border-b bg-muted/40 px-3 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase sm:grid">
-                    <span>Name</span>
-                    <span>Type</span>
-                    <span>Options</span>
-                    <span>Required</span>
-                    <span className="sr-only">Actions</span>
+            <TooltipProvider delay={400}>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-sm font-medium">Properties</h3>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                            />
+                          }
+                        >
+                          <CircleHelpIcon className="size-3.5" />
+                          <span className="sr-only">About properties</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Each property is a field on records that use this
+                          schema. The name becomes the JSON key and column.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {properties.length === 0
+                        ? "Add the fields you want on each record."
+                        : `${properties.length} ${properties.length === 1 ? "field" : "fields"}${
+                            requiredCount > 0
+                              ? ` · ${requiredCount} required`
+                              : ""
+                          }`}
+                    </p>
                   </div>
-                  {properties.map((property, index) => (
-                    <PropertyRow
-                      key={property.key}
-                      property={property}
-                      index={index}
-                      total={properties.length}
-                      focus={property.key === focusKey}
-                      onUpdate={(patch) => updateProperty(property.key, patch)}
-                      onMove={(offset) => moveProperty(index, offset)}
-                      onDuplicate={() => duplicateProperty(index)}
-                      onRemove={() => {
-                        markBuilderSource()
-                        setProperties((current) =>
-                          current.filter((item) => item.key !== property.key)
-                        )
-                      }}
-                      onNameEnter={() => {
-                        if (index === properties.length - 1) {
-                          addProperty()
-                        }
-                      }}
-                    />
-                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addProperty}
+                  >
+                    <PlusIcon />
+                    Add field
+                  </Button>
+                </div>
+
+                {properties.length === 0 ? (
                   <button
                     type="button"
                     onClick={addProperty}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                    className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
                   >
-                    <PlusIcon className="size-3.5" />
-                    Add field
+                    <span className="flex size-8 items-center justify-center rounded-full border border-dashed">
+                      <PlusIcon className="size-4" />
+                    </span>
+                    <span className="font-medium text-foreground">
+                      Add your first field
+                    </span>
+                    <span>
+                      Name it, pick a type, and mark it required if every record
+                      needs a value. You can also paste a JSON Schema on the
+                      right.
+                    </span>
                   </button>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {properties.map((property, index) => (
+                      <PropertyRow
+                        key={property.key}
+                        property={property}
+                        index={index}
+                        total={properties.length}
+                        jsonKey={propertyKeys[index]!}
+                        isDuplicate={duplicateKeys.has(propertyKeys[index]!)}
+                        focus={property.key === focusKey}
+                        onUpdate={(patch) =>
+                          updateProperty(property.key, patch)
+                        }
+                        onMove={(offset) => moveProperty(index, offset)}
+                        onDuplicate={() => duplicateProperty(index)}
+                        onRemove={() => {
+                          markBuilderSource()
+                          setProperties((current) =>
+                            current.filter((item) => item.key !== property.key)
+                          )
+                        }}
+                        onNameEnter={() => {
+                          if (index === properties.length - 1) {
+                            addProperty()
+                          }
+                        }}
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addProperty}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+                    >
+                      <PlusIcon className="size-3.5" />
+                      Add field
+                    </button>
+                  </div>
+                )}
+              </div>
+            </TooltipProvider>
           </DefinitionDialogBody>
           <DialogFooter>
             <DialogClose
@@ -837,10 +919,153 @@ export function SchemaDefinitionDialog({
   )
 }
 
+function splitTagTokens(value: string) {
+  return value
+    .split(/[,\n]/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+}
+
+function TagInput({
+  id,
+  values,
+  onChange,
+  placeholder,
+}: {
+  id?: string
+  values: string[]
+  onChange: (values: string[]) => void
+  placeholder?: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [draft, setDraft] = useState("")
+
+  function addTokens(raw: string) {
+    const next = [...values]
+    for (const token of splitTagTokens(raw)) {
+      if (!next.includes(token)) {
+        next.push(token)
+      }
+    }
+    onChange(next)
+    setDraft("")
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex min-h-8 w-full cursor-text flex-wrap items-center gap-1 rounded-lg border border-input bg-transparent px-1.5 py-1 transition-colors dark:bg-input/30",
+        "focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50"
+      )}
+      onClick={() => inputRef.current?.focus()}
+    >
+      {values.map((value) => (
+        <span
+          key={value}
+          className="inline-flex h-6 max-w-full items-center gap-0.5 rounded-full border bg-muted px-2 text-xs font-medium"
+        >
+          <span className="truncate">{value}</span>
+          <button
+            type="button"
+            className="rounded-full text-muted-foreground hover:text-foreground"
+            onClick={(event) => {
+              event.stopPropagation()
+              onChange(values.filter((item) => item !== value))
+            }}
+          >
+            <XIcon className="size-3" />
+            <span className="sr-only">Remove {value}</span>
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        id={id}
+        value={draft}
+        onChange={(event) => {
+          const next = event.target.value
+          if (/[,\n]/.test(next)) {
+            addTokens(next)
+            return
+          }
+          setDraft(next)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault()
+            if (draft.trim()) {
+              addTokens(draft)
+            }
+          }
+          if (event.key === "Backspace" && !draft && values.length > 0) {
+            event.preventDefault()
+            onChange(values.slice(0, -1))
+          }
+        }}
+        onBlur={() => {
+          if (draft.trim()) {
+            addTokens(draft)
+          }
+        }}
+        onPaste={(event) => {
+          const text = event.clipboardData.getData("text")
+          if (/[,\n]/.test(text)) {
+            event.preventDefault()
+            addTokens(`${draft}${text}`)
+          }
+        }}
+        placeholder={values.length === 0 ? placeholder : undefined}
+        className="min-w-16 flex-1 bg-transparent py-0.5 text-sm outline-none placeholder:text-muted-foreground md:text-sm"
+      />
+    </div>
+  )
+}
+
+function IconTooltipButton({
+  label,
+  disabled,
+  onClick,
+  destructive,
+  children,
+}: {
+  label: string
+  disabled?: boolean
+  onClick: () => void
+  destructive?: boolean
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        disabled={disabled}
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={disabled}
+            onClick={onClick}
+            className={cn(
+              "text-muted-foreground",
+              destructive && "hover:bg-destructive/10 hover:text-destructive"
+            )}
+          />
+        }
+      >
+        {children}
+        <span className="sr-only">{label}</span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function PropertyRow({
   property,
   index,
   total,
+  jsonKey,
+  isDuplicate,
   focus,
   onUpdate,
   onMove,
@@ -851,6 +1076,8 @@ function PropertyRow({
   property: PropertyDraft
   index: number
   total: number
+  jsonKey: string
+  isDuplicate: boolean
   focus: boolean
   onUpdate: (patch: Partial<PropertyDraft>) => void
   onMove: (offset: number) => void
@@ -858,6 +1085,14 @@ function PropertyRow({
   onRemove: () => void
   onNameEnter: () => void
 }) {
+  const nameId = `${property.key}-name`
+  const typeId = `${property.key}-type`
+  const requiredId = `${property.key}-required`
+  const descriptionId = `${property.key}-description`
+  const formatId = `${property.key}-format`
+  const itemsId = `${property.key}-items`
+  const enumId = `${property.key}-enum`
+
   function handleNameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") {
       return
@@ -867,149 +1102,214 @@ function PropertyRow({
   }
 
   return (
-    <div className="border-b last:border-b-0">
-      <div className="grid gap-2 px-3 pt-2.5 pb-2 sm:grid-cols-[minmax(0,1.3fr)_8.5rem_minmax(7rem,0.9fr)_4.75rem_auto] sm:items-center">
-        <Field className="gap-1">
-          <FieldLabel className="sm:sr-only">Name</FieldLabel>
-          <Input
-            value={property.name}
-            onChange={(event) => onUpdate({ name: event.target.value })}
-            onKeyDown={handleNameKeyDown}
-            placeholder="fieldName"
-            className="font-mono"
-            autoFocus={focus}
-            required
-            aria-label={`Property ${index + 1} name`}
-          />
-        </Field>
-        <Field className="gap-1">
-          <FieldLabel className="sm:sr-only">Type</FieldLabel>
-          <NativeSelect
-            value={property.type}
-            aria-label={`Property ${index + 1} type`}
-            onChange={(event) =>
-              onUpdate({ type: asPropertyType(event.target.value) })
-            }
-          >
-            {propertyTypes.map((type) => (
-              <NativeSelectOption key={type} value={type}>
-                {propertyTypeLabels[type]}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field className="gap-1">
-          <FieldLabel className="sm:sr-only">
-            {property.type === "array" ? "Item type" : "Format"}
-          </FieldLabel>
-          {property.type === "string" ? (
-            <NativeSelect
-              value={property.format}
-              aria-label={`Property ${index + 1} format`}
-              onChange={(event) =>
-                onUpdate({ format: asFormat(event.target.value) })
-              }
-            >
-              <NativeSelectOption value="">No format</NativeSelectOption>
-              {(["date", "date-time", "email", "uri", "file"] as const).map(
-                (format) => (
-                  <NativeSelectOption key={format} value={format}>
-                    {formatLabels[format]}
-                  </NativeSelectOption>
-                )
-              )}
-            </NativeSelect>
-          ) : property.type === "array" ? (
-            <NativeSelect
-              value={property.itemsType}
-              aria-label={`Property ${index + 1} item type`}
-              onChange={(event) =>
-                onUpdate({
-                  itemsType: event.target.value as PropertyDraft["itemsType"],
-                })
-              }
-            >
-              {itemTypes.map((type) => (
-                <NativeSelectOption key={type} value={type}>
-                  {propertyTypeLabels[type]} items
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          ) : (
-            <p className="flex h-8 items-center text-xs text-muted-foreground">
-              —
-            </p>
-          )}
-        </Field>
-        <div className="flex h-8 items-center">
-          <CheckboxField
-            checked={property.required}
-            onChange={(checked) => onUpdate({ required: checked })}
-            label={<span className="sm:sr-only">Required</span>}
-          />
+    <div
+      className={cn(
+        "rounded-xl border bg-background p-3 shadow-xs",
+        focus && "ring-3 ring-ring/40"
+      )}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">
+            Field {index + 1}
+            <span className="font-normal text-muted-foreground">
+              {" "}
+              of {total}
+            </span>
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {propertyTypeLabels[property.type]}
+            {property.required ? " · Required" : " · Optional"}
+            {property.name.trim() ? ` · ${jsonKey}` : ""}
+          </p>
         </div>
-        <div className="flex items-center justify-end gap-0.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
+        <div className="flex shrink-0 items-center gap-0.5">
+          <IconTooltipButton
+            label="Move up"
             disabled={index === 0}
             onClick={() => onMove(-1)}
           >
             <ChevronUpIcon />
-            <span className="sr-only">Move up</span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
+          </IconTooltipButton>
+          <IconTooltipButton
+            label="Move down"
             disabled={index === total - 1}
             onClick={() => onMove(1)}
           >
             <ChevronDownIcon />
-            <span className="sr-only">Move down</span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={onDuplicate}
-          >
+          </IconTooltipButton>
+          <IconTooltipButton label="Duplicate field" onClick={onDuplicate}>
             <CopyPlusIcon />
-            <span className="sr-only">Duplicate</span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
+          </IconTooltipButton>
+          <IconTooltipButton
+            label="Remove field"
+            destructive
             onClick={onRemove}
           >
             <Trash2Icon />
-            <span className="sr-only">Remove property</span>
-          </Button>
+          </IconTooltipButton>
         </div>
       </div>
-      <div
-        className={cn(
-          "grid gap-2 px-3 pb-2.5 sm:grid-cols-2 sm:pr-[calc(4.75rem+5.5rem)]"
-        )}
-      >
-        <Input
-          value={property.description}
-          onChange={(event) => onUpdate({ description: event.target.value })}
-          placeholder="Description"
-          aria-label={`Property ${index + 1} description`}
-        />
-        {property.type === "string" ? (
+
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_10rem_auto] sm:items-start">
+        <Field className="gap-1">
+          <FieldLabel htmlFor={nameId}>Name</FieldLabel>
           <Input
-            value={property.enumText}
-            onChange={(event) => onUpdate({ enumText: event.target.value })}
-            placeholder="Enum values: draft, published"
-            aria-label={`Property ${index + 1} enum values`}
+            id={nameId}
+            value={property.name}
+            onChange={(event) => onUpdate({ name: event.target.value })}
+            onKeyDown={handleNameKeyDown}
+            placeholder="shipmentId"
+            className="font-mono"
+            autoFocus={focus}
+            required
+            aria-invalid={isDuplicate || undefined}
           />
-        ) : (
-          <div className="hidden sm:block" />
-        )}
+          {isDuplicate ? (
+            <FieldError>Another field already uses this name.</FieldError>
+          ) : (
+            <FieldDescription className="text-xs">
+              Becomes the JSON key{" "}
+              <span className="font-mono text-foreground">{jsonKey}</span>
+            </FieldDescription>
+          )}
+        </Field>
+        <Field className="gap-1">
+          <FieldLabel htmlFor={typeId}>Type</FieldLabel>
+          <Select
+            value={property.type}
+            modal={false}
+            items={propertyTypes.map((type) => ({
+              value: type,
+              label: propertyTypeLabels[type],
+            }))}
+            onValueChange={(value) => {
+              if (value) {
+                onUpdate({ type: asPropertyType(value) })
+              }
+            }}
+          >
+            <SelectTrigger id={typeId}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {propertyTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {propertyTypeLabels[type]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field className="gap-1 sm:pt-6">
+          <CheckboxField
+            id={requiredId}
+            checked={property.required}
+            onChange={(checked) => onUpdate({ required: checked })}
+            label="Required"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field className="gap-1 sm:col-span-2">
+          <FieldLabel htmlFor={descriptionId}>Description</FieldLabel>
+          <Input
+            id={descriptionId}
+            value={property.description}
+            onChange={(event) => onUpdate({ description: event.target.value })}
+            placeholder="What this field stores"
+          />
+        </Field>
+        {property.type === "string" ? (
+          <>
+            <Field className="gap-1">
+              <FieldLabel htmlFor={formatId}>Format</FieldLabel>
+              <Select
+                value={property.format || anyFormatValue}
+                modal={false}
+                items={[
+                  { value: anyFormatValue, label: "Any text" },
+                  ...(["date", "date-time", "email", "uri", "file"] as const).map(
+                    (format) => ({
+                      value: format,
+                      label: formatLabels[format],
+                    })
+                  ),
+                ]}
+                onValueChange={(value) => {
+                  if (!value || value === anyFormatValue) {
+                    onUpdate({ format: "" })
+                    return
+                  }
+                  onUpdate({ format: asFormat(value) })
+                }}
+              >
+                <SelectTrigger id={formatId}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={anyFormatValue}>Any text</SelectItem>
+                  {(["date", "date-time", "email", "uri", "file"] as const).map(
+                    (format) => (
+                      <SelectItem key={format} value={format}>
+                        {formatLabels[format]}
+                      </SelectItem>
+                    )
+                  )}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className="gap-1">
+              <FieldLabel htmlFor={enumId}>Allowed values</FieldLabel>
+              <TagInput
+                id={enumId}
+                values={property.enumValues}
+                onChange={(enumValues) => onUpdate({ enumValues })}
+                placeholder="Type a value and press Enter"
+              />
+              <FieldDescription className="text-xs">
+                Optional. Leave empty to allow any text.
+              </FieldDescription>
+            </Field>
+          </>
+        ) : null}
+        {property.type === "array" ? (
+          <Field className="gap-1">
+            <FieldLabel htmlFor={itemsId}>List item type</FieldLabel>
+            <Select
+              value={property.itemsType}
+              modal={false}
+              items={itemTypes.map((type) => ({
+                value: type,
+                label: propertyTypeLabels[type],
+              }))}
+              onValueChange={(value) => {
+                if (value) {
+                  onUpdate({
+                    itemsType: value as PropertyDraft["itemsType"],
+                  })
+                }
+              }}
+            >
+              <SelectTrigger id={itemsId}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {itemTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {propertyTypeLabels[type]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
+        {property.type === "object" ? (
+          <FieldDescription className="sm:col-span-2">
+            Object fields store nested JSON on the record.
+          </FieldDescription>
+        ) : null}
       </div>
     </div>
   )

@@ -334,7 +334,7 @@ export function useWorkspaceSchemas() {
 
   return {
     ...query,
-    schemas: (query.data ?? []).map(workspaceSchemaFromApi),
+    schemas: (query.data?.items ?? []).map(workspaceSchemaFromApi),
   }
 }
 

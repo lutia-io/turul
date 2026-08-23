@@ -1,5 +1,7 @@
 import type { ReactNode } from "react"
 
+import { Checkbox } from "@/components/ui/checkbox"
+
 export function CheckboxField({
   id,
   checked,
@@ -16,12 +18,10 @@ export function CheckboxField({
       htmlFor={id}
       className="inline-flex cursor-pointer items-center gap-2 text-sm leading-none select-none"
     >
-      <input
+      <Checkbox
         id={id}
-        type="checkbox"
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="size-4 rounded border-input accent-primary"
+        onCheckedChange={(next) => onChange(next === true)}
       />
       {label}
     </label>

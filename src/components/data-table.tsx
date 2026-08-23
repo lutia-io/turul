@@ -5,9 +5,11 @@ import {
   ArrowUpIcon,
   ChevronsUpDownIcon,
   SearchIcon,
+  XIcon,
 } from "lucide-react"
 
 import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
@@ -99,6 +101,37 @@ export function dataTableCount({
   return `${visible} of ${total} ${word}`
 }
 
+export function dataTablePageSummary({
+  isLoading,
+  loadingLabel,
+  pageIndex,
+  pageSize,
+  total,
+  singular,
+  plural,
+}: {
+  isLoading?: boolean
+  loadingLabel: string
+  pageIndex: number
+  pageSize: number
+  total: number
+  singular: string
+  plural?: string
+}) {
+  if (isLoading) {
+    return loadingLabel
+  }
+
+  const word = plural ?? `${singular}s`
+  if (total === 0) {
+    return `0 ${word}`
+  }
+
+  const start = pageIndex * pageSize + 1
+  const end = Math.min(total, (pageIndex + 1) * pageSize)
+  return `${start}–${end} of ${total} ${word}`
+}
+
 export function DataTablePage({
   title,
   description,
@@ -130,7 +163,10 @@ export function DataTableToolbar({
   query,
   onQueryChange,
   searchPlaceholder,
+  searchClassName,
   filters,
+  chips,
+  trailing,
   count,
   onRefresh,
   isRefreshing,
@@ -138,36 +174,58 @@ export function DataTableToolbar({
   query: string
   onQueryChange: (query: string) => void
   searchPlaceholder: string
+  searchClassName?: string
   filters?: ReactNode
+  chips?: ReactNode
+  trailing?: ReactNode
   count: string
   onRefresh?: () => void
   isRefreshing?: boolean
 }) {
   return (
-    <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:max-w-sm">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder={searchPlaceholder}
-            className="h-8 bg-background pl-8"
-          />
+    <div className="flex shrink-0 flex-col gap-2">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className={cn("relative w-full", searchClassName ?? "sm:max-w-sm")}>
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder={searchPlaceholder}
+              className={cn(
+                "h-8 bg-background pl-8 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
+                query && "pr-8"
+              )}
+            />
+            {query ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => onQueryChange("")}
+              >
+                <XIcon />
+                <span className="sr-only">Clear search</span>
+              </Button>
+            ) : null}
+          </div>
+          {filters}
         </div>
-        {filters}
+        <div className="flex items-center gap-2">
+          {trailing}
+          {onRefresh ? (
+            <RefreshButton
+              onRefresh={onRefresh}
+              isRefreshing={isRefreshing}
+              size="icon"
+            />
+          ) : null}
+          <p className="text-sm text-muted-foreground tabular-nums">{count}</p>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        {onRefresh ? (
-          <RefreshButton
-            onRefresh={onRefresh}
-            isRefreshing={isRefreshing}
-            size="icon"
-          />
-        ) : null}
-        <p className="text-sm text-muted-foreground tabular-nums">{count}</p>
-      </div>
+      {chips}
     </div>
   )
 }
