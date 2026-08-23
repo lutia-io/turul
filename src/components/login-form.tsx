@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { getHumaErrorMessage, useLoginUserMutation } from "@/store/api"
-import { FishIcon } from "lucide-react"
 
 export function LoginForm({
   className,
@@ -44,19 +43,10 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <form onSubmit={handleSubmit}>
         <FieldGroup>
-          <div className="flex flex-col items-center gap-2 text-center">
-            <Link
-              to="/"
-              className="flex flex-col items-center gap-2 font-medium"
-            >
-              <div className="flex size-8 items-center justify-center rounded-md">
-                <FishIcon className="size-6 text-primary" />
-              </div>
-              <span className="sr-only">Lutia</span>
-            </Link>
-            <h1 className="text-xl font-bold">Welcome to Lutia</h1>
+          <div className="flex flex-col items-center gap-1 text-center">
+            <h1 className="text-2xl font-bold">Welcome to Lutia</h1>
             <FieldDescription>
-              Don&apos;t have an account? <Link to="/app/signup">Sign up</Link>
+              Enter your email below to login to your account
             </FieldDescription>
           </div>
           <Field data-invalid={error ? true : undefined}>
@@ -99,7 +89,6 @@ export function LoginForm({
                   fill="currentColor"
                 />
               </svg>
-              Continue with Apple
             </Button>
             <Button variant="outline" type="button">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -108,9 +97,11 @@ export function LoginForm({
                   fill="currentColor"
                 />
               </svg>
-              Continue with Google
             </Button>
           </Field>
+          <FieldDescription className="text-center">
+            Don&apos;t have an account? <Link to="/app/signup">Sign up</Link>
+          </FieldDescription>
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center">

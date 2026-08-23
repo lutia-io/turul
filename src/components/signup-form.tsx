@@ -14,24 +14,14 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  getHumaErrorMessage,
-  useCreateUserMutation,
-  useLoginUserMutation,
-} from "@/store/api"
-import { FishIcon } from "lucide-react"
+import { getHumaErrorMessage, useCreateUserMutation } from "@/store/api"
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const [createUser, { isLoading: isCreating, error: createError }] =
-    useCreateUserMutation()
-  const [loginUser, { isLoading: isLoggingIn, error: loginError }] =
-    useLoginUserMutation()
+  const [createUser, { isLoading, error }] = useCreateUserMutation()
   const navigate = useNavigate()
-  const isLoading = isCreating || isLoggingIn
-  const error = createError ?? loginError
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -43,8 +33,7 @@ export function SignupForm({
 
     try {
       await createUser({ firstName, lastName, email, password }).unwrap()
-      await loginUser({ email, password }).unwrap()
-      navigate("/app/home", { replace: true })
+      navigate("/app/login", { replace: true })
     } catch {
       // Error is rendered from the mutation state.
     }
@@ -54,19 +43,10 @@ export function SignupForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <form onSubmit={handleSubmit}>
         <FieldGroup>
-          <div className="flex flex-col items-center gap-2 text-center">
-            <Link
-              to="/"
-              className="flex flex-col items-center gap-2 font-medium"
-            >
-              <div className="flex size-8 items-center justify-center rounded-md">
-                <FishIcon className="size-6 text-primary" />
-              </div>
-              <span className="sr-only">Lutia</span>
-            </Link>
-            <h1 className="text-xl font-bold">Welcome to Lutia</h1>
+          <div className="flex flex-col items-center gap-1 text-center">
+            <h1 className="text-2xl font-bold">Create your account</h1>
             <FieldDescription>
-              Already have an account? <Link to="/app/login">Sign in</Link>
+              Enter your details below to create your account
             </FieldDescription>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -135,7 +115,6 @@ export function SignupForm({
                   fill="currentColor"
                 />
               </svg>
-              Continue with Apple
             </Button>
             <Button variant="outline" type="button">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -144,9 +123,11 @@ export function SignupForm({
                   fill="currentColor"
                 />
               </svg>
-              Continue with Google
             </Button>
           </Field>
+          <FieldDescription className="text-center">
+            Already have an account? <Link to="/app/login">Sign in</Link>
+          </FieldDescription>
         </FieldGroup>
       </form>
       <FieldDescription className="px-6 text-center">
