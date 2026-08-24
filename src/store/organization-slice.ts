@@ -1,3 +1,4 @@
+import { setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
 export type ApiOrganization = {
@@ -29,7 +30,7 @@ export type UpdateOrganizationResponse = {
   id: string
 }
 
-export type StringFilterOp = "contains" | "eq" | "startsWith"
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 export type OrganizationListSort =
   | "name"
   | "slug"
@@ -87,24 +88,9 @@ function listOrganizationQueryParams(params?: ListOrganizationsParams) {
   if (params.organizationId) {
     query.organizationId = params.organizationId
   }
-  if (params.name) {
-    query.name = params.name
-    if (params.nameOp) {
-      query.nameOp = params.nameOp
-    }
-  }
-  if (params.slug) {
-    query.slug = params.slug
-    if (params.slugOp) {
-      query.slugOp = params.slugOp
-    }
-  }
-  if (params.network) {
-    query.network = params.network
-    if (params.networkOp) {
-      query.networkOp = params.networkOp
-    }
-  }
+  setStringFilterParam(query, "name", params.name, params.nameOp)
+  setStringFilterParam(query, "slug", params.slug, params.slugOp)
+  setStringFilterParam(query, "network", params.network, params.networkOp)
 
   return query
 }

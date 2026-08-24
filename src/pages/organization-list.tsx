@@ -18,7 +18,7 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  stringFilterOps,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type PaginationState,
@@ -323,7 +323,7 @@ export default function OrganizationList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -332,7 +332,7 @@ export default function OrganizationList() {
       chips.push({
         id: "slug",
         label: "Slug",
-        value: `${opLabel(columnFilters.slug.op)} “${columnFilters.slug.value}”`,
+        value: stringFilterChipValue(columnFilters.slug.op, columnFilters.slug.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
@@ -399,6 +399,3 @@ export default function OrganizationList() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

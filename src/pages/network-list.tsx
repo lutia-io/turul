@@ -1,15 +1,17 @@
+import { useState, type ReactNode } from "react"
 import { Link } from "react-router"
 import {
   ArrowRightIcon,
   Building2Icon,
   FileJsonIcon,
   GalleryVerticalEndIcon,
-  GlobeIcon,
   LayersIcon,
-  MapPinIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
   PlusIcon,
+  Trash2Icon,
+  UsersIcon,
   WorkflowIcon,
-  type LucideIcon,
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
@@ -24,177 +26,330 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { publicationStatus } from "@/lib/json-definition"
-import { getBadgeColor, type BadgeColor } from "@/lib/badge"
+import { getBadgeColor } from "@/lib/badge"
 import {
   networkWorkspacePath,
   useWorkspaceNetworks,
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
+import { useDeleteNetworkMutation } from "@/store/network-slice"
 import type { Network, Organization } from "@/data/networks"
 
-function countByStatus<T>(items: T[], statusOf: (item: T) => string) {
-  return items.reduce(
-    (counts, item) => {
-      if (statusOf(item) === "Draft") {
-        counts.draft += 1
-      } else {
-        counts.live += 1
-      }
-      return counts
-    },
-    { live: 0, draft: 0 }
+type NetworkDetails = Network & {
+  slug?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+type OrganizationDetails = Organization & {
+  slug?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+function organizationInitials(name: string) {
+  const parts = name.split(/\s+/).filter(Boolean)
+  if (parts.length === 0) {
+    return "Or"
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2)
+  }
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`
+}
+
+function formatDateTime(value?: string) {
+  if (!value) {
+    return undefined
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return undefined
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
+}
+
+function organizationSlug(organization: OrganizationDetails) {
+  return organization.slug || undefined
+}
+
+function organizationKind(organization: OrganizationDetails) {
+  const slug = organizationSlug(organization)
+  if (organization.type && organization.type !== slug) {
+    return organization.type
+  }
+  return undefined
+}
+
+function networkSlug(network: NetworkDetails) {
+  return network.slug || network.summary || undefined
+}
+
+function countLabel(count: number, singular: string) {
+  return `${count} ${count === 1 ? singular : `${singular}s`}`
+}
+
+function DetailItem({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value?: ReactNode
+  mono?: boolean
+}) {
+  if (value == null || value === "") {
+    return null
+  }
+
+  return (
+    <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 font-medium wrap-break-word", mono && "font-mono text-sm")}>
+        {value}
+      </p>
+    </div>
   )
 }
 
-function statusDetail(counts: { live: number; draft: number }, liveLabel: string) {
-  if (counts.draft > 0) {
-    return `${counts.live} ${liveLabel} · ${counts.draft} draft`
-  }
-  return `${counts.live} ${liveLabel}`
-}
-
-function EntityCard({
-  to,
-  name,
-  subtitle,
-  status,
-  color,
-  icon: Icon,
-}: {
-  to: string
-  name: string
-  subtitle: string
-  status?: string
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
+function NetworkCounts({ network }: { network: Network }) {
+  const items = [
+    {
+      to: networkWorkspacePath({ networkId: network.id, rest: "schemas" }),
+      label: "Schemas",
+      value: network.schemas.length,
+      icon: FileJsonIcon,
+    },
+    {
+      to: networkWorkspacePath({
+        networkId: network.id,
+        rest: "workflow-definitions",
+      }),
+      label: "Workflows",
+      value: network.workflowDefinitions.length,
+      icon: WorkflowIcon,
+    },
+    {
+      to: networkWorkspacePath({
+        networkId: network.id,
+        rest: "pipeline-definitions",
+      }),
+      label: "Pipelines",
+      value: network.pipelineDefinitions.length,
+      icon: LayersIcon,
+    },
+  ]
 
   return (
-    <Link
-      to={to}
-      className="group flex min-h-[88px] min-w-0 items-center gap-3.5 overflow-hidden rounded-xl border bg-background px-3.5 py-3 shadow-xs transition-colors hover:bg-muted/50"
-    >
-      <div
-        className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-lg",
-          tone.bg,
-          tone.text
-        )}
-      >
-        <Icon className="size-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <p className="min-w-0 truncate font-medium">{name}</p>
-          {status ? (
-            <span className="shrink-0">
-              <StatusBadge status={status} />
-            </span>
-          ) : null}
-        </div>
-        <p className="text-sm wrap-break-word text-muted-foreground sm:truncate">
-          {subtitle}
-        </p>
-      </div>
-      <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-    </Link>
+    <div className="grid grid-cols-3 gap-2">
+      {items.map((item) => (
+        <Link
+          key={item.label}
+          to={item.to}
+          className="rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
+        >
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <item.icon className="size-3.5" />
+            <p className="truncate text-xs">{item.label}</p>
+          </div>
+          <p className="mt-1 text-lg font-semibold tracking-tight tabular-nums">
+            {item.value}
+          </p>
+        </Link>
+      ))}
+    </div>
   )
 }
 
 function OrganizationCard({
-  organization,
   networkId,
+  organization,
 }: {
-  organization: Organization
   networkId: string
+  organization: OrganizationDetails
 }) {
-  return (
-    <EntityCard
-      to={networkWorkspacePath({
-        networkId,
-        organizationId: organization.id,
-      })}
-      name={organization.name}
-      status={organization.status}
-      color={organization.color}
-      icon={Building2Icon}
-      subtitle={
-        [organization.type, organization.location]
-          .filter(Boolean)
-          .join(" · ") || "Organization"
-      }
-    />
-  )
-}
-
-function NetworkStat({
-  to,
-  label,
-  value,
-  detail,
-  color,
-  icon: Icon,
-}: {
-  to: string
-  label: string
-  value: number
-  detail: string
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
+  const { openEditOrganization } = useCreateEntity()
+  const tone = getBadgeColor(organization.color)
+  const workspacePath = networkWorkspacePath({
+    networkId,
+    organizationId: organization.id,
+  })
+  const slug = organizationSlug(organization)
+  const kind = organizationKind(organization)
+  const created = formatDateTime(organization.createdAt)
+  const updated = formatDateTime(organization.updatedAt)
 
   return (
-    <Link
-      to={to}
-      className="group flex min-w-0 items-center gap-3 rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
-    >
-      <div
-        className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-lg",
-          tone.bg,
-          tone.text
-        )}
+    <div className="flex min-w-0 flex-col gap-3 rounded-xl border bg-background p-3.5 shadow-xs">
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "flex size-12 shrink-0 items-center justify-center rounded-lg text-sm font-semibold tracking-tight",
+            tone.bg,
+            tone.text
+          )}
+        >
+          {organizationInitials(organization.name)}
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="font-medium wrap-break-word">{organization.name}</p>
+            <StatusBadge status={organization.status} />
+          </div>
+          {organization.description ? (
+            <p className="text-sm text-pretty text-muted-foreground">
+              {organization.description}
+            </p>
+          ) : null}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon-sm" />}
+          >
+            <MoreHorizontalIcon />
+            <span className="sr-only">Organization actions</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-44">
+            <DropdownMenuItem render={<Link to={workspacePath} />}>
+              <Building2Icon />
+              Open workspace
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => openEditOrganization(organization.id)}
+            >
+              <PencilIcon />
+              Edit organization
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <DetailItem label="Slug" value={slug} mono />
+        <DetailItem label="Type" value={kind} />
+        <DetailItem label="Location" value={organization.location} />
+        <DetailItem
+          label="Members"
+          value={
+            organization.members > 0
+              ? countLabel(organization.members, "member")
+              : undefined
+          }
+        />
+        <DetailItem label="Created" value={created} />
+        <DetailItem
+          label="Updated"
+          value={updated && updated !== created ? updated : undefined}
+        />
+      </div>
+      <Link
+        to={workspacePath}
+        className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
-        <Icon className="size-4" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-lg font-semibold tracking-tight tabular-nums">
-          {value}
-        </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {label}
-          <span className="mx-1 text-border">·</span>
-          {detail}
-        </p>
-      </div>
-    </Link>
+        Open workspace
+        <ArrowRightIcon className="size-3.5" />
+      </Link>
+    </div>
   )
 }
 
-function NetworkCard({ network }: { network: Network }) {
-  const { openCreateOrganization } = useCreateEntity()
+function DeleteNetworkDialog({
+  network,
+  open,
+  onOpenChange,
+}: {
+  network: Network
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const [deleteNetwork, deleteState] = useDeleteNetworkMutation()
+  const organizationCount = network.organizations.length
+
+  async function handleDelete() {
+    try {
+      await deleteNetwork(network.id).unwrap()
+      onOpenChange(false)
+    } catch {
+      // Error is rendered from the mutation state.
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          deleteState.reset()
+        }
+        onOpenChange(nextOpen)
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Delete {network.name}?</DialogTitle>
+          <DialogDescription>
+            This will permanently delete the network
+            {organizationCount > 0
+              ? ` and ${organizationCount} ${organizationCount === 1 ? "organization" : "organizations"}`
+              : ""}
+            . This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        {deleteState.error ? (
+          <p className="text-sm text-destructive">
+            {getHumaErrorMessage(deleteState.error, "Failed to delete network")}
+          </p>
+        ) : null}
+        <DialogFooter>
+          <DialogClose
+            render={
+              <Button variant="outline" disabled={deleteState.isLoading} />
+            }
+          >
+            Cancel
+          </DialogClose>
+          <Button
+            variant="destructive"
+            onClick={() => void handleDelete()}
+            disabled={deleteState.isLoading}
+          >
+            {deleteState.isLoading ? "Deleting..." : "Delete network"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function NetworkCard({ network }: { network: NetworkDetails }) {
+  const { openCreateOrganization, openEditNetwork } = useCreateEntity()
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const tone = getBadgeColor(network.color)
-  const organizationCounts = countByStatus(
-    network.organizations,
-    (organization) => organization.status
-  )
-  const schemaCounts = countByStatus(network.schemas, (schema) =>
-    publicationStatus(schema.active)
-  )
-  const workflowCounts = countByStatus(
-    network.workflowDefinitions,
-    (workflow) => publicationStatus(workflow.active)
-  )
-  const pipelineCounts = countByStatus(
-    network.pipelineDefinitions,
-    (pipeline) => publicationStatus(pipeline.active)
-  )
-  const industryLabel = network.industry || network.summary
+  const slug = networkSlug(network)
+  const created = formatDateTime(network.createdAt)
+  const updated = formatDateTime(network.updatedAt)
+  const organizationCount = network.organizations.length
 
   return (
     <Card>
@@ -213,32 +368,11 @@ function NetworkCard({ network }: { network: Network }) {
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-lg">{network.name}</CardTitle>
               <StatusBadge status={network.status} />
-              {industryLabel ? (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  {industryLabel}
-                </span>
-              ) : null}
             </div>
             {network.description ? (
               <CardDescription className="max-w-2xl text-pretty">
                 {network.description}
               </CardDescription>
-            ) : null}
-            {network.headquarters || network.coverage ? (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {network.headquarters ? (
-                  <span className="inline-flex items-center gap-1">
-                    <MapPinIcon className="size-3.5" />
-                    {network.headquarters}
-                  </span>
-                ) : null}
-                {network.coverage ? (
-                  <span className="inline-flex items-center gap-1">
-                    <GlobeIcon className="size-3.5" />
-                    {network.coverage}
-                  </span>
-                ) : null}
-              </div>
             ) : null}
           </div>
         </div>
@@ -251,62 +385,95 @@ function NetworkCard({ network }: { network: Network }) {
             <PlusIcon />
             Add organization
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="outline" size="icon-sm" />}
+            >
+              <MoreHorizontalIcon />
+              <span className="sr-only">Network actions</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem onClick={() => openEditNetwork(network.id)}>
+                <PencilIcon />
+                Edit network
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2Icon />
+                Delete network
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <NetworkStat
-            to={`/app/networks/${network.id}`}
-            label="Organizations"
-            value={network.organizations.length}
-            detail={statusDetail(organizationCounts, "active")}
-            color="cyan"
-            icon={Building2Icon}
-          />
-          <NetworkStat
-            to={networkWorkspacePath({
-              networkId: network.id,
-              rest: "schemas",
-            })}
-            label="Schemas"
-            value={network.schemas.length}
-            detail={statusDetail(schemaCounts, "published")}
-            color="purple"
-            icon={FileJsonIcon}
-          />
-          <NetworkStat
-            to={networkWorkspacePath({
-              networkId: network.id,
-              rest: "workflow-definitions",
-            })}
-            label="Workflows"
-            value={network.workflowDefinitions.length}
-            detail={statusDetail(workflowCounts, "published")}
-            color="teal"
-            icon={WorkflowIcon}
-          />
-          <NetworkStat
-            to={networkWorkspacePath({
-              networkId: network.id,
-              rest: "pipeline-definitions",
-            })}
-            label="Pipelines"
-            value={network.pipelineDefinitions.length}
-            detail={statusDetail(pipelineCounts, "published")}
-            color="pink"
-            icon={LayersIcon}
+      <CardContent className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <DetailItem label="Slug" value={slug} mono />
+          <DetailItem label="Industry" value={network.industry} />
+          <DetailItem label="Headquarters" value={network.headquarters} />
+          <DetailItem label="Coverage" value={network.coverage} />
+          <DetailItem label="Created" value={created} />
+          <DetailItem
+            label="Updated"
+            value={updated && updated !== created ? updated : undefined}
           />
         </div>
+        <NetworkCounts network={network} />
+        {organizationCount > 0 ? (
+          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {network.organizations.map((organization) => (
+              <OrganizationCard
+                key={organization.id}
+                networkId={network.id}
+                organization={organization}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-8 text-center">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Building2Icon className="size-4" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">No organizations yet</p>
+              <p className="text-sm text-muted-foreground">
+                Add an organization to start collaborating in this network.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openCreateOrganization(network.id)}
+            >
+              <PlusIcon />
+              Add organization
+            </Button>
+          </div>
+        )}
       </CardContent>
-      <CardFooter>
+      <CardFooter className="justify-between gap-3">
         <Link
           to={`/app/networks/${network.id}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          View network
+          Open network
           <ArrowRightIcon className="size-3.5" />
         </Link>
+        {organizationCount > 0 ? (
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <UsersIcon className="size-3.5" />
+            {countLabel(organizationCount, "organization")}
+          </span>
+        ) : null}
       </CardFooter>
+      <DeleteNetworkDialog
+        network={network}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+      />
     </Card>
   )
 }
@@ -334,8 +501,8 @@ export default function NetworkList() {
             All Networks
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Networks group organizations and the schemas they share. Open a card
-            to inspect a member, or view the full network.
+            Inspect each network and its organizations, then open a workspace to
+            collaborate.
           </p>
         </div>
         <div className="flex items-center gap-2">

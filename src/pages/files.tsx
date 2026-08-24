@@ -19,8 +19,8 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  numberFilterOps,
-  stringFilterOps,
+  numberFilterChipValue,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type NumberFilterOp,
@@ -425,7 +425,7 @@ export default function FilesPage() {
       chips.push({
         id: "filename",
         label: "Filename",
-        value: `${opLabel(columnFilters.filename.op)} “${columnFilters.filename.value}”`,
+        value: stringFilterChipValue(columnFilters.filename.op, columnFilters.filename.value),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -449,13 +449,14 @@ export default function FilesPage() {
       })
     }
     if (columnFilters.sizeBytes) {
-      const op = numberFilterOps.find(
-        (item) => item.value === columnFilters.sizeBytes?.op
-      )?.label
       chips.push({
         id: "sizeBytes",
         label: "Size",
-        value: `${op ?? "="} ${formatFileSize(columnFilters.sizeBytes.value)}`,
+        value: numberFilterChipValue(
+          columnFilters.sizeBytes.op,
+          columnFilters.sizeBytes.value,
+          formatFileSize
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -467,7 +468,7 @@ export default function FilesPage() {
       chips.push({
         id: "organization",
         label: "Organization",
-        value: `${opLabel(columnFilters.organization.op)} “${columnFilters.organization.value}”`,
+        value: stringFilterChipValue(columnFilters.organization.op, columnFilters.organization.value),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -535,6 +536,3 @@ export default function FilesPage() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

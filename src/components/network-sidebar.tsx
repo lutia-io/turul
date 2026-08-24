@@ -36,7 +36,7 @@ import {
   networkWorkspacePath,
   parseNetworkPath,
   useNetworkWorkspace,
-  useWorkspaceNetworks,
+  useWorkspaceNetworkList,
 } from "@/lib/network-workspace"
 
 export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
@@ -45,7 +45,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const [searchParams] = useSearchParams()
   const { isMobile, setOpenMobile } = useSidebar()
   const { network, organizationId } = useNetworkWorkspace()
-  const { networks } = useWorkspaceNetworks()
+  const { networks } = useWorkspaceNetworkList()
   const { openCreateNetwork, openCreateOrganization } = useCreateEntity()
   const parsed = parseNetworkPath(pathname)
   const rest = parsed?.rest ?? ""

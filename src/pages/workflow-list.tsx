@@ -18,7 +18,7 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  stringFilterOps,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type PaginationState,
@@ -490,7 +490,7 @@ export default function WorkflowList() {
       chips.push({
         id: "name",
         label: "Workflow",
-        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -510,7 +510,7 @@ export default function WorkflowList() {
       chips.push({
         id: "organization",
         label: "Organization",
-        value: `${opLabel(columnFilters.organization.op)} “${columnFilters.organization.value}”`,
+        value: stringFilterChipValue(columnFilters.organization.op, columnFilters.organization.value),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -578,6 +578,3 @@ export default function WorkflowList() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

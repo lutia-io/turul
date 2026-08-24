@@ -1,5 +1,6 @@
 import type { JsonObject } from "@/lib/json-definition"
 import type { WorkflowDefinitionBody } from "@/lib/workflow-definition"
+import { setNumberFilterParam, setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
 export type ApiWorkflowDefinition = {
@@ -41,8 +42,8 @@ export type UpdateWorkflowDefinitionResponse = {
   id: string
 }
 
-export type StringFilterOp = "contains" | "eq" | "startsWith"
-export type NumberFilterOp = "eq" | "gte" | "lte"
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
+export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
 export type WorkflowDefinitionListSort =
   | "name"
   | "slug"
@@ -113,36 +114,11 @@ function listWorkflowDefinitionQueryParams(
   if (params.active != null) {
     query.active = String(params.active)
   }
-  if (params.name) {
-    query.name = params.name
-    if (params.nameOp) {
-      query.nameOp = params.nameOp
-    }
-  }
-  if (params.slug) {
-    query.slug = params.slug
-    if (params.slugOp) {
-      query.slugOp = params.slugOp
-    }
-  }
-  if (params.schema) {
-    query.schema = params.schema
-    if (params.schemaOp) {
-      query.schemaOp = params.schemaOp
-    }
-  }
-  if (params.network) {
-    query.network = params.network
-    if (params.networkOp) {
-      query.networkOp = params.networkOp
-    }
-  }
-  if (params.actions != null) {
-    query.actions = params.actions
-    if (params.actionsOp) {
-      query.actionsOp = params.actionsOp
-    }
-  }
+  setStringFilterParam(query, "name", params.name, params.nameOp)
+  setStringFilterParam(query, "slug", params.slug, params.slugOp)
+  setStringFilterParam(query, "schema", params.schema, params.schemaOp)
+  setStringFilterParam(query, "network", params.network, params.networkOp)
+  setNumberFilterParam(query, "actions", params.actions, params.actionsOp)
 
   return query
 }
@@ -228,27 +204,12 @@ function listWorkflowQueryParams(params?: ListWorkflowsParams) {
   if (params.organizationId) {
     query.organizationId = params.organizationId
   }
-  if (params.name) {
-    query.name = params.name
-    if (params.nameOp) {
-      query.nameOp = params.nameOp
-    }
-  }
+  setStringFilterParam(query, "name", params.name, params.nameOp)
   if (params.status) {
     query.status = params.status
   }
-  if (params.network) {
-    query.network = params.network
-    if (params.networkOp) {
-      query.networkOp = params.networkOp
-    }
-  }
-  if (params.organization) {
-    query.organization = params.organization
-    if (params.organizationOp) {
-      query.organizationOp = params.organizationOp
-    }
-  }
+  setStringFilterParam(query, "network", params.network, params.networkOp)
+  setStringFilterParam(query, "organization", params.organization, params.organizationOp)
 
   return query
 }

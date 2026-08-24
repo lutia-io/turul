@@ -75,20 +75,44 @@ export type ManagedTable<TData extends Record<string, unknown>> = ReactTable<
 
 export type ColumnPinPosition = false | "start" | "end"
 
-export type StringFilterOp = "contains" | "eq" | "startsWith"
-export type NumberFilterOp = "eq" | "gte" | "lte"
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
+export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
+
+export const emptyFilterValue = "__empty__"
 
 export const stringFilterOps: { value: StringFilterOp; label: string }[] = [
   { value: "contains", label: "Contains" },
   { value: "eq", label: "Equals" },
   { value: "startsWith", label: "Starts with" },
+  { value: "empty", label: "Is empty" },
 ]
 
 export const numberFilterOps: { value: NumberFilterOp; label: string }[] = [
   { value: "eq", label: "Equals" },
   { value: "gte", label: "At least" },
   { value: "lte", label: "At most" },
+  { value: "empty", label: "Is empty" },
 ]
+
+export function stringFilterChipValue(op: StringFilterOp, value: string) {
+  if (op === "empty") {
+    return "Is empty"
+  }
+  const label = stringFilterOps.find((item) => item.value === op)?.label ?? op
+  return `${label} “${value}”`
+}
+
+export function numberFilterChipValue(
+  op: NumberFilterOp,
+  value: number,
+  format: (value: number) => string = String
+) {
+  if (op === "empty") {
+    return "Is empty"
+  }
+  const label = numberFilterOps.find((item) => item.value === op)?.label ?? "="
+  return `${label} ${format(value)}`
+}
 
 export type ColumnFilterConfig =
   | {
@@ -373,6 +397,10 @@ function TextFilterForm({
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault()
+        if (op === "empty") {
+          filter.onChange({ op, value: "" })
+          return
+        }
         const next = value.trim()
         filter.onChange(next ? { op, value: next } : undefined)
       }}
@@ -391,12 +419,14 @@ function TextFilterForm({
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      <Input
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        placeholder={`Filter ${title.toLowerCase()}...`}
-        className="h-8"
-      />
+      {op === "empty" ? null : (
+        <Input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder={`Filter ${title.toLowerCase()}...`}
+          className="h-8"
+        />
+      )}
       <div className="flex justify-end gap-1.5">
         {filter.value ? (
           <Button
@@ -436,6 +466,10 @@ function NumberFilterForm({
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault()
+        if (op === "empty") {
+          filter.onChange({ op, value: 0 })
+          return
+        }
         const parsed = Number(value)
         if (!Number.isFinite(parsed) || parsed < 0) {
           filter.onChange(undefined)
@@ -458,14 +492,16 @@ function NumberFilterForm({
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      <Input
-        type="number"
-        min={0}
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        placeholder="0"
-        className="h-8"
-      />
+      {op === "empty" ? null : (
+        <Input
+          type="number"
+          min={0}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="0"
+          className="h-8"
+        />
+      )}
       <div className="flex justify-end gap-1.5">
         {filter.value ? (
           <Button

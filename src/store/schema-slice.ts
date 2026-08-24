@@ -1,4 +1,5 @@
 import type { JsonObject } from "@/lib/json-definition"
+import { setNumberFilterParam, setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
 export type ApiSchema = {
@@ -39,8 +40,8 @@ export type UpdateSchemaResponse = {
   id: string
 }
 
-export type StringFilterOp = "contains" | "eq" | "startsWith"
-export type NumberFilterOp = "eq" | "gte" | "lte"
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
+export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
 export type SchemaListSort =
   | "name"
   | "slug"
@@ -108,24 +109,9 @@ function listSchemaQueryParams(params?: ListSchemasParams) {
   if (params.active != null) {
     query.active = String(params.active)
   }
-  if (params.name) {
-    query.name = params.name
-    if (params.nameOp) {
-      query.nameOp = params.nameOp
-    }
-  }
-  if (params.slug) {
-    query.slug = params.slug
-    if (params.slugOp) {
-      query.slugOp = params.slugOp
-    }
-  }
-  if (params.properties != null) {
-    query.properties = params.properties
-    if (params.propertiesOp) {
-      query.propertiesOp = params.propertiesOp
-    }
-  }
+  setStringFilterParam(query, "name", params.name, params.nameOp)
+  setStringFilterParam(query, "slug", params.slug, params.slugOp)
+  setNumberFilterParam(query, "properties", params.properties, params.propertiesOp)
 
   return query
 }

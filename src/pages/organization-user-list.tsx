@@ -18,7 +18,7 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  stringFilterOps,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type PaginationState,
@@ -367,7 +367,7 @@ export default function OrganizationUserList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -376,7 +376,7 @@ export default function OrganizationUserList() {
       chips.push({
         id: "email",
         label: "Email",
-        value: `${opLabel(columnFilters.email.op)} “${columnFilters.email.value}”`,
+        value: stringFilterChipValue(columnFilters.email.op, columnFilters.email.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, email: undefined })),
       })
@@ -385,7 +385,7 @@ export default function OrganizationUserList() {
       chips.push({
         id: "organization",
         label: "Organization",
-        value: `${opLabel(columnFilters.organization.op)} “${columnFilters.organization.value}”`,
+        value: stringFilterChipValue(columnFilters.organization.op, columnFilters.organization.value),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -462,6 +462,3 @@ export default function OrganizationUserList() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

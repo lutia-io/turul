@@ -7,6 +7,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -82,17 +83,20 @@ export function NavMain({
               className="group/collapsible"
               render={<SidebarMenuItem />}
             >
-              <CollapsibleTrigger
-                render={
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    isActive={isItemActive(item.url, item.exact)}
-                  />
-                }
+              <SidebarMenuButton
+                tooltip={item.title}
+                isActive={isItemActive(item.url, item.exact)}
+                render={<Link to={item.url} />}
+                onClick={closeMobileSidebar}
               >
                 {item.icon}
                 <span>{item.title}</span>
-                <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
+              </SidebarMenuButton>
+              <CollapsibleTrigger
+                render={<SidebarMenuAction />}
+              >
+                <ChevronRightIcon className="transition-transform duration-200 group-data-open/collapsible:rotate-90" />
+                <span className="sr-only">Toggle {item.title}</span>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>

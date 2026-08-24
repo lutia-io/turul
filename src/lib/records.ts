@@ -1,10 +1,8 @@
-import type { StoredFile } from "@/data/files"
 import type { StoredRecord } from "@/data/files"
 import type { Schema } from "@/data/networks"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
-  type JsonObject,
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
@@ -19,22 +17,6 @@ export function formatFileSize(bytes: number) {
   }
 
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-export function cellSearchText(value: JsonValue | undefined): string {
-  if (value == null) {
-    return ""
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => cellSearchText(item)).join(" ")
-  }
-
-  if (typeof value === "object") {
-    return JSON.stringify(value)
-  }
-
-  return String(value)
 }
 
 export function formatCellValue(
@@ -87,115 +69,6 @@ export function formatCellValue(
   }
 
   return value
-}
-
-export function compareCellValues(
-  left: JsonValue | undefined,
-  right: JsonValue | undefined,
-  property: JsonSchemaProperty
-) {
-  const emptyLeft = left == null || left === ""
-  const emptyRight = right == null || right === ""
-
-  if (emptyLeft && emptyRight) {
-    return 0
-  }
-
-  if (emptyLeft) {
-    return 1
-  }
-
-  if (emptyRight) {
-    return -1
-  }
-
-  if (typeof left === "number" && typeof right === "number") {
-    return left - right
-  }
-
-  if (typeof left === "boolean" && typeof right === "boolean") {
-    return Number(left) - Number(right)
-  }
-
-  if (
-    typeof left === "string" &&
-    typeof right === "string" &&
-    (property.format === "date" || property.format === "date-time")
-  ) {
-    return new Date(left).getTime() - new Date(right).getTime()
-  }
-
-  return formatCellValue(left, property).localeCompare(
-    formatCellValue(right, property),
-    undefined,
-    { numeric: true, sensitivity: "base" }
-  )
-}
-
-export function recordMatchesQuery(
-  record: StoredRecord,
-  query: string,
-  properties: JsonSchemaProperty[],
-  filesById: Map<string, StoredFile>
-) {
-  const needle = query.trim().toLowerCase()
-
-  if (!needle) {
-    return true
-  }
-
-  const haystack = [
-    record.id,
-    record.organizationId,
-    ...properties.map((property) => {
-      const value = record.data[property.name]
-
-      if (property.format === "file" && typeof value === "string") {
-        return filesById.get(value)?.filename ?? value
-      }
-
-      return cellSearchText(value)
-    }),
-  ]
-    .join(" ")
-    .toLowerCase()
-
-  return haystack.includes(needle)
-}
-
-export function uniqueColumnValues(
-  rows: StoredRecord[],
-  property: JsonSchemaProperty,
-  filesById: Map<string, StoredFile>
-) {
-  const values = new Set<string>()
-
-  for (const row of rows) {
-    const value = row.data[property.name]
-
-    if (property.format === "file" && typeof value === "string") {
-      const filename = filesById.get(value)?.filename
-      if (filename) {
-        values.add(filename)
-      } else if (value) {
-        values.add(value)
-      }
-      continue
-    }
-
-    const text = formatCellValue(value, property)
-    if (text) {
-      values.add(text)
-    }
-  }
-
-  return [...values].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
-  )
-}
-
-export function getRecordDataValue(data: JsonObject, name: string) {
-  return data[name]
 }
 
 export function recordsReferencingFile(

@@ -18,8 +18,8 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  numberFilterOps,
-  stringFilterOps,
+  numberFilterChipValue,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type NumberFilterOp,
@@ -407,7 +407,7 @@ export default function SchemaList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -416,7 +416,7 @@ export default function SchemaList() {
       chips.push({
         id: "slug",
         label: "Slug",
-        value: `${opLabel(columnFilters.slug.op)} “${columnFilters.slug.value}”`,
+        value: stringFilterChipValue(columnFilters.slug.op, columnFilters.slug.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
@@ -434,13 +434,13 @@ export default function SchemaList() {
       })
     }
     if (columnFilters.properties) {
-      const op = numberFilterOps.find(
-        (item) => item.value === columnFilters.properties?.op
-      )?.label
       chips.push({
         id: "properties",
         label: "Properties",
-        value: `${op ?? "="} ${columnFilters.properties.value}`,
+        value: numberFilterChipValue(
+          columnFilters.properties.op,
+          columnFilters.properties.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -526,6 +526,3 @@ export default function SchemaList() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

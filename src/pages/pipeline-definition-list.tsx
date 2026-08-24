@@ -18,8 +18,8 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  numberFilterOps,
-  stringFilterOps,
+  numberFilterChipValue,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type NumberFilterOp,
@@ -458,7 +458,7 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -467,7 +467,7 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "slug",
         label: "Slug",
-        value: `${opLabel(columnFilters.slug.op)} “${columnFilters.slug.value}”`,
+        value: stringFilterChipValue(columnFilters.slug.op, columnFilters.slug.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
@@ -476,7 +476,7 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "network",
         label: "Network",
-        value: `${opLabel(columnFilters.network.op)} “${columnFilters.network.value}”`,
+        value: stringFilterChipValue(columnFilters.network.op, columnFilters.network.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, network: undefined })),
       })
@@ -485,19 +485,19 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "source",
         label: "Source",
-        value: `${opLabel(columnFilters.source.op)} “${columnFilters.source.value}”`,
+        value: stringFilterChipValue(columnFilters.source.op, columnFilters.source.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, source: undefined })),
       })
     }
     if (columnFilters.stages) {
-      const op = numberFilterOps.find(
-        (item) => item.value === columnFilters.stages?.op
-      )?.label
       chips.push({
         id: "stages",
         label: "Stages",
-        value: `${op ?? "="} ${columnFilters.stages.value}`,
+        value: numberFilterChipValue(
+          columnFilters.stages.op,
+          columnFilters.stages.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, stages: undefined })),
       })
@@ -573,6 +573,3 @@ export default function PipelineDefinitionList() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

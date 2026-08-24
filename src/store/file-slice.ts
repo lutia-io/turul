@@ -1,4 +1,5 @@
 import type { StoredFile } from "@/data/files"
+import { setNumberFilterParam, setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
 export type ApiFile = {
@@ -30,8 +31,8 @@ export type FileContent = {
   blob: Blob
 }
 
-export type StringFilterOp = "contains" | "eq" | "startsWith"
-export type NumberFilterOp = "eq" | "gte" | "lte"
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
+export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
 export type FileContentTypeFilter =
   "Image" | "PDF" | "CSV" | "Spreadsheet" | "Other"
 export type FileListSort =
@@ -93,27 +94,12 @@ function listFileQueryParams(params?: ListFilesParams) {
   if (params.organizationId) {
     query.organizationId = params.organizationId
   }
-  if (params.filename) {
-    query.filename = params.filename
-    if (params.filenameOp) {
-      query.filenameOp = params.filenameOp
-    }
-  }
+  setStringFilterParam(query, "filename", params.filename, params.filenameOp)
   if (params.contentType) {
     query.contentType = params.contentType
   }
-  if (params.sizeBytes != null) {
-    query.sizeBytes = params.sizeBytes
-    if (params.sizeBytesOp) {
-      query.sizeBytesOp = params.sizeBytesOp
-    }
-  }
-  if (params.organization) {
-    query.organization = params.organization
-    if (params.organizationOp) {
-      query.organizationOp = params.organizationOp
-    }
-  }
+  setNumberFilterParam(query, "sizeBytes", params.sizeBytes, params.sizeBytesOp)
+  setStringFilterParam(query, "organization", params.organization, params.organizationOp)
 
   return query
 }

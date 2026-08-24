@@ -74,6 +74,18 @@ const networkApi = api.injectEndpoints({
         { type: "Network", id: "LIST" },
       ],
     }),
+    deleteNetwork: build.mutation<void, string>({
+      query: (id) => ({
+        url: `/network/${id}`,
+        method: "DELETE",
+        responseHandler: (response) => response.text(),
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: "Network", id },
+        { type: "Network", id: "LIST" },
+        { type: "Organization", id: "LIST" },
+      ],
+    }),
   }),
 })
 
@@ -82,4 +94,5 @@ export const {
   useGetNetworkQuery,
   useCreateNetworkMutation,
   useUpdateNetworkMutation,
+  useDeleteNetworkMutation,
 } = networkApi

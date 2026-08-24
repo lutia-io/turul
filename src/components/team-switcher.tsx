@@ -47,7 +47,7 @@ export function TeamSwitcher({
 }: {
   kind: SwitcherKind
   teams: SwitcherItem[]
-  activeId?: string
+  activeId?: string | null
   onSelect?: (team: SwitcherItem) => void
   onAdd?: () => void
   label?: string
@@ -57,20 +57,23 @@ export function TeamSwitcher({
   const [uncontrolledId, setUncontrolledId] = React.useState(
     activeId ?? teams[0]?.id
   )
-  const selectedId = activeId ?? uncontrolledId
-  const activeTeam = teams.find((team) => team.id === selectedId) ?? teams[0]
+  const selectedId = activeId === undefined ? uncontrolledId : activeId
+  const activeTeam = selectedId
+    ? (teams.find((team) => team.id === selectedId) ??
+      (activeId === undefined ? teams[0] : undefined))
+    : undefined
   const activeTone = getBadgeColor(activeTeam?.color)
   const copy = kindCopy[kind]
   const menuLabel = label ?? copy.plural
   const actionLabel =
     addLabel === undefined ? `Add ${copy.singular.toLowerCase()}` : addLabel
 
-  if (!activeTeam) {
+  if (!activeTeam && !actionLabel && teams.length === 0) {
     return null
   }
 
   function handleSelect(team: SwitcherItem) {
-    if (!activeId) {
+    if (activeId === undefined) {
       setUncontrolledId(team.id)
     }
     onSelect?.(team)
@@ -84,24 +87,33 @@ export function TeamSwitcher({
             render={
               <SidebarMenuButton
                 size="lg"
-                tooltip={`${copy.singular}: ${activeTeam.name}`}
+                tooltip={
+                  activeTeam
+                    ? `${copy.singular}: ${activeTeam.name}`
+                    : copy.plural
+                }
                 className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
               />
             }
           >
             <div
               className={cn(
-                "flex aspect-square size-8 items-center justify-center rounded-lg text-white [&_svg]:stroke-white",
-                activeTone.bg
+                "flex aspect-square size-8 items-center justify-center rounded-lg [&_svg]:stroke-current",
+                activeTeam
+                  ? "text-white [&_svg]:stroke-white"
+                  : "bg-muted text-muted-foreground",
+                activeTeam ? activeTone.bg : null
               )}
             >
-              {activeTeam.logo}
+              {activeTeam?.logo}
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate text-xs text-muted-foreground">
                 {copy.singular}
               </span>
-              <span className="truncate font-medium">{activeTeam.name}</span>
+              <span className="truncate font-medium">
+                {activeTeam?.name ?? `Select ${copy.singular.toLowerCase()}`}
+              </span>
             </div>
             <ChevronsUpDownIcon className="ml-auto" />
           </DropdownMenuTrigger>

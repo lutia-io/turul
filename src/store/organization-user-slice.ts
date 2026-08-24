@@ -1,3 +1,4 @@
+import { setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
 export type ApiOrganizationUser = {
@@ -37,7 +38,7 @@ export type UpdateOrganizationUserResponse = {
   id: string
 }
 
-export type StringFilterOp = "contains" | "eq" | "startsWith"
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 export type OrganizationUserListSort =
   | "name"
   | "email"
@@ -95,24 +96,9 @@ function listOrganizationUserQueryParams(params?: ListOrganizationUsersParams) {
   if (params.organizationId) {
     query.organizationId = params.organizationId
   }
-  if (params.name) {
-    query.name = params.name
-    if (params.nameOp) {
-      query.nameOp = params.nameOp
-    }
-  }
-  if (params.email) {
-    query.email = params.email
-    if (params.emailOp) {
-      query.emailOp = params.emailOp
-    }
-  }
-  if (params.organization) {
-    query.organization = params.organization
-    if (params.organizationOp) {
-      query.organizationOp = params.organizationOp
-    }
-  }
+  setStringFilterParam(query, "name", params.name, params.nameOp)
+  setStringFilterParam(query, "email", params.email, params.emailOp)
+  setStringFilterParam(query, "organization", params.organization, params.organizationOp)
 
   return query
 }

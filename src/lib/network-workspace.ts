@@ -139,12 +139,15 @@ export function workspaceNetworkFromApi(network: ApiNetwork): Network {
     id: network.id,
     name: network.name,
     summary: network.slug,
+    slug: network.slug,
     description: "",
     industry: "",
     headquarters: "",
     coverage: "",
     status: "Active",
     color: "purple",
+    createdAt: network.createdAt,
+    updatedAt: network.updatedAt,
     organizations: [],
     schemas: [],
     workflowDefinitions: [],
@@ -159,12 +162,15 @@ export function workspaceOrganizationFromApi(
     id: organization.id,
     name: organization.name,
     type: organization.slug,
+    slug: organization.slug,
     location: "",
     members: 0,
     description: "",
     status: "Active",
     color: "cyan",
     networkId: organization.networkId,
+    createdAt: organization.createdAt,
+    updatedAt: organization.updatedAt,
   }
 }
 
@@ -361,7 +367,7 @@ export function useWorkspaceRecords() {
 
   return {
     ...query,
-    records: (query.data ?? []).map(workspaceRecordFromApi),
+    records: (query.data?.items ?? []).map(workspaceRecordFromApi),
   }
 }
 
@@ -409,9 +415,18 @@ export function useWorkspacePipelines() {
   }
 }
 
-export function useWorkspaceNetworks() {
+export function useWorkspaceNetworkList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const query = useListNetworksQuery(undefined, { skip: !isAuthenticated })
+
+  return {
+    ...query,
+    networks: (query.data ?? []).map(workspaceNetworkFromApi),
+  }
+}
+
+export function useWorkspaceNetworks() {
+  const query = useWorkspaceNetworkList()
   const organizationsQuery = useWorkspaceOrganizations()
   const schemasQuery = useWorkspaceSchemas()
   const workflowsQuery = useWorkspaceWorkflows()

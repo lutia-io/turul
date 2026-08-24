@@ -1,4 +1,5 @@
 import type { JsonObject } from "@/lib/json-definition"
+import { setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
 export type ApiRecord = {
@@ -31,21 +32,107 @@ export type UpdateRecordResponse = {
   id: string
 }
 
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
+export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
+export type RecordListSort = "organization" | "createdAt" | "updatedAt" | (string & {})
+
+export type RecordFieldFilter = {
+  name: string
+  value?: string
+  op?: StringFilterOp | NumberFilterOp
+}
+
+export type ListRecordsParams = {
+  page?: number
+  pageSize?: number
+  q?: string
+  sort?: RecordListSort
+  order?: "asc" | "desc"
+  schemaId?: string
+  networkId?: string
+  organizationId?: string
+  organization?: string
+  organizationOp?: StringFilterOp
+  fields?: RecordFieldFilter[]
+}
+
+export type ApiRecordList = {
+  items: ApiRecord[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function listRecordQueryParams(params?: ListRecordsParams) {
+  if (!params) {
+    return undefined
+  }
+
+  const query: Record<string, string | number> = {}
+  if (params.page != null) {
+    query.page = params.page
+  }
+  if (params.pageSize != null) {
+    query.pageSize = params.pageSize
+  }
+  if (params.q) {
+    query.q = params.q
+  }
+  if (params.sort) {
+    query.sort = params.sort
+  }
+  if (params.order) {
+    query.order = params.order
+  }
+  if (params.schemaId) {
+    query.schemaId = params.schemaId
+  }
+  if (params.networkId) {
+    query.networkId = params.networkId
+  }
+  if (params.organizationId) {
+    query.organizationId = params.organizationId
+  }
+  setStringFilterParam(
+    query,
+    "organization",
+    params.organization,
+    params.organizationOp
+  )
+  for (const field of params.fields ?? []) {
+    if (field.op === "empty") {
+      query[`fieldOp.${field.name}`] = "empty"
+      continue
+    }
+    if (field.value) {
+      query[`field.${field.name}`] = field.value
+      if (field.op) {
+        query[`fieldOp.${field.name}`] = field.op
+      }
+    }
+  }
+
+  return query
+}
+
 const recordApi = api.injectEndpoints({
   endpoints: (build) => ({
-    listRecords: build.query<ApiRecord[], void>({
-      query: () => "/record",
+    listRecords: build.query<ApiRecordList, ListRecordsParams | void>({
+      query: (params) => ({
+        url: "/record",
+        params: listRecordQueryParams(params ?? undefined),
+      }),
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "Record" as const, id })),
+              ...result.items.map(({ id }) => ({ type: "Record" as const, id })),
               { type: "Record", id: "LIST" },
             ]
           : [{ type: "Record", id: "LIST" }],
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          for (const record of data) {
+          for (const record of data.items) {
             dispatch(api.util.upsertQueryData("getRecord", record.id, record))
           }
         } catch {

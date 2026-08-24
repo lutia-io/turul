@@ -19,7 +19,7 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  stringFilterOps,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type PaginationState,
@@ -88,6 +88,9 @@ function matchesString(
 ) {
   if (!filter) {
     return true
+  }
+  if (filter.op === "empty") {
+    return value.trim() === ""
   }
   const haystack = value.toLowerCase()
   const needle = filter.value.toLowerCase()
@@ -421,7 +424,7 @@ export default function PipelineList() {
       chips.push({
         id: "name",
         label: "Pipeline",
-        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -439,7 +442,7 @@ export default function PipelineList() {
       chips.push({
         id: "organization",
         label: "Organization",
-        value: `${opLabel(columnFilters.organization.op)} “${columnFilters.organization.value}”`,
+        value: stringFilterChipValue(columnFilters.organization.op, columnFilters.organization.value),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -494,6 +497,3 @@ export default function PipelineList() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

@@ -18,8 +18,8 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  numberFilterOps,
-  stringFilterOps,
+  numberFilterChipValue,
+  stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
   type NumberFilterOp,
@@ -473,7 +473,7 @@ export default function WorkflowDefinitionList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -482,7 +482,7 @@ export default function WorkflowDefinitionList() {
       chips.push({
         id: "slug",
         label: "Slug",
-        value: `${opLabel(columnFilters.slug.op)} “${columnFilters.slug.value}”`,
+        value: stringFilterChipValue(columnFilters.slug.op, columnFilters.slug.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
@@ -491,7 +491,7 @@ export default function WorkflowDefinitionList() {
       chips.push({
         id: "network",
         label: "Network",
-        value: `${opLabel(columnFilters.network.op)} “${columnFilters.network.value}”`,
+        value: stringFilterChipValue(columnFilters.network.op, columnFilters.network.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, network: undefined })),
       })
@@ -500,19 +500,19 @@ export default function WorkflowDefinitionList() {
       chips.push({
         id: "schema",
         label: "Starts from",
-        value: `${opLabel(columnFilters.schema.op)} “${columnFilters.schema.value}”`,
+        value: stringFilterChipValue(columnFilters.schema.op, columnFilters.schema.value),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, schema: undefined })),
       })
     }
     if (columnFilters.actions) {
-      const op = numberFilterOps.find(
-        (item) => item.value === columnFilters.actions?.op
-      )?.label
       chips.push({
         id: "actions",
         label: "Definition",
-        value: `${op ?? "="} ${columnFilters.actions.value}`,
+        value: numberFilterChipValue(
+          columnFilters.actions.op,
+          columnFilters.actions.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -591,6 +591,3 @@ export default function WorkflowDefinitionList() {
   )
 }
 
-function opLabel(op: StringFilterOp) {
-  return stringFilterOps.find((item) => item.value === op)?.label ?? op
-}

@@ -1,4 +1,5 @@
 import type { JsonObject } from "@/lib/json-definition"
+import { setNumberFilterParam, setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
 export type ApiPipelineDefinition = {
@@ -15,8 +16,8 @@ export type ApiPipelineDefinition = {
   deletedAt?: string | null
 }
 
-export type StringFilterOp = "contains" | "eq" | "startsWith"
-export type NumberFilterOp = "eq" | "gte" | "lte"
+export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
+export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
 export type PipelineDefinitionListSort =
   | "name"
   | "slug"
@@ -83,36 +84,11 @@ function listPipelineDefinitionQueryParams(
   if (params.active != null) {
     query.active = String(params.active)
   }
-  if (params.name) {
-    query.name = params.name
-    if (params.nameOp) {
-      query.nameOp = params.nameOp
-    }
-  }
-  if (params.slug) {
-    query.slug = params.slug
-    if (params.slugOp) {
-      query.slugOp = params.slugOp
-    }
-  }
-  if (params.network) {
-    query.network = params.network
-    if (params.networkOp) {
-      query.networkOp = params.networkOp
-    }
-  }
-  if (params.source) {
-    query.source = params.source
-    if (params.sourceOp) {
-      query.sourceOp = params.sourceOp
-    }
-  }
-  if (params.stages != null) {
-    query.stages = params.stages
-    if (params.stagesOp) {
-      query.stagesOp = params.stagesOp
-    }
-  }
+  setStringFilterParam(query, "name", params.name, params.nameOp)
+  setStringFilterParam(query, "slug", params.slug, params.slugOp)
+  setStringFilterParam(query, "network", params.network, params.networkOp)
+  setStringFilterParam(query, "source", params.source, params.sourceOp)
+  setNumberFilterParam(query, "stages", params.stages, params.stagesOp)
 
   return query
 }
