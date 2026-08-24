@@ -30,21 +30,112 @@ export type FileContent = {
   blob: Blob
 }
 
+export type StringFilterOp = "contains" | "eq" | "startsWith"
+export type NumberFilterOp = "eq" | "gte" | "lte"
+export type FileContentTypeFilter =
+  "Image" | "PDF" | "CSV" | "Spreadsheet" | "Other"
+export type FileListSort =
+  | "filename"
+  | "contentType"
+  | "sizeBytes"
+  | "organization"
+  | "createdAt"
+  | "updatedAt"
+
+export type ListFilesParams = {
+  page?: number
+  pageSize?: number
+  q?: string
+  sort?: FileListSort
+  order?: "asc" | "desc"
+  networkId?: string
+  organizationId?: string
+  filename?: string
+  filenameOp?: StringFilterOp
+  contentType?: FileContentTypeFilter
+  sizeBytes?: number
+  sizeBytesOp?: NumberFilterOp
+  organization?: string
+  organizationOp?: StringFilterOp
+}
+
+export type ApiFileList = {
+  items: ApiFile[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function listFileQueryParams(params?: ListFilesParams) {
+  if (!params) {
+    return undefined
+  }
+
+  const query: Record<string, string | number> = {}
+  if (params.page != null) {
+    query.page = params.page
+  }
+  if (params.pageSize != null) {
+    query.pageSize = params.pageSize
+  }
+  if (params.q) {
+    query.q = params.q
+  }
+  if (params.sort) {
+    query.sort = params.sort
+  }
+  if (params.order) {
+    query.order = params.order
+  }
+  if (params.networkId) {
+    query.networkId = params.networkId
+  }
+  if (params.organizationId) {
+    query.organizationId = params.organizationId
+  }
+  if (params.filename) {
+    query.filename = params.filename
+    if (params.filenameOp) {
+      query.filenameOp = params.filenameOp
+    }
+  }
+  if (params.contentType) {
+    query.contentType = params.contentType
+  }
+  if (params.sizeBytes != null) {
+    query.sizeBytes = params.sizeBytes
+    if (params.sizeBytesOp) {
+      query.sizeBytesOp = params.sizeBytesOp
+    }
+  }
+  if (params.organization) {
+    query.organization = params.organization
+    if (params.organizationOp) {
+      query.organizationOp = params.organizationOp
+    }
+  }
+
+  return query
+}
+
 const fileApi = api.injectEndpoints({
   endpoints: (build) => ({
-    listFiles: build.query<ApiFile[], void>({
-      query: () => "/file",
+    listFiles: build.query<ApiFileList, ListFilesParams | void>({
+      query: (params) => ({
+        url: "/file",
+        params: listFileQueryParams(params ?? undefined),
+      }),
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "File" as const, id })),
+              ...result.items.map(({ id }) => ({ type: "File" as const, id })),
               { type: "File", id: "LIST" },
             ]
           : [{ type: "File", id: "LIST" }],
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          for (const file of data) {
+          for (const file of data.items) {
             dispatch(api.util.upsertQueryData("getFile", file.id, file))
           }
         } catch {

@@ -50,6 +50,7 @@ export type PipelineDefinition = {
   active: boolean
   internal: boolean
   definition: JsonObject
+  networkId?: string
 }
 
 export type Network = {

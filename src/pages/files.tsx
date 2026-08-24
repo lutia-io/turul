@@ -1,40 +1,74 @@
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Link } from "react-router"
+import { ViewIcon } from "lucide-react"
+import { useTable } from "@tanstack/react-table"
 
 import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
 import {
-  DataTable,
   DataTableCellLink,
-  DataTableFilter,
   DataTablePage,
   DataTableToolbar,
-  compareText,
-  dataTableCount,
-  matchesQuery,
-  toggleSort,
-  type DataTableColumn,
-  type DataTableSort,
+  dataTablePageSummary,
 } from "@/components/data-table"
+import {
+  createManagedColumnHelper,
+  DataTableActiveFilters,
+  DataTableColumnHeader,
+  DataTablePagination,
+  DataTableRowActions,
+  DataTableView,
+  DataTableViewOptions,
+  managedTableFeatures,
+  numberFilterOps,
+  stringFilterOps,
+  type ColumnPinningState,
+  type DataTableActiveFilter,
+  type NumberFilterOp,
+  type PaginationState,
+  type SortingState,
+  type StringFilterOp,
+} from "@/components/data-table-view"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import type { StoredFile } from "@/data/files"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { fileKindLabel } from "@/lib/file-preview"
 import { formatFileSize } from "@/lib/records"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
-  useWorkspaceFiles,
   useWorkspaceOrganizations,
+  workspaceFileFromApi,
 } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import {
+  useListFilesQuery,
+  type FileContentTypeFilter,
+  type FileListSort,
+  type ListFilesParams,
+} from "@/store/file-slice"
 
-type FileSortKey =
-  | "preview"
-  | "filename"
-  | "contentType"
-  | "sizeBytes"
-  | "organization"
-  | "createdAt"
+const helper = createManagedColumnHelper<StoredFile>()
+const EMPTY_FILES: StoredFile[] = []
 
-const fileTypeOptions = [
-  { value: "all", label: "All types" },
+type FileColumnFilters = {
+  filename?: { op: StringFilterOp; value: string }
+  contentType?: FileContentTypeFilter
+  sizeBytes?: { op: NumberFilterOp; value: number }
+  organization?: { op: StringFilterOp; value: string }
+}
+
+const sortFields: FileListSort[] = [
+  "filename",
+  "contentType",
+  "sizeBytes",
+  "organization",
+  "createdAt",
+  "updatedAt",
+]
+
+const fileTypeOptions: { value: FileContentTypeFilter; label: string }[] = [
   { value: "Image", label: "Images" },
   { value: "PDF", label: "PDFs" },
   { value: "CSV", label: "CSVs" },
@@ -42,17 +76,18 @@ const fileTypeOptions = [
   { value: "Other", label: "Other" },
 ]
 
-function fileTypeBucket(file: StoredFile) {
-  const label = fileKindLabel(file)
-  if (
-    label === "Image" ||
-    label === "PDF" ||
-    label === "CSV" ||
-    label === "Spreadsheet"
-  ) {
-    return label
+function isFileSort(value: string): value is FileListSort {
+  return sortFields.includes(value as FileListSort)
+}
+
+function headerPin(column: {
+  getIsPinned: () => false | "start" | "end"
+  pin: (position: false | "start" | "end") => void
+}) {
+  return {
+    position: column.getIsPinned(),
+    onPin: (position: false | "start" | "end") => column.pin(position),
   }
-  return "Other"
 }
 
 function formatCreatedAt(value: string) {
@@ -65,17 +100,75 @@ function formatCreatedAt(value: string) {
 }
 
 export default function FilesPage() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organizationId } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
-  const { files, isLoading, isFetching, isError, error, refetch } =
-    useWorkspaceFiles()
   const [query, setQuery] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all")
+  const debouncedQuery = useDebouncedValue(query)
+  const [columnFilters, setColumnFilters] = useState<FileColumnFilters>({})
   const [previewFileId, setPreviewFileId] = useState<string>()
-  const [sort, setSort] = useState<DataTableSort<FileSortKey>>({
-    key: "createdAt",
-    direction: "desc",
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "createdAt", desc: true },
+  ])
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
   })
+  const [columnVisibility, setColumnVisibility] = useState({})
+  const [columnSizing, setColumnSizing] = useState({})
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
+    start: [],
+    end: ["actions"],
+  })
+
+  useEffect(() => {
+    setPagination((current) => ({ ...current, pageIndex: 0 }))
+  }, [debouncedQuery, columnFilters, network?.id, organizationId])
+
+  const listParams = useMemo<ListFilesParams>(() => {
+    const sort = sorting[0]
+    return {
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      q: debouncedQuery.trim() || undefined,
+      sort: sort && isFileSort(sort.id) ? sort.id : "createdAt",
+      order: sort?.desc ? "desc" : "asc",
+      networkId: network?.id,
+      organizationId,
+      filename: columnFilters.filename?.value,
+      filenameOp: columnFilters.filename?.op,
+      contentType: columnFilters.contentType,
+      sizeBytes: columnFilters.sizeBytes?.value,
+      sizeBytesOp: columnFilters.sizeBytes?.op,
+      organization: columnFilters.organization?.value,
+      organizationOp: columnFilters.organization?.op,
+    }
+  }, [
+    columnFilters,
+    debouncedQuery,
+    network?.id,
+    organizationId,
+    pagination.pageIndex,
+    pagination.pageSize,
+    sorting,
+  ])
+
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useListFilesQuery(listParams, {
+      skip: !isAuthenticated,
+    })
+  const dataRef = useRef(data)
+  if (data) {
+    dataRef.current = data
+  }
+  const list = data ?? dataRef.current
+  const rows = useMemo(
+    () => list?.items.map(workspaceFileFromApi) ?? EMPTY_FILES,
+    [list]
+  )
+  const total = list?.total ?? 0
+  const filtersActive =
+    query.trim().length > 0 || Object.values(columnFilters).some(Boolean)
   const organizationsById = useMemo(
     () =>
       new Map(
@@ -83,122 +176,307 @@ export default function FilesPage() {
       ),
     [organizations]
   )
-  const scoped = files.filter((file) => {
-    if (network && file.networkId !== network.id) {
-      return false
-    }
-    if (organizationId && file.organizationId !== organizationId) {
-      return false
-    }
-    return true
-  })
-  const filtered = scoped.filter((file) => {
-    if (typeFilter !== "all" && fileTypeBucket(file) !== typeFilter) {
-      return false
-    }
 
-    return matchesQuery(query, [
-      file.filename,
-      file.contentType,
-      fileKindLabel(file),
-      organizationsById.get(file.organizationId)?.name,
-      file.id,
-    ])
-  })
-  const rows = [...filtered].sort((left, right) => {
-    const result = compareFiles(left, right, sort.key, organizationsById)
-    return sort.direction === "asc" ? result : -result
-  })
-  const filtersActive = query.trim().length > 0 || typeFilter !== "all"
-
-  function hrefFor(file: StoredFile) {
-    return networkWorkspacePath({
-      networkId: file.networkId,
-      organizationId,
-      rest: `files/${file.id}`,
-    })
-  }
+  const hrefFor = useCallback(
+    (file: StoredFile) => {
+      return networkWorkspacePath({
+        networkId: file.networkId,
+        organizationId,
+        rest: `files/${file.id}`,
+      })
+    },
+    [organizationId]
+  )
 
   const previewFile = previewFileId
     ? rows.find((file) => file.id === previewFileId)
     : undefined
 
-  const columns: DataTableColumn<StoredFile, FileSortKey>[] = [
-    {
-      key: "preview",
-      label: "Preview",
-      sortable: false,
-      className: "w-14",
-      render: (file) => (
-        <button
-          type="button"
-          onClick={() => setPreviewFileId(file.id)}
-          className="rounded-sm"
-        >
-          <FileThumbnail file={file} className="size-10" />
-          <span className="sr-only">Preview {file.filename}</span>
-        </button>
-      ),
+  const columns = useMemo(
+    () =>
+      helper.columns([
+        helper.display({
+          id: "preview",
+          enableSorting: false,
+          header: ({ column }) => (
+            <DataTableColumnHeader title="Preview" pin={headerPin(column)} />
+          ),
+          cell: ({ row }) => (
+            <button
+              type="button"
+              onClick={() => setPreviewFileId(row.original.id)}
+              className="rounded-sm"
+            >
+              <FileThumbnail file={row.original} className="size-10" />
+              <span className="sr-only">Preview {row.original.filename}</span>
+            </button>
+          ),
+          size: 88,
+          minSize: 72,
+        }),
+        helper.accessor("filename", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Filename"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "text",
+                value: columnFilters.filename,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({
+                    ...current,
+                    filename: value,
+                  })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <button
+              type="button"
+              onClick={() => setPreviewFileId(row.original.id)}
+              className="block w-full truncate text-left font-medium hover:underline"
+            >
+              {row.original.filename}
+            </button>
+          ),
+          size: 240,
+          enableHiding: false,
+        }),
+        helper.accessor((file) => fileKindLabel(file), {
+          id: "contentType",
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Type"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "enum",
+                value: columnFilters.contentType,
+                options: fileTypeOptions,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({
+                    ...current,
+                    contentType: value as FileColumnFilters["contentType"],
+                  })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="text-muted-foreground"
+            >
+              {fileKindLabel(row.original)}
+            </DataTableCellLink>
+          ),
+          size: 140,
+        }),
+        helper.accessor("sizeBytes", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Size"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "number",
+                value: columnFilters.sizeBytes,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({
+                    ...current,
+                    sizeBytes: value,
+                  })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="font-mono tabular-nums"
+            >
+              {formatFileSize(row.original.sizeBytes)}
+            </DataTableCellLink>
+          ),
+          size: 120,
+        }),
+        ...(!organizationId
+          ? [
+              helper.accessor(
+                (file) =>
+                  organizationsById.get(file.organizationId)?.name ??
+                  file.organizationId,
+                {
+                  id: "organization",
+                  header: ({ column }) => (
+                    <DataTableColumnHeader
+                      title="Organization"
+                      sorted={column.getIsSorted()}
+                      onSort={column.getToggleSortingHandler()}
+                      pin={headerPin(column)}
+                      filter={{
+                        type: "text",
+                        value: columnFilters.organization,
+                        onChange: (value) =>
+                          setColumnFilters((current) => ({
+                            ...current,
+                            organization: value,
+                          })),
+                      }}
+                    />
+                  ),
+                  cell: ({ row }) => (
+                    <DataTableCellLink
+                      to={hrefFor(row.original)}
+                      className="text-muted-foreground"
+                    >
+                      {organizationsById.get(row.original.organizationId)
+                        ?.name ?? row.original.organizationId}
+                    </DataTableCellLink>
+                  ),
+                  size: 180,
+                }
+              ),
+            ]
+          : []),
+        helper.accessor("createdAt", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Created"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="whitespace-nowrap text-muted-foreground"
+            >
+              {formatCreatedAt(row.original.createdAt)}
+            </DataTableCellLink>
+          ),
+          size: 160,
+        }),
+        helper.display({
+          id: "actions",
+          enableSorting: false,
+          enableHiding: false,
+          enableResizing: false,
+          size: 52,
+          minSize: 52,
+          maxSize: 52,
+          cell: ({ row }) => (
+            <DataTableRowActions
+              items={
+                <DropdownMenuItem render={<Link to={hrefFor(row.original)} />}>
+                  <ViewIcon />
+                  View
+                </DropdownMenuItem>
+              }
+            />
+          ),
+        }),
+      ]),
+    [columnFilters, hrefFor, organizationId, organizationsById]
+  )
+
+  const table = useTable({
+    features: managedTableFeatures,
+    columns,
+    data: rows,
+    getRowId: (file) => file.id,
+    defaultColumn: {
+      minSize: 80,
+      size: 160,
+      maxSize: 480,
     },
-    {
-      key: "filename",
-      label: "Filename",
-      render: (file) => (
-        <button
-          type="button"
-          onClick={() => setPreviewFileId(file.id)}
-          className="block max-w-[22rem] truncate text-left font-medium hover:underline"
-        >
-          {file.filename}
-        </button>
-      ),
+    manualPagination: true,
+    manualSorting: true,
+    autoResetPageIndex: false,
+    enableSortingRemoval: false,
+    enableMultiSort: false,
+    enableColumnResizing: true,
+    enableColumnPinning: true,
+    columnResizeMode: "onChange",
+    rowCount: total,
+    state: {
+      pagination,
+      sorting,
+      columnVisibility,
+      columnSizing,
+      columnPinning,
     },
-    {
-      key: "contentType",
-      label: "Type",
-      className: "text-muted-foreground",
-      render: (file) => (
-        <DataTableCellLink to={hrefFor(file)}>
-          {fileKindLabel(file)}
-        </DataTableCellLink>
-      ),
+    onPaginationChange: setPagination,
+    onSortingChange: (updater) => {
+      setSorting(updater)
+      setPagination((current) => ({ ...current, pageIndex: 0 }))
     },
-    {
-      key: "sizeBytes",
-      label: "Size",
-      className: "font-mono tabular-nums",
-      render: (file) => (
-        <DataTableCellLink to={hrefFor(file)}>
-          {formatFileSize(file.sizeBytes)}
-        </DataTableCellLink>
-      ),
-    },
-    ...(!organizationId
-      ? [
-          {
-            key: "organization" as const,
-            label: "Organization",
-            className: "text-muted-foreground",
-            render: (file: StoredFile) => (
-              <DataTableCellLink to={hrefFor(file)}>
-                {organizationsById.get(file.organizationId)?.name ??
-                  file.organizationId}
-              </DataTableCellLink>
-            ),
-          },
-        ]
-      : []),
-    {
-      key: "createdAt",
-      label: "Created",
-      className: "text-muted-foreground",
-      render: (file) => (
-        <DataTableCellLink to={hrefFor(file)} className="whitespace-nowrap">
-          {formatCreatedAt(file.createdAt)}
-        </DataTableCellLink>
-      ),
-    },
-  ]
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnSizingChange: setColumnSizing,
+    onColumnPinningChange: setColumnPinning,
+  })
+
+  const activeFilters = useMemo<DataTableActiveFilter[]>(() => {
+    const chips: DataTableActiveFilter[] = []
+    if (columnFilters.filename) {
+      chips.push({
+        id: "filename",
+        label: "Filename",
+        value: `${opLabel(columnFilters.filename.op)} “${columnFilters.filename.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({
+            ...current,
+            filename: undefined,
+          })),
+      })
+    }
+    if (columnFilters.contentType) {
+      chips.push({
+        id: "contentType",
+        label: "Type",
+        value:
+          fileTypeOptions.find(
+            (option) => option.value === columnFilters.contentType
+          )?.label ?? columnFilters.contentType,
+        onRemove: () =>
+          setColumnFilters((current) => ({
+            ...current,
+            contentType: undefined,
+          })),
+      })
+    }
+    if (columnFilters.sizeBytes) {
+      const op = numberFilterOps.find(
+        (item) => item.value === columnFilters.sizeBytes?.op
+      )?.label
+      chips.push({
+        id: "sizeBytes",
+        label: "Size",
+        value: `${op ?? "="} ${formatFileSize(columnFilters.sizeBytes.value)}`,
+        onRemove: () =>
+          setColumnFilters((current) => ({
+            ...current,
+            sizeBytes: undefined,
+          })),
+      })
+    }
+    if (columnFilters.organization) {
+      chips.push({
+        id: "organization",
+        label: "Organization",
+        value: `${opLabel(columnFilters.organization.op)} “${columnFilters.organization.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({
+            ...current,
+            organization: undefined,
+          })),
+      })
+    }
+    return chips
+  }, [columnFilters])
 
   return (
     <DataTablePage
@@ -208,21 +486,16 @@ export default function FilesPage() {
       <DataTableToolbar
         query={query}
         onQueryChange={setQuery}
-        searchPlaceholder="Search files..."
-        filters={
-          <DataTableFilter
-            label="Filter by type"
-            value={typeFilter}
-            onChange={setTypeFilter}
-            className="sm:w-40"
-            options={fileTypeOptions}
-          />
-        }
-        count={dataTableCount({
+        searchPlaceholder="Search filename or type..."
+        searchClassName="sm:max-w-3xl"
+        chips={<DataTableActiveFilters filters={activeFilters} />}
+        trailing={<DataTableViewOptions table={table} />}
+        count={dataTablePageSummary({
           isLoading,
           loadingLabel: "Loading files...",
-          visible: rows.length,
-          total: scoped.length,
+          pageIndex: pagination.pageIndex,
+          pageSize: pagination.pageSize,
+          total,
           singular: "file",
         })}
         onRefresh={refetch}
@@ -233,25 +506,20 @@ export default function FilesPage() {
           {getHumaErrorMessage(error, "Failed to load files")}
         </p>
       ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          sort={sort}
-          onSort={(key) =>
-            setSort((current) =>
-              toggleSort(current, key, ["createdAt", "sizeBytes"])
-            )
-          }
-          getRowId={(file) => file.id}
-          isRefreshing={isFetching}
-          empty={
-            isLoading
-              ? "Loading files..."
-              : filtersActive
-                ? "No files match this view."
-                : "No files yet."
-          }
-        />
+        <>
+          <DataTableView
+            table={table}
+            isRefreshing={isFetching}
+            empty={
+              isLoading
+                ? "Loading files..."
+                : filtersActive
+                  ? "No files match this view."
+                  : "No files yet."
+            }
+          />
+          <DataTablePagination table={table} />
+        </>
       )}
       <FilePreviewDialog
         file={previewFile}
@@ -267,28 +535,6 @@ export default function FilesPage() {
   )
 }
 
-function compareFiles(
-  left: StoredFile,
-  right: StoredFile,
-  key: FileSortKey,
-  organizationsById: Map<string, { name: string }>
-) {
-  if (key === "sizeBytes") {
-    return left.sizeBytes - right.sizeBytes
-  }
-  if (key === "createdAt") {
-    return (
-      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
-    )
-  }
-  if (key === "organization") {
-    return compareText(
-      organizationsById.get(left.organizationId)?.name ?? "",
-      organizationsById.get(right.organizationId)?.name ?? ""
-    )
-  }
-  if (key === "contentType") {
-    return compareText(fileKindLabel(left), fileKindLabel(right))
-  }
-  return compareText(left.filename, right.filename)
+function opLabel(op: StringFilterOp) {
+  return stringFilterOps.find((item) => item.value === op)?.label ?? op
 }

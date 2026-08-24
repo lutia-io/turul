@@ -113,17 +113,6 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       exact: true,
     },
     {
-      title: "Organization Users",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "organization-users",
-          })
-        : "/app/networks",
-      icon: <UsersIcon />,
-    },
-    {
       title: "Records",
       url: recordsUrl,
       icon: <TableIcon />,
@@ -166,6 +155,17 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
           })
         : "/app/networks",
       icon: <ActivityIcon />,
+    },
+    {
+      title: "Organization Users",
+      url: network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: "organization-users",
+          })
+        : "/app/networks",
+      icon: <UsersIcon />,
     },
   ]
 

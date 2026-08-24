@@ -13,33 +13,67 @@ import {
   JsonDefinitionCard,
 } from "@/components/json-definition-card"
 import { Button } from "@/components/ui/button"
-import { getPipelineDefinition } from "@/data/networks"
 import { getPipelineStages, pipelineSourceLabel } from "@/lib/json-definition"
-import { useNetworkWorkspace } from "@/lib/network-workspace"
+import {
+  useNetworkWorkspace,
+  workspacePipelineFromApi,
+} from "@/lib/network-workspace"
+import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useGetPipelineDefinitionQuery } from "@/store/pipeline-slice"
 
 export default function PipelineDefinitionDetail() {
   const { pipelineDefinitionId } = useParams()
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network: workspaceNetwork, href } = useNetworkWorkspace()
   const { openEditPipeline } = useCreateEntity()
-  const result = pipelineDefinitionId
-    ? getPipelineDefinition(pipelineDefinitionId)
+  const pipelineQuery = useGetPipelineDefinitionQuery(
+    pipelineDefinitionId ?? "",
+    { skip: !isAuthenticated || !pipelineDefinitionId }
+  )
+  const pipelineDefinition = pipelineQuery.data
+    ? workspacePipelineFromApi(pipelineQuery.data)
     : undefined
   const belongsToWorkspace =
-    !workspaceNetwork || result?.network.id === workspaceNetwork.id
-  const pipelineDefinition = belongsToWorkspace
-    ? result?.pipelineDefinition
-    : undefined
-  const network = belongsToWorkspace ? result?.network : undefined
-  const stages = pipelineDefinition
-    ? getPipelineStages(pipelineDefinition.definition)
+    !workspaceNetwork || pipelineDefinition?.networkId === workspaceNetwork.id
+  const visiblePipeline = belongsToWorkspace ? pipelineDefinition : undefined
+  const network = belongsToWorkspace ? workspaceNetwork : undefined
+  const stages = visiblePipeline
+    ? getPipelineStages(visiblePipeline.definition)
     : []
-  const source = pipelineDefinition
-    ? pipelineSourceLabel(pipelineDefinition.definition)
+  const source = visiblePipeline
+    ? pipelineSourceLabel(visiblePipeline.definition)
     : ""
+
+  if (pipelineQuery.isLoading) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
+        <h1 className="text-lg font-semibold">Loading pipeline</h1>
+        <p className="text-sm text-muted-foreground">
+          Fetching this pipeline definition from the server.
+        </p>
+      </div>
+    )
+  }
+
+  if (pipelineQuery.isError) {
+    return (
+      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
+        <h1 className="text-lg font-semibold">Pipeline definition not found</h1>
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(
+            pipelineQuery.error,
+            "This pipeline definition does not exist or is no longer available."
+          )}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
-      {pipelineDefinition && network ? (
+      {visiblePipeline && network ? (
         <>
           <div className="flex items-start gap-3.5">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-pink-500 text-white">
@@ -48,20 +82,21 @@ export default function PipelineDefinitionDetail() {
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-semibold tracking-tight">
-                  {pipelineDefinition.name}
+                  {visiblePipeline.name}
                 </h1>
                 <DefinitionFlags
-                  active={pipelineDefinition.active}
-                  internal={pipelineDefinition.internal}
+                  active={visiblePipeline.active}
+                  internal={visiblePipeline.internal}
                 />
               </div>
               <p className="font-mono text-xs text-muted-foreground">
-                {pipelineDefinition.slug}
+                {visiblePipeline.slug}
               </p>
             </div>
             <Button
               variant="outline"
-              onClick={() => openEditPipeline(pipelineDefinition.id)}
+              disabled={visiblePipeline.internal}
+              onClick={() => openEditPipeline(visiblePipeline.id)}
             >
               <PencilIcon />
               Edit
@@ -97,7 +132,7 @@ export default function PipelineDefinitionDetail() {
             />
           </section>
 
-          <JsonDefinitionCard definition={pipelineDefinition.definition} />
+          <JsonDefinitionCard definition={visiblePipeline.definition} />
 
           <section className="flex min-w-0 flex-col gap-3">
             <div>
@@ -118,7 +153,7 @@ export default function PipelineDefinitionDetail() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{network.name}</p>
                 <p className="truncate text-sm text-muted-foreground">
-                  {network.description}
+                  {network.description || network.summary}
                 </p>
               </div>
             </Link>

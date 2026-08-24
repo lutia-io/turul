@@ -120,7 +120,34 @@ export function getWorkflowSteps(definition: JsonObject) {
 }
 
 export function getPipelineStages(definition: JsonObject) {
-  return getNamedSteps(definition.stages)
+  const fromStages = getNamedSteps(definition.stages)
+  if (fromStages.length > 0) {
+    return fromStages
+  }
+  if (!Array.isArray(definition.nodes)) {
+    return []
+  }
+  return definition.nodes.flatMap((stage, index) => {
+    if (!Array.isArray(stage)) {
+      return []
+    }
+    const slugs = stage.flatMap((item) => {
+      const node = asObject(item)
+      const slug = asString(node?.slug)
+      return slug ? [slug] : []
+    })
+    if (slugs.length === 0) {
+      return []
+    }
+    return [
+      {
+        id: slugs.join("+"),
+        type: "stage",
+        name: slugs.join(", "),
+        order: index + 1,
+      },
+    ]
+  })
 }
 
 export function workflowTriggerLabel(definition: JsonObject) {

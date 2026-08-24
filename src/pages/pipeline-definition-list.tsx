@@ -1,158 +1,528 @@
-import { useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Link } from "react-router"
+import { PencilIcon, PlusIcon, ViewIcon } from "lucide-react"
+import { useTable } from "@tanstack/react-table"
 
 import {
-  DataTable,
   DataTableCellLink,
-  DataTableFilter,
   DataTablePage,
   DataTableToolbar,
-  compareText,
-  dataTableCount,
-  matchesQuery,
-  toggleSort,
-  type DataTableColumn,
-  type DataTableSort,
+  dataTablePageSummary,
 } from "@/components/data-table"
+import {
+  createManagedColumnHelper,
+  DataTableActiveFilters,
+  DataTableColumnHeader,
+  DataTablePagination,
+  DataTableRowActions,
+  DataTableView,
+  DataTableViewOptions,
+  managedTableFeatures,
+  numberFilterOps,
+  stringFilterOps,
+  type ColumnPinningState,
+  type DataTableActiveFilter,
+  type NumberFilterOp,
+  type PaginationState,
+  type SortingState,
+  type StringFilterOp,
+} from "@/components/data-table-view"
 import { StatusBadge } from "@/components/json-definition-card"
 import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
-import {
-  pipelineDefinitionList,
-  type PipelineDefinition,
-} from "@/data/networks"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import type { PipelineDefinition } from "@/data/networks"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import {
   getPipelineStages,
   pipelineSourceLabel,
   publicationStatus,
 } from "@/lib/json-definition"
-import { useNetworkWorkspace } from "@/lib/network-workspace"
+import {
+  networkWorkspacePath,
+  useNetworkWorkspace,
+  workspacePipelineFromApi,
+} from "@/lib/network-workspace"
+import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useListNetworksQuery } from "@/store/network-slice"
+import {
+  useListPipelineDefinitionsQuery,
+  type ListPipelineDefinitionsParams,
+  type PipelineDefinitionListSort,
+} from "@/store/pipeline-slice"
 
-type PipelineSortKey = "name" | "network" | "source" | "stages" | "status"
+const helper = createManagedColumnHelper<PipelineDefinition>()
+const EMPTY_PIPELINES: PipelineDefinition[] = []
 
-type PipelineRow = {
-  pipelineDefinition: PipelineDefinition
-  networkName: string
+type PipelineColumnFilters = {
+  name?: { op: StringFilterOp; value: string }
+  slug?: { op: StringFilterOp; value: string }
+  network?: { op: StringFilterOp; value: string }
+  source?: { op: StringFilterOp; value: string }
+  stages?: { op: NumberFilterOp; value: number }
+  status?: "published" | "draft"
+}
+
+const sortFields: PipelineDefinitionListSort[] = [
+  "name",
+  "slug",
+  "status",
+  "network",
+  "source",
+  "stages",
+]
+
+function isPipelineSort(value: string): value is PipelineDefinitionListSort {
+  return sortFields.includes(value as PipelineDefinitionListSort)
+}
+
+function headerPin(column: {
+  getIsPinned: () => false | "start" | "end"
+  pin: (position: false | "start" | "end") => void
+}) {
+  return {
+    position: column.getIsPinned(),
+    onPin: (position: false | "start" | "end") => column.pin(position),
+  }
+}
+
+function pipelineStageCount(pipeline: PipelineDefinition) {
+  return getPipelineStages(pipeline.definition).length
 }
 
 export default function PipelineDefinitionList() {
-  const { network, href } = useNetworkWorkspace()
-  const { openCreatePipeline } = useCreateEntity()
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const { network, organization, organizationId } = useNetworkWorkspace()
+  const { openCreatePipeline, openEditPipeline } = useCreateEntity()
+  const { data: networks } = useListNetworksQuery(undefined, {
+    skip: !isAuthenticated || Boolean(network),
+  })
   const [query, setQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [sort, setSort] = useState<DataTableSort<PipelineSortKey>>({
-    key: "name",
-    direction: "asc",
+  const debouncedQuery = useDebouncedValue(query)
+  const [columnFilters, setColumnFilters] = useState<PipelineColumnFilters>({})
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: false },
+  ])
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
   })
-  const items: PipelineRow[] = network
-    ? network.pipelineDefinitions.map((pipelineDefinition) => ({
-        pipelineDefinition,
-        networkName: network.name,
-      }))
-    : pipelineDefinitionList.map(({ pipelineDefinition, network: itemNetwork }) => ({
-        pipelineDefinition,
-        networkName: itemNetwork.name,
-      }))
-  const filtered = items.filter(({ pipelineDefinition, networkName }) => {
-    if (statusFilter === "published" && !pipelineDefinition.active) {
-      return false
-    }
-    if (statusFilter === "draft" && pipelineDefinition.active) {
-      return false
-    }
+  const [columnVisibility, setColumnVisibility] = useState({})
+  const [columnSizing, setColumnSizing] = useState({})
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
+    start: [],
+    end: ["rowActions"],
+  })
 
-    return matchesQuery(query, [
-      pipelineDefinition.name,
-      pipelineDefinition.slug,
-      networkName,
-      pipelineSourceLabel(pipelineDefinition.definition),
-      pipelineDefinition.id,
-    ])
-  })
-  const rows = [...filtered].sort((left, right) => {
-    const result = comparePipelines(left, right, sort.key)
-    return sort.direction === "asc" ? result : -result
-  })
-  const filtersActive = query.trim().length > 0 || statusFilter !== "all"
+  useEffect(() => {
+    setPagination((current) => ({ ...current, pageIndex: 0 }))
+  }, [debouncedQuery, columnFilters, network?.id, organizationId])
 
-  function hrefFor(row: PipelineRow) {
-    return network
-      ? href(`pipeline-definitions/${row.pipelineDefinition.id}`)
-      : `/app/pipeline-definitions/${row.pipelineDefinition.id}`
+  const listParams = useMemo<ListPipelineDefinitionsParams>(() => {
+    const sort = sorting[0]
+    return {
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      q: debouncedQuery.trim() || undefined,
+      sort: sort && isPipelineSort(sort.id) ? sort.id : "name",
+      order: sort?.desc ? "desc" : "asc",
+      networkId: network?.id,
+      active:
+        columnFilters.status === "published"
+          ? true
+          : columnFilters.status === "draft"
+            ? false
+            : undefined,
+      name: columnFilters.name?.value,
+      nameOp: columnFilters.name?.op,
+      slug: columnFilters.slug?.value,
+      slugOp: columnFilters.slug?.op,
+      network: columnFilters.network?.value,
+      networkOp: columnFilters.network?.op,
+      source: columnFilters.source?.value,
+      sourceOp: columnFilters.source?.op,
+      stages: columnFilters.stages?.value,
+      stagesOp: columnFilters.stages?.op,
+    }
+  }, [
+    columnFilters,
+    debouncedQuery,
+    network?.id,
+    pagination.pageIndex,
+    pagination.pageSize,
+    sorting,
+  ])
+
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useListPipelineDefinitionsQuery(listParams, {
+      skip: !isAuthenticated,
+    })
+  const dataRef = useRef(data)
+  if (data) {
+    dataRef.current = data
   }
+  const list = data ?? dataRef.current
+  const rows = useMemo(
+    () => list?.items.map(workspacePipelineFromApi) ?? EMPTY_PIPELINES,
+    [list]
+  )
+  const total = list?.total ?? 0
+  const filtersActive =
+    query.trim().length > 0 || Object.values(columnFilters).some(Boolean)
+  const networksById = useMemo(
+    () => new Map((networks ?? []).map((item) => [item.id, item])),
+    [networks]
+  )
 
-  const columns: DataTableColumn<PipelineRow, PipelineSortKey>[] = [
-    {
-      key: "name",
-      label: "Name",
-      render: (row) => (
-        <DataTableCellLink
-          to={hrefFor(row)}
-          className="max-w-[22rem] font-medium"
-        >
-          {row.pipelineDefinition.name}
-        </DataTableCellLink>
-      ),
+  const hrefFor = useCallback(
+    (pipeline: PipelineDefinition) => {
+      return network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: `pipeline-definitions/${pipeline.id}`,
+          })
+        : `/app/pipeline-definitions/${pipeline.id}`
     },
-    ...(!network
-      ? [
+    [network, organizationId]
+  )
+
+  const columns = useMemo(
+    () =>
+      helper.columns([
+        helper.accessor("name", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Name"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "text",
+                value: columnFilters.name,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({ ...current, name: value })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="font-medium"
+            >
+              {row.original.name}
+            </DataTableCellLink>
+          ),
+          size: 240,
+          enableHiding: false,
+        }),
+        helper.accessor("slug", {
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Slug"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "text",
+                value: columnFilters.slug,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({ ...current, slug: value })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="font-mono text-muted-foreground"
+            >
+              {row.original.slug}
+            </DataTableCellLink>
+          ),
+          size: 180,
+        }),
+        ...(!network
+          ? [
+              helper.accessor(
+                (pipeline) =>
+                  pipeline.networkId
+                    ? (networksById.get(pipeline.networkId)?.name ?? "—")
+                    : "—",
+                {
+                  id: "network",
+                  header: ({ column }) => (
+                    <DataTableColumnHeader
+                      title="Network"
+                      sorted={column.getIsSorted()}
+                      onSort={column.getToggleSortingHandler()}
+                      pin={headerPin(column)}
+                      filter={{
+                        type: "text",
+                        value: columnFilters.network,
+                        onChange: (value) =>
+                          setColumnFilters((current) => ({
+                            ...current,
+                            network: value,
+                          })),
+                      }}
+                    />
+                  ),
+                  cell: ({ row }) => (
+                    <DataTableCellLink
+                      to={hrefFor(row.original)}
+                      className="text-muted-foreground"
+                    >
+                      {row.original.networkId
+                        ? (networksById.get(row.original.networkId)?.name ??
+                          "—")
+                        : "—"}
+                    </DataTableCellLink>
+                  ),
+                  size: 180,
+                }
+              ),
+            ]
+          : []),
+        helper.accessor(
+          (pipeline) => pipelineSourceLabel(pipeline.definition),
           {
-            key: "network" as const,
-            label: "Network",
-            className: "text-muted-foreground",
-            render: (row: PipelineRow) => (
-              <DataTableCellLink to={hrefFor(row)}>
-                {row.networkName}
+            id: "source",
+            header: ({ column }) => (
+              <DataTableColumnHeader
+                title="Source"
+                sorted={column.getIsSorted()}
+                onSort={column.getToggleSortingHandler()}
+                pin={headerPin(column)}
+                filter={{
+                  type: "text",
+                  value: columnFilters.source,
+                  onChange: (value) =>
+                    setColumnFilters((current) => ({
+                      ...current,
+                      source: value,
+                    })),
+                }}
+              />
+            ),
+            cell: ({ row }) => (
+              <DataTableCellLink
+                to={hrefFor(row.original)}
+                className="text-muted-foreground"
+              >
+                {pipelineSourceLabel(row.original.definition)}
               </DataTableCellLink>
             ),
+            size: 180,
+          }
+        ),
+        helper.accessor(pipelineStageCount, {
+          id: "stages",
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Stages"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "number",
+                value: columnFilters.stages,
+                onChange: (value) =>
+                  setColumnFilters((current) => ({
+                    ...current,
+                    stages: value,
+                  })),
+              }}
+            />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="text-muted-foreground tabular-nums"
+            >
+              {pipelineStageCount(row.original)}
+            </DataTableCellLink>
+          ),
+          size: 120,
+        }),
+        helper.accessor((pipeline) => publicationStatus(pipeline.active), {
+          id: "status",
+          header: ({ column }) => (
+            <DataTableColumnHeader
+              title="Status"
+              sorted={column.getIsSorted()}
+              onSort={column.getToggleSortingHandler()}
+              pin={headerPin(column)}
+              filter={{
+                type: "enum",
+                value: columnFilters.status,
+                options: [
+                  { value: "published", label: "Published" },
+                  { value: "draft", label: "Draft" },
+                ],
+                onChange: (value) =>
+                  setColumnFilters((current) => ({
+                    ...current,
+                    status: value as PipelineColumnFilters["status"],
+                  })),
+              }}
+            />
+          ),
+          cell: ({ row }) => {
+            const status = publicationStatus(row.original.active)
+            return (
+              <DataTableCellLink
+                to={hrefFor(row.original)}
+                className="inline-flex items-center gap-1.5"
+              >
+                <StatusBadge status={status} />
+                <span className="text-muted-foreground">{status}</span>
+              </DataTableCellLink>
+            )
           },
-        ]
-      : []),
-    {
-      key: "source",
-      label: "Source",
-      className: "text-muted-foreground",
-      render: (row) => (
-        <DataTableCellLink to={hrefFor(row)}>
-          {pipelineSourceLabel(row.pipelineDefinition.definition)}
-        </DataTableCellLink>
-      ),
+          size: 140,
+        }),
+        helper.display({
+          id: "rowActions",
+          enableSorting: false,
+          enableHiding: false,
+          enableResizing: false,
+          size: 52,
+          minSize: 52,
+          maxSize: 52,
+          cell: ({ row }) => (
+            <DataTableRowActions
+              items={
+                <>
+                  <DropdownMenuItem
+                    render={<Link to={hrefFor(row.original)} />}
+                  >
+                    <ViewIcon />
+                    View
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => openEditPipeline(row.original.id)}
+                  >
+                    <PencilIcon />
+                    Edit
+                  </DropdownMenuItem>
+                </>
+              }
+            />
+          ),
+        }),
+      ]),
+    [columnFilters, hrefFor, network, networksById, openEditPipeline]
+  )
+
+  const table = useTable({
+    features: managedTableFeatures,
+    columns,
+    data: rows,
+    getRowId: (pipeline) => pipeline.id,
+    defaultColumn: {
+      minSize: 80,
+      size: 160,
+      maxSize: 480,
     },
-    {
-      key: "stages",
-      label: "Stages",
-      className: "tabular-nums text-muted-foreground",
-      render: (row) => (
-        <DataTableCellLink to={hrefFor(row)}>
-          {getPipelineStages(row.pipelineDefinition.definition).length}
-        </DataTableCellLink>
-      ),
+    manualPagination: true,
+    manualSorting: true,
+    autoResetPageIndex: false,
+    enableSortingRemoval: false,
+    enableMultiSort: false,
+    enableColumnResizing: true,
+    enableColumnPinning: true,
+    columnResizeMode: "onChange",
+    rowCount: total,
+    state: {
+      pagination,
+      sorting,
+      columnVisibility,
+      columnSizing,
+      columnPinning,
     },
-    {
-      key: "status",
-      label: "Status",
-      render: (row) => {
-        const status = publicationStatus(row.pipelineDefinition.active)
-        return (
-          <DataTableCellLink
-            to={hrefFor(row)}
-            className="inline-flex items-center gap-1.5"
-          >
-            <StatusBadge status={status} />
-            <span className="text-muted-foreground">{status}</span>
-          </DataTableCellLink>
-        )
-      },
+    onPaginationChange: setPagination,
+    onSortingChange: (updater) => {
+      setSorting(updater)
+      setPagination((current) => ({ ...current, pageIndex: 0 }))
     },
-  ]
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnSizingChange: setColumnSizing,
+    onColumnPinningChange: setColumnPinning,
+  })
+
+  const activeFilters = useMemo<DataTableActiveFilter[]>(() => {
+    const chips: DataTableActiveFilter[] = []
+    if (columnFilters.name) {
+      chips.push({
+        id: "name",
+        label: "Name",
+        value: `${opLabel(columnFilters.name.op)} “${columnFilters.name.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, name: undefined })),
+      })
+    }
+    if (columnFilters.slug) {
+      chips.push({
+        id: "slug",
+        label: "Slug",
+        value: `${opLabel(columnFilters.slug.op)} “${columnFilters.slug.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, slug: undefined })),
+      })
+    }
+    if (columnFilters.network) {
+      chips.push({
+        id: "network",
+        label: "Network",
+        value: `${opLabel(columnFilters.network.op)} “${columnFilters.network.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, network: undefined })),
+      })
+    }
+    if (columnFilters.source) {
+      chips.push({
+        id: "source",
+        label: "Source",
+        value: `${opLabel(columnFilters.source.op)} “${columnFilters.source.value}”`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, source: undefined })),
+      })
+    }
+    if (columnFilters.stages) {
+      const op = numberFilterOps.find(
+        (item) => item.value === columnFilters.stages?.op
+      )?.label
+      chips.push({
+        id: "stages",
+        label: "Stages",
+        value: `${op ?? "="} ${columnFilters.stages.value}`,
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, stages: undefined })),
+      })
+    }
+    if (columnFilters.status) {
+      chips.push({
+        id: "status",
+        label: "Status",
+        value: columnFilters.status === "published" ? "Published" : "Draft",
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, status: undefined })),
+      })
+    }
+    return chips
+  }, [columnFilters])
 
   return (
     <DataTablePage
       title="Pipeline Definitions"
       description={
-        network
-          ? `Pipeline definitions used by the ${network.name} network.`
-          : "Ingest pipelines that move partner data into records."
+        organization
+          ? `Ingest pipelines that move partner data into records in ${organization.name}.`
+          : network
+            ? `Pipeline definitions used by the ${network.name} network.`
+            : "Ingest pipelines that move partner data into records."
       }
       action={
         <Button onClick={() => openCreatePipeline(network?.id)}>
@@ -165,66 +535,44 @@ export default function PipelineDefinitionList() {
         query={query}
         onQueryChange={setQuery}
         searchPlaceholder="Search pipelines..."
-        filters={
-          <DataTableFilter
-            label="Filter by status"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            className="sm:w-40"
-            options={[
-              { value: "all", label: "All statuses" },
-              { value: "published", label: "Published" },
-              { value: "draft", label: "Draft" },
-            ]}
-          />
-        }
-        count={dataTableCount({
-          visible: rows.length,
-          total: items.length,
+        searchClassName="sm:max-w-3xl"
+        chips={<DataTableActiveFilters filters={activeFilters} />}
+        trailing={<DataTableViewOptions table={table} />}
+        count={dataTablePageSummary({
+          isLoading,
+          loadingLabel: "Loading pipelines...",
+          pageIndex: pagination.pageIndex,
+          pageSize: pagination.pageSize,
+          total,
           singular: "pipeline",
         })}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
-      <DataTable
-        columns={columns}
-        rows={rows}
-        sort={sort}
-        onSort={(key) => setSort((current) => toggleSort(current, key))}
-        getRowId={(row) => row.pipelineDefinition.id}
-        empty={
-          filtersActive
-            ? "No pipelines match this view."
-            : "No pipeline definitions yet."
-        }
-      />
+      {isError ? (
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(error, "Failed to load pipelines")}
+        </p>
+      ) : (
+        <>
+          <DataTableView
+            table={table}
+            isRefreshing={isFetching}
+            empty={
+              isLoading
+                ? "Loading pipelines..."
+                : filtersActive
+                  ? "No pipelines match this view."
+                  : "No pipeline definitions yet."
+            }
+          />
+          <DataTablePagination table={table} />
+        </>
+      )}
     </DataTablePage>
   )
 }
 
-function comparePipelines(
-  left: PipelineRow,
-  right: PipelineRow,
-  key: PipelineSortKey
-) {
-  if (key === "network") {
-    return compareText(left.networkName, right.networkName)
-  }
-  if (key === "source") {
-    return compareText(
-      pipelineSourceLabel(left.pipelineDefinition.definition),
-      pipelineSourceLabel(right.pipelineDefinition.definition)
-    )
-  }
-  if (key === "stages") {
-    return (
-      getPipelineStages(left.pipelineDefinition.definition).length -
-      getPipelineStages(right.pipelineDefinition.definition).length
-    )
-  }
-  if (key === "status") {
-    return (
-      Number(left.pipelineDefinition.active) -
-      Number(right.pipelineDefinition.active)
-    )
-  }
-  return compareText(left.pipelineDefinition.name, right.pipelineDefinition.name)
+function opLabel(op: StringFilterOp) {
+  return stringFilterOps.find((item) => item.value === op)?.label ?? op
 }

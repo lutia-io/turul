@@ -10,6 +10,7 @@ import "@/store/schema-slice"
 import "@/store/record-slice"
 import "@/store/file-slice"
 import "@/store/workflow-slice"
+import "@/store/pipeline-slice"
 
 export const store = configureStore({
   reducer: {
