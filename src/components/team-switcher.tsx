@@ -9,7 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -92,9 +91,8 @@ export function TeamSwitcher({
           >
             <div
               className={cn(
-                "flex aspect-square size-8 items-center justify-center rounded-lg",
-                activeTone.bg,
-                activeTone.text
+                "flex aspect-square size-8 items-center justify-center rounded-lg text-white [&_svg]:stroke-white",
+                activeTone.bg
               )}
             >
               {activeTeam.logo}
@@ -117,7 +115,7 @@ export function TeamSwitcher({
               <DropdownMenuLabel className="text-xs text-muted-foreground">
                 {menuLabel}
               </DropdownMenuLabel>
-              {teams.map((team, index) => {
+              {teams.map((team) => {
                 const tone = getBadgeColor(team.color)
 
                 return (
@@ -128,9 +126,8 @@ export function TeamSwitcher({
                   >
                     <div
                       className={cn(
-                        "flex size-6 items-center justify-center rounded-md",
-                        tone.bg,
-                        tone.text
+                        "flex size-6 items-center justify-center rounded-md text-white [&_svg]:stroke-white",
+                        tone.bg
                       )}
                     >
                       {team.logo}
@@ -143,7 +140,6 @@ export function TeamSwitcher({
                         </span>
                       ) : null}
                     </div>
-                    <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
                   </DropdownMenuItem>
                 )
               })}
