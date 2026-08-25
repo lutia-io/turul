@@ -119,7 +119,44 @@ export function getWorkflowSteps(definition: JsonObject) {
   return getNamedSteps(definition.steps)
 }
 
-export function getPipelineStages(definition: JsonObject) {
+export type PipelineLevelNode = {
+  id: string
+}
+
+export function getPipelineLevels(definition: JsonObject): PipelineLevelNode[][] {
+  if (!Array.isArray(definition.nodes)) {
+    return []
+  }
+
+  return definition.nodes.flatMap((level) => {
+    if (!Array.isArray(level)) {
+      return []
+    }
+    const nodes = level.flatMap((item) => {
+      const node = asObject(item)
+      const id = asString(node?.id)
+      return id ? [{ id }] : []
+    })
+    return nodes.length > 0 ? [nodes] : []
+  })
+}
+
+export function getPipelineStages(
+  definition: JsonObject,
+  names?: Map<string, string>
+) {
+  const levels = getPipelineLevels(definition)
+  if (levels.length > 0) {
+    return levels.map((level, index) => ({
+      id: `level-${index}`,
+      type: "level",
+      name: level
+        .map((node, nodeIndex) => names?.get(node.id) ?? `[${nodeIndex}]`)
+        .join(", "),
+      order: index + 1,
+    }))
+  }
+
   const fromStages = getNamedSteps(definition.stages)
   if (fromStages.length > 0) {
     return fromStages

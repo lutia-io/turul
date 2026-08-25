@@ -254,6 +254,26 @@ function OrganizationCard({
   )
 }
 
+function AddOrganizationCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-w-0 items-center gap-3 rounded-xl border border-dashed bg-transparent p-3 text-left transition-colors hover:bg-muted/40"
+    >
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-muted/80">
+        <PlusIcon className="size-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">Add organization</p>
+        <p className="truncate text-xs text-muted-foreground">
+          Start collaborating in this network
+        </p>
+      </div>
+    </button>
+  )
+}
+
 function DeleteNetworkDialog({
   network,
   open,
@@ -401,41 +421,25 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
               ? countLabel(organizationCount, "organization")
               : "Organizations"}
           </p>
-          {organizationCount > 0 ? (
-            <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {network.organizations.map((organization) => (
-                <OrganizationCard
-                  key={organization.id}
-                  networkId={network.id}
-                  organization={organization}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 rounded-xl border border-dashed px-3.5 py-3">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <Building2Icon className="size-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium">No organizations yet</p>
-                <p className="text-xs text-muted-foreground">
-                  Add an organization to start collaborating in this network.
-                </p>
-              </div>
-            </div>
-          )}
+          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {network.organizations.map((organization) => (
+              <OrganizationCard
+                key={organization.id}
+                networkId={network.id}
+                organization={organization}
+              />
+            ))}
+            <AddOrganizationCard
+              onClick={() => openCreateOrganization(network.id)}
+            />
+          </div>
         </div>
       </CardContent>
-      <CardFooter className="flex-wrap justify-between gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => openCreateOrganization(network.id)}
+      <CardFooter>
+        <Link
+          to={networkPath}
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
         >
-          <PlusIcon />
-          Add organization
-        </Button>
-        <Link to={networkPath} className={buttonVariants({ size: "sm" })}>
           View network
           <ArrowRightIcon />
         </Link>

@@ -53,6 +53,17 @@ export type PipelineDefinition = {
   networkId?: string
 }
 
+export type NodeDefinition = {
+  id: string
+  name: string
+  slug: string
+  active: boolean
+  internal: boolean
+  type: string
+  definition: JsonObject
+  networkId?: string
+}
+
 export type Network = {
   id: string
   name: string
@@ -67,6 +78,7 @@ export type Network = {
   schemas: Schema[]
   workflowDefinitions: WorkflowDefinition[]
   pipelineDefinitions: PipelineDefinition[]
+  nodeDefinitions?: NodeDefinition[]
 }
 
 export const networks: Record<string, Network> = {

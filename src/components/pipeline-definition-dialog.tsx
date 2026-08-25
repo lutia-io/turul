@@ -1,17 +1,17 @@
-import { useEffect, useId, useState, type FormEvent } from "react"
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 
 import { CheckboxField } from "@/components/checkbox-field"
-import {
-  DefinitionStepEditor,
-  newFlowStep,
-  type FlowStepDraft,
-} from "@/components/definition-step-editor"
 import {
   DefinitionDialogBody,
   DefinitionJsonPane,
   definitionDialogClassName,
 } from "@/components/definition-dialog-layout"
+import {
+  PipelineLevelsEditor,
+  newPipelineLevel,
+  type PipelineLevelDraft,
+} from "@/components/pipeline-levels-editor"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,40 +22,62 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
-  createPipelineDefinition,
-  getPipelineDefinition,
-  networkList,
-  updatePipelineDefinition,
-} from "@/data/networks"
-import { getPipelineStages, stringifyDefinition } from "@/lib/json-definition"
-import { networkWorkspacePath } from "@/lib/network-workspace"
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { stringifyDefinition } from "@/lib/json-definition"
+import {
+  networkWorkspacePath,
+  useWorkspaceNetworks,
+  useWorkspaceNodes,
+  workspacePipelineFromApi,
+} from "@/lib/network-workspace"
+import {
+  parsePipelineDefinition,
+  type PipelineDefinitionBody,
+} from "@/lib/pipeline-definition"
 import { slugifyId } from "@/lib/slug"
+import { getHumaErrorMessage } from "@/store/api"
+import {
+  useCreatePipelineDefinitionMutation,
+  useGetPipelineDefinitionQuery,
+  useUpdatePipelineDefinitionMutation,
+} from "@/store/pipeline-slice"
 
-const sourceTypes = ["api", "stream", "file", "mailbox", "database"]
-const stageTypes = ["extract", "validate", "transform", "publish"]
-
-function draftsFromPipeline(pipelineDefinitionId?: string): FlowStepDraft[] {
-  const result = pipelineDefinitionId
-    ? getPipelineDefinition(pipelineDefinitionId)
-    : undefined
-  const stages = result
-    ? getPipelineStages(result.pipelineDefinition.definition)
-    : []
-
-  if (stages.length === 0) {
-    return [newFlowStep("extract", "Extract records")]
+function draftsFromDefinition(
+  definition?: PipelineDefinitionBody
+): PipelineLevelDraft[] {
+  if (!definition || definition.nodes.length === 0) {
+    return [newPipelineLevel()]
   }
-
-  return stages.map((stage) => ({
-    key: stage.id,
-    id: stage.id,
-    type: stage.type,
-    name: stage.name,
+  return definition.nodes.map((level, index) => ({
+    key: `level-${index}-${level.map((node) => node.id).join("-")}`,
+    nodeIds: level.map((node) => node.id),
   }))
+}
+
+function definitionFromDrafts(
+  levels: PipelineLevelDraft[]
+): PipelineDefinitionBody | undefined {
+  const nodes = levels.map((level) =>
+    level.nodeIds.filter(Boolean).map((id) => ({ id }))
+  )
+  if (nodes.length === 0 || nodes.some((level) => level.length === 0)) {
+    return undefined
+  }
+  return { nodes }
 }
 
 export function PipelineDefinitionDialog({
@@ -71,101 +93,85 @@ export function PipelineDefinitionDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const existing = pipelineDefinitionId
-    ? getPipelineDefinition(pipelineDefinitionId)
-    : undefined
-  const editing = Boolean(existing)
-  const [selectedNetworkId, setSelectedNetworkId] = useState(
-    networkId ?? existing?.network.id ?? networkList[0]?.id ?? ""
+  const { networks } = useWorkspaceNetworks()
+  const { nodes } = useWorkspaceNodes()
+  const [createPipeline, createState] = useCreatePipelineDefinitionMutation()
+  const [updatePipeline, updateState] = useUpdatePipelineDefinitionMutation()
+  const isLoading = createState.isLoading || updateState.isLoading
+  const error = createState.error ?? updateState.error
+  const existingQuery = useGetPipelineDefinitionQuery(
+    pipelineDefinitionId ?? "",
+    { skip: !open || !pipelineDefinitionId }
   )
+  const editing = Boolean(pipelineDefinitionId)
+  const firstNetworkId = networks[0]?.id ?? ""
+  const [selectedNetworkId, setSelectedNetworkId] = useState(networkId ?? "")
   const [name, setName] = useState("")
-  const [slug, setSlug] = useState("")
-  const [slugTouched, setSlugTouched] = useState(false)
-  const [sourceType, setSourceType] = useState("api")
-  const [sourceName, setSourceName] = useState("")
-  const [active, setActive] = useState(false)
-  const [internal, setInternal] = useState(false)
-  const [stages, setStages] = useState<FlowStepDraft[]>([
-    newFlowStep("extract", "Extract records"),
+  const [active, setActive] = useState(true)
+  const [levels, setLevels] = useState<PipelineLevelDraft[]>([
+    newPipelineLevel(),
   ])
 
   useEffect(() => {
     if (!open) {
       return
     }
-
-    const current = pipelineDefinitionId
-      ? getPipelineDefinition(pipelineDefinitionId)
+    const current = existingQuery.data
+      ? workspacePipelineFromApi(existingQuery.data)
       : undefined
-    const source = current?.pipelineDefinition.definition.source
-    const sourceObject =
-      source && typeof source === "object" && !Array.isArray(source)
-        ? source
-        : undefined
-
+    const parsed = current
+      ? parsePipelineDefinition(current.definition)
+      : undefined
     setSelectedNetworkId(
-      networkId ?? current?.network.id ?? networkList[0]?.id ?? ""
+      networkId ?? current?.networkId ?? firstNetworkId
     )
-    setName(current?.pipelineDefinition.name ?? "")
-    setSlug(current?.pipelineDefinition.slug ?? "")
-    setSlugTouched(Boolean(current))
-    setSourceType(
-      typeof sourceObject?.type === "string" ? sourceObject.type : "api"
-    )
-    setSourceName(
-      typeof sourceObject?.name === "string" ? sourceObject.name : ""
-    )
-    setActive(current?.pipelineDefinition.active ?? false)
-    setInternal(current?.pipelineDefinition.internal ?? false)
-    setStages(draftsFromPipeline(pipelineDefinitionId))
-  }, [networkId, open, pipelineDefinitionId])
+    setName(current?.name ?? "")
+    setActive(current?.active ?? true)
+    setLevels(draftsFromDefinition(parsed))
+  }, [existingQuery.data, firstNetworkId, networkId, open])
 
-  const preview = stringifyDefinition({
-    version: 1,
-    source: {
-      type: sourceType,
-      name: sourceName.trim() || "Partner API",
-    },
-    stages: stages.map((stage, index) => ({
-      id: slugifyId(stage.id || stage.name || `stage-${index + 1}`),
-      type: stage.type,
-      name: stage.name.trim() || `Stage ${index + 1}`,
-      order: index + 1,
-    })),
-  })
+  const networkNodes = useMemo(
+    () => nodes.filter((node) => node.networkId === selectedNetworkId),
+    [nodes, selectedNetworkId]
+  )
+  const definition = definitionFromDrafts(levels)
+  const preview = stringifyDefinition(definition ?? { nodes: [] })
+  const networkItems = networks.map((item) => ({
+    value: item.id,
+    label: item.name,
+  }))
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!name.trim() || !selectedNetworkId) {
+    if (!name.trim() || !selectedNetworkId || !definition) {
       return
     }
-
-    const input = {
-      name,
-      slug: slugTouched ? slug : slugifyId(name),
-      sourceType,
-      sourceName: sourceName.trim() || "Partner API",
-      stages: stages.map((stage, index) => ({
-        id: slugifyId(stage.id || stage.name || `stage-${index + 1}`),
-        type: stage.type,
-        name: stage.name.trim() || `Stage ${index + 1}`,
-      })),
-      active,
-      internal,
-    }
-
-    const pipeline = editing
-      ? updatePipelineDefinition(pipelineDefinitionId!, input)
-      : createPipelineDefinition(selectedNetworkId, input)
-
-    onOpenChange(false)
-    if (!editing) {
+    try {
+      if (editing && pipelineDefinitionId) {
+        await updatePipeline({
+          id: pipelineDefinitionId,
+          name: name.trim(),
+          active,
+          definition,
+        }).unwrap()
+        onOpenChange(false)
+        return
+      }
+      const created = await createPipeline({
+        name: name.trim(),
+        active,
+        definition,
+        networkId: selectedNetworkId,
+      }).unwrap()
+      onOpenChange(false)
       navigate(
         networkWorkspacePath({
           networkId: selectedNetworkId,
-          rest: `pipeline-definitions/${pipeline.id}`,
+          rest: `pipeline-definitions/${created.id}`,
         })
       )
+    } catch {
+      // RTK Query error is shown below.
     }
   }
 
@@ -179,7 +185,8 @@ export function PipelineDefinitionDialog({
               : "Create a pipeline definition"}
           </DialogTitle>
           <DialogDescription>
-            Choose a source and order the stages stored in the JSONB definition.
+            Orchestrate node definitions in BFS levels. Every node in a level
+            runs; the next level receives those outputs by index.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -192,7 +199,7 @@ export function PipelineDefinitionDialog({
             json={
               <DefinitionJsonPane
                 title="JSON definition"
-                description="Updates as you edit the source and stages."
+                description="Persisted as levels of node IDs. Templates live on the nodes, not this graph."
                 value={preview}
                 readOnly
               />
@@ -202,124 +209,105 @@ export function PipelineDefinitionDialog({
               {!editing ? (
                 <Field>
                   <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
-                  <NativeSelect
-                    id={`${formId}-network`}
+                  <Select
                     value={selectedNetworkId}
-                    disabled={Boolean(networkId)}
-                    onChange={(event) =>
-                      setSelectedNetworkId(event.target.value)
-                    }
+                    disabled={Boolean(networkId) || isLoading}
                     required
-                  >
-                    {networkList.map((network) => (
-                      <NativeSelectOption key={network.id} value={network.id}>
-                        {network.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
-              ) : null}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
-                  <Input
-                    id={`${formId}-name`}
-                    value={name}
-                    onChange={(event) => {
-                      const next = event.target.value
-                      setName(next)
-                      if (!slugTouched) {
-                        setSlug(slugifyId(next))
+                    modal={false}
+                    items={networkItems}
+                    onValueChange={(value) => {
+                      if (value) {
+                        setSelectedNetworkId(value)
                       }
                     }}
-                    placeholder="Manifest ingest"
-                    autoFocus
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-slug`}>Slug</FieldLabel>
-                  <Input
-                    id={`${formId}-slug`}
-                    value={slug}
-                    onChange={(event) => {
-                      setSlugTouched(true)
-                      setSlug(event.target.value)
-                    }}
-                    className="font-mono"
-                    disabled={editing}
-                    required
-                  />
-                </Field>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-source-type`}>
-                    Source type
-                  </FieldLabel>
-                  <NativeSelect
-                    id={`${formId}-source-type`}
-                    value={sourceType}
-                    onChange={(event) => setSourceType(event.target.value)}
                   >
-                    {sourceTypes.map((type) => (
-                      <NativeSelectOption key={type} value={type}>
-                        {type}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                    <SelectTrigger id={`${formId}-network`}>
+                      <SelectValue placeholder="Select a network" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {networks.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-source-name`}>
-                    Source name
-                  </FieldLabel>
-                  <Input
-                    id={`${formId}-source-name`}
-                    value={sourceName}
-                    onChange={(event) => setSourceName(event.target.value)}
-                    placeholder="Partner API"
-                  />
-                </Field>
-              </div>
-              <div className="flex gap-5">
+              ) : null}
+              <Field>
+                <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
+                <Input
+                  id={`${formId}-name`}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Fetch and summarize"
+                  autoFocus
+                  required
+                  disabled={isLoading}
+                />
+                <FieldDescription>
+                  Slug {slugifyId(name) || "is generated from the name"}.
+                </FieldDescription>
+              </Field>
+              <Field>
                 <CheckboxField
                   id={`${formId}-active`}
                   checked={active}
                   onChange={setActive}
                   label="Published"
                 />
-                <CheckboxField
-                  id={`${formId}-internal`}
-                  checked={internal}
-                  onChange={setInternal}
-                  label="Internal"
-                />
-              </div>
+                <FieldDescription>
+                  Published pipelines can be started. Drafts are saved but do
+                  not run.
+                </FieldDescription>
+              </Field>
+              {error ? (
+                <FieldError>
+                  {getHumaErrorMessage(
+                    error,
+                    "Failed to save pipeline definition"
+                  )}
+                </FieldError>
+              ) : null}
             </FieldGroup>
 
             <div className="flex flex-col gap-2">
               <div>
-                <h3 className="text-sm font-medium">Stages</h3>
+                <h3 className="text-sm font-medium">Levels</h3>
                 <p className="text-xs text-muted-foreground">
-                  {stages.length === 0
-                    ? "Add ordered stages stored on the definition."
-                    : `${stages.length} ${stages.length === 1 ? "stage" : "stages"}`}
+                  All nodes in a level run. After the barrier, later levels
+                  read previous outputs as {"{{ .Input.0 }}"}, {"{{ .Input.1 }}"}.
                 </p>
               </div>
-              <DefinitionStepEditor
-                noun="stage"
-                steps={stages}
-                typeOptions={stageTypes}
-                onChange={setStages}
+              <PipelineLevelsEditor
+                levels={levels}
+                nodes={networkNodes}
+                onChange={setLevels}
               />
             </div>
           </DefinitionDialogBody>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
+            <DialogClose
+              render={<Button variant="outline" disabled={isLoading} />}
+            >
               Cancel
             </DialogClose>
-            <Button type="submit" disabled={!name.trim() || !selectedNetworkId}>
-              {editing ? "Save pipeline" : "Create pipeline"}
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                !name.trim() ||
+                !selectedNetworkId ||
+                !definition
+              }
+            >
+              {isLoading
+                ? editing
+                  ? "Saving..."
+                  : "Creating..."
+                : editing
+                  ? "Save pipeline"
+                  : "Create pipeline"}
             </Button>
           </DialogFooter>
         </form>

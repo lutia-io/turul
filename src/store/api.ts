@@ -153,6 +153,9 @@ export const api = createApi({
     "Workflow",
     "WorkflowAction",
     "PipelineDefinition",
+    "Pipeline",
+    "PipelineNode",
+    "NodeDefinition",
   ],
   endpoints: (build) => ({
     createUser: build.mutation<CreateUserResponse, CreateUserRequest>({

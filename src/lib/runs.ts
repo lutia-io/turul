@@ -279,3 +279,63 @@ export function matchesWorkflowScope(
   }
   return true
 }
+
+export function apiPipelineStatus(status: string): RunStatus {
+  switch (status) {
+    case "running":
+      return "Running"
+    case "completed":
+      return "Succeeded"
+    case "failed":
+      return "Failed"
+    default:
+      return "Queued"
+  }
+}
+
+export function apiPipelineLevelSteps(
+  definition: { nodes?: { name?: string; type?: string }[][] } | undefined
+): DefinitionStep[] {
+  return (definition?.nodes ?? []).map((level, index) => ({
+    id: `level-${index}`,
+    type: "level",
+    name:
+      level
+        .map((node) => node.name)
+        .filter(Boolean)
+        .join(", ") || `Level ${index}`,
+    order: index + 1,
+  }))
+}
+
+export function apiPipelineCurrentLevel(pipeline: {
+  status: string
+  currentLevel: number
+  definition: { nodes?: unknown[] }
+}) {
+  const total = pipeline.definition.nodes?.length ?? 0
+  if (pipeline.status === "pending") {
+    return 0
+  }
+  if (pipeline.status === "completed") {
+    return total
+  }
+  if (pipeline.status === "failed") {
+    return Math.min(Math.max(pipeline.currentLevel + 1, 1), Math.max(total, 1))
+  }
+  return Math.min(pipeline.currentLevel + 1, Math.max(total, 1))
+}
+
+export function matchesPipelineScope(
+  pipeline: Pick<{ networkId: string; organizationId: string }, "networkId" | "organizationId">,
+  networkId?: string,
+  organizationId?: string
+) {
+  if (networkId && pipeline.networkId !== networkId) {
+    return false
+  }
+  if (organizationId && pipeline.organizationId !== organizationId) {
+    return false
+  }
+  return true
+}

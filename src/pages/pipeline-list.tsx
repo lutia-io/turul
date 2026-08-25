@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
 import { PlayIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
@@ -8,7 +8,6 @@ import {
   DataTablePage,
   DataTableToolbar,
   dataTablePageSummary,
-  matchesQuery,
 } from "@/components/data-table"
 import {
   createManagedColumnHelper,
@@ -27,27 +26,41 @@ import {
   type StringFilterOp,
 } from "@/components/data-table-view"
 import { RunStatusPill } from "@/components/run-card"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import type { RunStatus } from "@/data/runs"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor } from "@/lib/badge"
 import {
+  apiPipelineCurrentLevel,
+  apiPipelineLevelSteps,
+  apiPipelineStatus,
   formatRelativeTime,
   formatRunDuration,
-  listPipelineRunViews,
   runProgress,
 } from "@/lib/runs"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
+  useWorkspaceOrganizations,
+  useWorkspacePipelines,
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
+import { getHumaErrorMessage } from "@/store/api"
+import { useAppSelector } from "@/store/hooks"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import {
+  useListPipelinesQuery,
+  type ApiPipelineStatus,
+  type ListPipelinesParams,
+  type PipelineListSort,
+} from "@/store/pipeline-slice"
 
 type PipelineRunRow = {
   id: string
   name: string
   href: string
-  status: RunStatus
+  status: ReturnType<typeof apiPipelineStatus>
+  apiStatus: ApiPipelineStatus
   networkName: string
   organizationName: string
   currentLabel: string
@@ -58,19 +71,34 @@ type PipelineRunRow = {
 }
 
 const helper = createManagedColumnHelper<PipelineRunRow>()
+const EMPTY_ROWS: PipelineRunRow[] = []
 
 type PipelineColumnFilters = {
   name?: { op: StringFilterOp; value: string }
-  status?: RunStatus
+  status?: ApiPipelineStatus
   organization?: { op: StringFilterOp; value: string }
 }
 
-const statusOptions: { value: RunStatus; label: string }[] = [
-  { value: "Queued", label: "Queued" },
-  { value: "Running", label: "Running" },
-  { value: "Succeeded", label: "Succeeded" },
-  { value: "Failed", label: "Failed" },
+const sortFields: PipelineListSort[] = [
+  "name",
+  "status",
+  "network",
+  "organization",
+  "currentLevel",
+  "createdAt",
+  "duration",
 ]
+
+const statusOptions: { value: ApiPipelineStatus; label: string }[] = [
+  { value: "pending", label: "Queued" },
+  { value: "running", label: "Running" },
+  { value: "completed", label: "Succeeded" },
+  { value: "failed", label: "Failed" },
+]
+
+function isPipelineRunSort(value: string): value is PipelineListSort {
+  return sortFields.includes(value as PipelineListSort)
+}
 
 function headerPin(column: {
   getIsPinned: () => false | "start" | "end"
@@ -82,33 +110,16 @@ function headerPin(column: {
   }
 }
 
-function matchesString(
-  value: string,
-  filter?: { op: StringFilterOp; value: string }
-) {
-  if (!filter) {
-    return true
-  }
-  if (filter.op === "empty") {
-    return value.trim() === ""
-  }
-  const haystack = value.toLowerCase()
-  const needle = filter.value.toLowerCase()
-  if (filter.op === "eq") {
-    return haystack === needle
-  }
-  if (filter.op === "startsWith") {
-    return haystack.startsWith(needle)
-  }
-  return haystack.includes(needle)
-}
-
 export default function PipelineList() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organizationId } = useNetworkWorkspace()
+  const { pipelines } = useWorkspacePipelines()
+  const { organizations } = useWorkspaceOrganizations()
   const [query, setQuery] = useState("")
+  const debouncedQuery = useDebouncedValue(query)
   const [columnFilters, setColumnFilters] = useState<PipelineColumnFilters>({})
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "startedAt", desc: true },
+    { id: "createdAt", desc: true },
   ])
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -123,62 +134,95 @@ export default function PipelineList() {
 
   useEffect(() => {
     setPagination((current) => ({ ...current, pageIndex: 0 }))
-  }, [query, columnFilters, network?.id, organizationId])
+  }, [debouncedQuery, columnFilters, network?.id, organizationId])
 
-  const items = useMemo<PipelineRunRow[]>(
-    () =>
-      listPipelineRunViews({
-        networkId: network?.id,
-        organizationId,
-      }).map((view) => ({
-        id: view.run.id,
-        name: view.definition.name,
-        href: networkWorkspacePath({
-          networkId: view.network.id,
-          rest: `pipelines/${view.run.id}`,
-        }),
-        status: view.run.status,
-        networkName: view.network.name,
-        organizationName: view.organization?.name ?? "",
-        currentLabel: view.current?.name ?? `Stage ${view.run.currentStage}`,
-        currentIndex: view.run.currentStage,
-        total: view.stages.length,
-        startedAt: view.run.startedAt,
-        finishedAt: view.run.finishedAt,
-      })),
-    [network?.id, organizationId]
-  )
+  const listParams = useMemo<ListPipelinesParams>(() => {
+    const sort = sorting[0]
+    return {
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+      q: debouncedQuery.trim() || undefined,
+      sort: sort && isPipelineRunSort(sort.id) ? sort.id : "createdAt",
+      order: sort?.desc ? "desc" : "asc",
+      networkId: network?.id,
+      organizationId,
+      name: columnFilters.name?.value,
+      nameOp: columnFilters.name?.op,
+      status: columnFilters.status,
+      organization: columnFilters.organization?.value,
+      organizationOp: columnFilters.organization?.op,
+    }
+  }, [
+    columnFilters,
+    debouncedQuery,
+    network?.id,
+    organizationId,
+    pagination.pageIndex,
+    pagination.pageSize,
+    sorting,
+  ])
 
-  const rows = useMemo(
-    () =>
-      items.filter((item) => {
-        if (
-          !matchesQuery(query, [
-            item.name,
-            item.status,
-            item.networkName,
-            item.organizationName,
-            item.currentLabel,
-            item.id,
-          ])
-        ) {
-          return false
-        }
-        if (!matchesString(item.name, columnFilters.name)) {
-          return false
-        }
-        if (columnFilters.status && item.status !== columnFilters.status) {
-          return false
-        }
-        if (!matchesString(item.organizationName, columnFilters.organization)) {
-          return false
-        }
-        return true
-      }),
-    [columnFilters, items, query]
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useListPipelinesQuery(listParams, {
+      skip: !isAuthenticated,
+    })
+  const dataRef = useRef(data)
+  if (data) {
+    dataRef.current = data
+  }
+  const list = data ?? dataRef.current
+  const pipelinesById = useMemo(
+    () => new Map(pipelines.map((pipeline) => [pipeline.id, pipeline])),
+    [pipelines]
   )
+  const organizationsById = useMemo(
+    () =>
+      new Map(
+        organizations.map((organization) => [organization.id, organization])
+      ),
+    [organizations]
+  )
+  const rows = useMemo(() => {
+    if (!list) {
+      return EMPTY_ROWS
+    }
+    return list.items.flatMap((run) => {
+      if (network && run.networkId !== network.id) {
+        return []
+      }
+      const definition = pipelinesById.get(run.pipelineDefinitionId)
+      const steps = apiPipelineLevelSteps(run.definition)
+      const currentIndex = apiPipelineCurrentLevel(run)
+      const current = steps.find((step) => step.order === currentIndex)
+      const organization = organizationsById.get(run.organizationId)
+      const status = apiPipelineStatus(run.status)
+      return [
+        {
+          id: run.id,
+          name: definition?.name ?? "Pipeline",
+          href: networkWorkspacePath({
+            networkId: run.networkId,
+            organizationId,
+            rest: `pipelines/${run.id}`,
+          }),
+          status,
+          apiStatus: run.status,
+          networkName: network?.name ?? run.networkId,
+          organizationName: organization?.name ?? run.organizationId,
+          currentLabel: current?.name ?? `Level ${Math.max(currentIndex - 1, 0)}`,
+          currentIndex,
+          total: steps.length,
+          startedAt: run.createdAt,
+          finishedAt: run.completedAt ?? undefined,
+        } satisfies PipelineRunRow,
+      ]
+    })
+  }, [list, network, organizationId, organizationsById, pipelinesById])
+  const total = list?.total ?? 0
   const filtersActive =
     query.trim().length > 0 || Object.values(columnFilters).some(Boolean)
+
+  const hrefFor = useCallback((row: PipelineRunRow) => row.href, [])
 
   const columns = useMemo(
     () =>
@@ -200,7 +244,7 @@ export default function PipelineList() {
           ),
           cell: ({ row }) => (
             <DataTableCellLink
-              to={row.original.href}
+              to={hrefFor(row.original)}
               className="max-w-[22rem] font-medium"
             >
               {row.original.name}
@@ -229,7 +273,7 @@ export default function PipelineList() {
             />
           ),
           cell: ({ row }) => (
-            <DataTableCellLink to={row.original.href}>
+            <DataTableCellLink to={hrefFor(row.original)}>
               <RunStatusPill status={row.original.status} />
             </DataTableCellLink>
           ),
@@ -258,7 +302,7 @@ export default function PipelineList() {
                 ),
                 cell: ({ row }) => (
                   <DataTableCellLink
-                    to={row.original.href}
+                    to={hrefFor(row.original)}
                     className="text-muted-foreground"
                   >
                     {row.original.organizationName || "—"}
@@ -271,14 +315,14 @@ export default function PipelineList() {
         helper.accessor("currentLabel", {
           header: ({ column }) => (
             <DataTableColumnHeader
-              title="Stage"
+              title="Level"
               sorted={column.getIsSorted()}
               onSort={column.getToggleSortingHandler()}
               pin={headerPin(column)}
             />
           ),
           cell: ({ row }) => (
-            <DataTableCellLink to={row.original.href} className="max-w-[16rem]">
+            <DataTableCellLink to={hrefFor(row.original)} className="max-w-[16rem]">
               {row.original.status === "Queued"
                 ? "Waiting to start"
                 : row.original.currentLabel}
@@ -305,7 +349,7 @@ export default function PipelineList() {
             const tone = getBadgeColor("pink")
             return (
               <DataTableCellLink
-                to={row.original.href}
+                to={hrefFor(row.original)}
                 className="flex items-center gap-2"
               >
                 <span className="flex h-1.5 w-16 overflow-hidden rounded-full bg-muted">
@@ -329,6 +373,7 @@ export default function PipelineList() {
           size: 140,
         }),
         helper.accessor("startedAt", {
+          id: "createdAt",
           header: ({ column }) => (
             <DataTableColumnHeader
               title="Started"
@@ -339,7 +384,7 @@ export default function PipelineList() {
           ),
           cell: ({ row }) => (
             <DataTableCellLink
-              to={row.original.href}
+              to={hrefFor(row.original)}
               className="whitespace-nowrap text-muted-foreground"
             >
               {formatRelativeTime(row.original.startedAt)}
@@ -354,7 +399,7 @@ export default function PipelineList() {
           ),
           cell: ({ row }) => (
             <DataTableCellLink
-              to={row.original.href}
+              to={hrefFor(row.original)}
               className="whitespace-nowrap text-muted-foreground tabular-nums"
             >
               {formatRunDuration(row.original)}
@@ -373,7 +418,7 @@ export default function PipelineList() {
           cell: ({ row }) => (
             <DataTableRowActions
               items={
-                <DropdownMenuItem render={<Link to={row.original.href} />}>
+                <DropdownMenuItem render={<Link to={hrefFor(row.original)} />}>
                   <ViewIcon />
                   View
                 </DropdownMenuItem>
@@ -382,7 +427,7 @@ export default function PipelineList() {
           ),
         }),
       ]),
-    [columnFilters, organizationId]
+    [columnFilters, hrefFor, organizationId]
   )
 
   const table = useTable({
@@ -395,12 +440,15 @@ export default function PipelineList() {
       size: 160,
       maxSize: 480,
     },
+    manualPagination: true,
+    manualSorting: true,
     autoResetPageIndex: false,
     enableSortingRemoval: false,
     enableMultiSort: false,
     enableColumnResizing: true,
     enableColumnPinning: true,
     columnResizeMode: "onChange",
+    rowCount: total,
     state: {
       pagination,
       sorting,
@@ -424,7 +472,10 @@ export default function PipelineList() {
       chips.push({
         id: "name",
         label: "Pipeline",
-        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
+        value: stringFilterChipValue(
+          columnFilters.name.op,
+          columnFilters.name.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -433,7 +484,9 @@ export default function PipelineList() {
       chips.push({
         id: "status",
         label: "Status",
-        value: columnFilters.status,
+        value:
+          statusOptions.find((option) => option.value === columnFilters.status)
+            ?.label ?? columnFilters.status,
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, status: undefined })),
       })
@@ -442,7 +495,10 @@ export default function PipelineList() {
       chips.push({
         id: "organization",
         label: "Organization",
-        value: stringFilterChipValue(columnFilters.organization.op, columnFilters.organization.value),
+        value: stringFilterChipValue(
+          columnFilters.organization.op,
+          columnFilters.organization.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -459,13 +515,22 @@ export default function PipelineList() {
       description={
         network
           ? `Live pipeline executions in ${network.name}${organizationId ? " for this organization" : ""}.`
-          : "Active pipeline executions across your networks. Open a run to inspect the current stage."
+          : "Active pipeline executions across your networks. Open a run to inspect the current level."
       }
       action={
-        <Button>
-          <PlayIcon />
-          Start a pipeline
-        </Button>
+        network ? (
+          <Link
+            to={networkWorkspacePath({
+              networkId: network.id,
+              organizationId,
+              rest: "pipeline-definitions",
+            })}
+            className={buttonVariants()}
+          >
+            <PlayIcon />
+            Start a pipeline
+          </Link>
+        ) : null
       }
     >
       <DataTableToolbar
@@ -476,24 +541,36 @@ export default function PipelineList() {
         chips={<DataTableActiveFilters filters={activeFilters} />}
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
-          isLoading: false,
+          isLoading,
           loadingLabel: "Loading pipelines...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
-          total: rows.length,
+          total,
           singular: "pipeline",
         })}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
       />
-      <DataTableView
-        table={table}
-        empty={
-          filtersActive
-            ? "No pipelines match this view."
-            : "No pipeline executions yet."
-        }
-      />
-      <DataTablePagination table={table} />
+      {isError ? (
+        <p className="text-sm text-destructive">
+          {getHumaErrorMessage(error, "Failed to load pipelines")}
+        </p>
+      ) : (
+        <>
+          <DataTableView
+            table={table}
+            isRefreshing={isFetching}
+            empty={
+              isLoading
+                ? "Loading pipelines..."
+                : filtersActive
+                  ? "No pipelines match this view."
+                  : "No pipeline executions yet."
+            }
+          />
+          <DataTablePagination table={table} />
+        </>
+      )}
     </DataTablePage>
   )
 }
-

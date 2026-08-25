@@ -29,6 +29,8 @@ export default defineConfig({
       "/workflow": humaProxy,
       "/workflow-action": humaProxy,
       "/pipeline-definition": humaProxy,
+      "/pipeline": humaProxy,
+      "/pipeline-node": humaProxy,
       "/record": humaProxy,
       "/file": humaProxy,
       "/healthz": humaProxy,

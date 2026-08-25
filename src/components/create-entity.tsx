@@ -9,6 +9,7 @@ import {
 import { CreateNetworkDialog } from "@/components/create-network-dialog"
 import { CreateOrganizationDialog } from "@/components/create-organization-dialog"
 import { CreateOrganizationUserDialog } from "@/components/create-organization-user-dialog"
+import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
 import { PipelineDefinitionDialog } from "@/components/pipeline-definition-dialog"
 import { SchemaDefinitionDialog } from "@/components/schema-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
@@ -30,6 +31,7 @@ type CreateState =
     }
   | { kind: "workflow"; networkId?: string; workflowDefinitionId?: string }
   | { kind: "pipeline"; networkId?: string; pipelineDefinitionId?: string }
+  | { kind: "node"; networkId?: string; nodeDefinitionId?: string }
   | null
 
 type CreateEntityContextValue = {
@@ -51,6 +53,8 @@ type CreateEntityContextValue = {
   openEditWorkflow: (workflowDefinitionId: string) => void
   openCreatePipeline: (networkId?: string) => void
   openEditPipeline: (pipelineDefinitionId: string) => void
+  openCreateNode: (networkId?: string) => void
+  openEditNode: (nodeDefinitionId: string) => void
 }
 
 const CreateEntityContext = createContext<CreateEntityContextValue | null>(null)
@@ -95,6 +99,12 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       },
       openEditPipeline(pipelineDefinitionId) {
         setState({ kind: "pipeline", pipelineDefinitionId })
+      },
+      openCreateNode(networkId) {
+        setState({ kind: "node", networkId })
+      },
+      openEditNode(nodeDefinitionId) {
+        setState({ kind: "node", nodeDefinitionId })
       },
     }),
     []
@@ -182,6 +192,18 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         networkId={state?.kind === "pipeline" ? state.networkId : undefined}
         pipelineDefinitionId={
           state?.kind === "pipeline" ? state.pipelineDefinitionId : undefined
+        }
+      />
+      <NodeDefinitionDialog
+        open={state?.kind === "node"}
+        onOpenChange={(open) => {
+          if (!open) {
+            close()
+          }
+        }}
+        networkId={state?.kind === "node" ? state.networkId : undefined}
+        nodeDefinitionId={
+          state?.kind === "node" ? state.nodeDefinitionId : undefined
         }
       />
     </CreateEntityContext.Provider>

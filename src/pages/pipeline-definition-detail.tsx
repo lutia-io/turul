@@ -1,23 +1,30 @@
+import { useState } from "react"
 import { Link, useParams } from "react-router"
 import {
+  BoxIcon,
   GalleryVerticalEndIcon,
   HashIcon,
   LayersIcon,
   PencilIcon,
+  PlayIcon,
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
 import {
   DefinitionFlags,
-  DefinitionStepsList,
   JsonDefinitionCard,
 } from "@/components/json-definition-card"
+import { RunPipelineDialog } from "@/components/run-pipeline-dialog"
 import { Button } from "@/components/ui/button"
-import { getPipelineStages, pipelineSourceLabel } from "@/lib/json-definition"
+import { getPipelineLevels } from "@/lib/json-definition"
 import {
+  networkWorkspacePath,
   useNetworkWorkspace,
+  useWorkspaceNodes,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
+import { nodeTypeLabel } from "@/lib/node-definition"
+import { pipelineSummary } from "@/lib/pipeline-definition"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -26,8 +33,14 @@ import { useGetPipelineDefinitionQuery } from "@/store/pipeline-slice"
 export default function PipelineDefinitionDetail() {
   const { pipelineDefinitionId } = useParams()
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const { network: workspaceNetwork, href } = useNetworkWorkspace()
+  const {
+    network: workspaceNetwork,
+    organizationId,
+    href,
+  } = useNetworkWorkspace()
+  const { nodes } = useWorkspaceNodes()
   const { openEditPipeline } = useCreateEntity()
+  const [runOpen, setRunOpen] = useState(false)
   const pipelineQuery = useGetPipelineDefinitionQuery(
     pipelineDefinitionId ?? "",
     { skip: !isAuthenticated || !pipelineDefinitionId }
@@ -39,11 +52,12 @@ export default function PipelineDefinitionDetail() {
     !workspaceNetwork || pipelineDefinition?.networkId === workspaceNetwork.id
   const visiblePipeline = belongsToWorkspace ? pipelineDefinition : undefined
   const network = belongsToWorkspace ? workspaceNetwork : undefined
-  const stages = visiblePipeline
-    ? getPipelineStages(visiblePipeline.definition)
+  const nodesById = new Map(nodes.map((node) => [node.id, node]))
+  const levels = visiblePipeline
+    ? getPipelineLevels(visiblePipeline.definition)
     : []
-  const source = visiblePipeline
-    ? pipelineSourceLabel(visiblePipeline.definition)
+  const summary = visiblePipeline
+    ? pipelineSummary(visiblePipeline.definition)
     : ""
 
   if (pipelineQuery.isLoading) {
@@ -93,43 +107,112 @@ export default function PipelineDefinitionDetail() {
                 {visiblePipeline.slug}
               </p>
             </div>
-            <Button
-              variant="outline"
-              disabled={visiblePipeline.internal}
-              onClick={() => openEditPipeline(visiblePipeline.id)}
-            >
-              <PencilIcon />
-              Edit
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={visiblePipeline.internal}
+                onClick={() => openEditPipeline(visiblePipeline.id)}
+              >
+                <PencilIcon />
+                Edit
+              </Button>
+              <Button
+                disabled={!visiblePipeline.active}
+                onClick={() => setRunOpen(true)}
+              >
+                <PlayIcon />
+                Run
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
               <p className="flex items-center gap-1 text-sm text-muted-foreground">
                 <HashIcon className="size-3.5" />
-                Stages
+                Levels
               </p>
               <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {stages.length}
+                {levels.length}
               </p>
             </div>
             <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs sm:col-span-2">
-              <p className="text-sm text-muted-foreground">Source</p>
-              <p className="mt-1 truncate font-medium">{source}</p>
+              <p className="text-sm text-muted-foreground">Graph</p>
+              <p className="mt-1 truncate font-medium">{summary}</p>
             </div>
           </div>
 
           <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
             <div>
-              <h2 className="text-base font-semibold tracking-tight">Stages</h2>
+              <h2 className="text-base font-semibold tracking-tight">
+                Levels
+              </h2>
               <p className="text-sm text-muted-foreground">
-                Ordered stages stored in the pipeline JSONB definition.
+                All nodes in a level run. Later levels read previous outputs by
+                0-based index.
               </p>
             </div>
-            <DefinitionStepsList
-              steps={stages}
-              emptyLabel="This pipeline definition does not declare any stages."
-            />
+            {levels.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                This pipeline definition does not declare any levels.
+              </p>
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {levels.map((level, levelIndex) => (
+                  <li
+                    key={`level-${levelIndex}`}
+                    className="rounded-xl border bg-background px-3.5 py-3"
+                  >
+                    <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      Level {levelIndex}
+                    </p>
+                    <ul className="flex flex-col gap-2">
+                      {level.map((ref, nodeIndex) => {
+                        const node = nodesById.get(ref.id)
+                        return (
+                          <li key={`${ref.id}-${nodeIndex}`}>
+                            {node ? (
+                              <Link
+                                to={networkWorkspacePath({
+                                  networkId: network.id,
+                                  organizationId,
+                                  rest: `node-definitions/${node.id}`,
+                                })}
+                                className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-muted/50"
+                              >
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs font-medium">
+                                  {nodeIndex}
+                                </span>
+                                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-300">
+                                  <BoxIcon className="size-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-medium">
+                                    {node.name}
+                                  </p>
+                                  <p className="truncate font-mono text-xs text-muted-foreground">
+                                    {node.slug} · {nodeTypeLabel(node.type)}
+                                  </p>
+                                </div>
+                              </Link>
+                            ) : (
+                              <div className="flex min-w-0 items-center gap-3 px-1 py-1">
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs font-medium">
+                                  {nodeIndex}
+                                </span>
+                                <p className="truncate font-mono text-sm text-muted-foreground">
+                                  {ref.id}
+                                </p>
+                              </div>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
 
           <JsonDefinitionCard definition={visiblePipeline.definition} />
@@ -158,6 +241,14 @@ export default function PipelineDefinitionDetail() {
               </div>
             </Link>
           </section>
+
+          <RunPipelineDialog
+            open={runOpen}
+            onOpenChange={setRunOpen}
+            pipelineDefinitionId={visiblePipeline.id}
+            networkId={network.id}
+            organizationId={organizationId}
+          />
         </>
       ) : (
         <div>

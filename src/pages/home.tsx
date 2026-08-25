@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { Link } from "react-router"
 import {
   ArrowRightIcon,
+  BoxIcon,
   Building2Icon,
   FileIcon,
   FileJsonIcon,
@@ -252,7 +253,10 @@ function NetworkCard({ network }: { network: Network }) {
         )}
       </CardContent>
       <CardFooter className="justify-end">
-        <Link to={networkPath} className={buttonVariants({ size: "sm" })}>
+        <Link
+          to={networkPath}
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
           View network
           <ArrowRightIcon />
         </Link>
@@ -480,6 +484,18 @@ export default function Home() {
           to: `/app/networks/${network.id}/pipeline-definitions/${pipelineDefinition.id}`,
           color: "pink" as const,
           icon: LayersIcon,
+          status: "Draft",
+        })),
+      ...(network.nodeDefinitions ?? [])
+        .filter((nodeDefinition) => !nodeDefinition.active)
+        .map((nodeDefinition) => ({
+          id: nodeDefinition.id,
+          name: nodeDefinition.name,
+          kind: "Node",
+          networkName: network.name,
+          to: `/app/networks/${network.id}/node-definitions/${nodeDefinition.id}`,
+          color: "purple" as const,
+          icon: BoxIcon,
           status: "Draft",
         })),
     ])

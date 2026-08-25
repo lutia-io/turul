@@ -18,11 +18,9 @@ import {
   DataTableView,
   DataTableViewOptions,
   managedTableFeatures,
-  numberFilterChipValue,
   stringFilterChipValue,
   type ColumnPinningState,
   type DataTableActiveFilter,
-  type NumberFilterOp,
   type PaginationState,
   type SortingState,
   type StringFilterOp,
@@ -31,50 +29,51 @@ import { StatusBadge } from "@/components/json-definition-card"
 import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import type { PipelineDefinition } from "@/data/networks"
+import type { NodeDefinition } from "@/data/networks"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
-import {
-  getPipelineLevels,
-  publicationStatus,
-} from "@/lib/json-definition"
+import { publicationStatus } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
-  workspacePipelineFromApi,
+  workspaceNodeFromApi,
 } from "@/lib/network-workspace"
-import { pipelineSummary } from "@/lib/pipeline-definition"
+import {
+  isNodeType,
+  nodeTypeLabel,
+  nodeTypeLabels,
+  nodeTypes,
+} from "@/lib/node-definition"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useListNetworksQuery } from "@/store/network-slice"
 import {
-  useListPipelineDefinitionsQuery,
-  type ListPipelineDefinitionsParams,
-  type PipelineDefinitionListSort,
-} from "@/store/pipeline-slice"
+  useListNodeDefinitionsQuery,
+  type ListNodeDefinitionsParams,
+  type NodeDefinitionListSort,
+} from "@/store/node-slice"
 
-const helper = createManagedColumnHelper<PipelineDefinition>()
-const EMPTY_PIPELINES: PipelineDefinition[] = []
+const helper = createManagedColumnHelper<NodeDefinition>()
+const EMPTY_NODES: NodeDefinition[] = []
 
-type PipelineColumnFilters = {
+type NodeColumnFilters = {
   name?: { op: StringFilterOp; value: string }
   slug?: { op: StringFilterOp; value: string }
   network?: { op: StringFilterOp; value: string }
-  stages?: { op: NumberFilterOp; value: number }
+  type?: string
   status?: "published" | "draft"
 }
 
-const sortFields: PipelineDefinitionListSort[] = [
+const sortFields: NodeDefinitionListSort[] = [
   "name",
   "slug",
   "status",
+  "type",
   "network",
-  "source",
-  "stages",
 ]
 
-function isPipelineSort(value: string): value is PipelineDefinitionListSort {
-  return sortFields.includes(value as PipelineDefinitionListSort)
+function isNodeSort(value: string): value is NodeDefinitionListSort {
+  return sortFields.includes(value as NodeDefinitionListSort)
 }
 
 function headerPin(column: {
@@ -87,20 +86,16 @@ function headerPin(column: {
   }
 }
 
-function pipelineLevelCount(pipeline: PipelineDefinition) {
-  return getPipelineLevels(pipeline.definition).length
-}
-
-export default function PipelineDefinitionList() {
+export default function NodeDefinitionList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
-  const { openCreatePipeline, openEditPipeline } = useCreateEntity()
+  const { openCreateNode, openEditNode } = useCreateEntity()
   const { data: networks } = useListNetworksQuery(undefined, {
     skip: !isAuthenticated || Boolean(network),
   })
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
-  const [columnFilters, setColumnFilters] = useState<PipelineColumnFilters>({})
+  const [columnFilters, setColumnFilters] = useState<NodeColumnFilters>({})
   const [sorting, setSorting] = useState<SortingState>([
     { id: "name", desc: false },
   ])
@@ -119,13 +114,13 @@ export default function PipelineDefinitionList() {
     setPagination((current) => ({ ...current, pageIndex: 0 }))
   }, [debouncedQuery, columnFilters, network?.id, organizationId])
 
-  const listParams = useMemo<ListPipelineDefinitionsParams>(() => {
+  const listParams = useMemo<ListNodeDefinitionsParams>(() => {
     const sort = sorting[0]
     return {
       page: pagination.pageIndex + 1,
       pageSize: pagination.pageSize,
       q: debouncedQuery.trim() || undefined,
-      sort: sort && isPipelineSort(sort.id) ? sort.id : "name",
+      sort: sort && isNodeSort(sort.id) ? sort.id : "name",
       order: sort?.desc ? "desc" : "asc",
       networkId: network?.id,
       active:
@@ -138,10 +133,10 @@ export default function PipelineDefinitionList() {
       nameOp: columnFilters.name?.op,
       slug: columnFilters.slug?.value,
       slugOp: columnFilters.slug?.op,
+      type: columnFilters.type,
+      typeOp: columnFilters.type ? "eq" : undefined,
       network: columnFilters.network?.value,
       networkOp: columnFilters.network?.op,
-      stages: columnFilters.stages?.value,
-      stagesOp: columnFilters.stages?.op,
     }
   }, [
     columnFilters,
@@ -153,7 +148,7 @@ export default function PipelineDefinitionList() {
   ])
 
   const { data, isLoading, isFetching, isError, error, refetch } =
-    useListPipelineDefinitionsQuery(listParams, {
+    useListNodeDefinitionsQuery(listParams, {
       skip: !isAuthenticated,
     })
   const dataRef = useRef(data)
@@ -162,7 +157,7 @@ export default function PipelineDefinitionList() {
   }
   const list = data ?? dataRef.current
   const rows = useMemo(
-    () => list?.items.map(workspacePipelineFromApi) ?? EMPTY_PIPELINES,
+    () => list?.items.map(workspaceNodeFromApi) ?? EMPTY_NODES,
     [list]
   )
   const total = list?.total ?? 0
@@ -174,16 +169,16 @@ export default function PipelineDefinitionList() {
   )
 
   const hrefFor = useCallback(
-    (pipeline: PipelineDefinition) => {
-      return network
+    (node: NodeDefinition) => {
+      return network?.id
         ? networkWorkspacePath({
             networkId: network.id,
             organizationId,
-            rest: `pipeline-definitions/${pipeline.id}`,
+            rest: `node-definitions/${node.id}`,
           })
-        : `/app/pipeline-definitions/${pipeline.id}`
+        : `/app/node-definitions/${node.id}`
     },
-    [network, organizationId]
+    [network?.id, organizationId]
   )
 
   const columns = useMemo(
@@ -243,9 +238,9 @@ export default function PipelineDefinitionList() {
         ...(!network
           ? [
               helper.accessor(
-                (pipeline) =>
-                  pipeline.networkId
-                    ? (networksById.get(pipeline.networkId)?.name ?? "—")
+                (node) =>
+                  node.networkId
+                    ? (networksById.get(node.networkId)?.name ?? "—")
                     : "—",
                 {
                   id: "network",
@@ -282,43 +277,24 @@ export default function PipelineDefinitionList() {
               ),
             ]
           : []),
-        helper.accessor(
-          (pipeline) => pipelineSummary(pipeline.definition),
-          {
-            id: "source",
-            enableSorting: false,
-            header: ({ column }) => (
-              <DataTableColumnHeader
-                title="Definition"
-                pin={headerPin(column)}
-              />
-            ),
-            cell: ({ row }) => (
-              <DataTableCellLink
-                to={hrefFor(row.original)}
-                className="text-muted-foreground"
-              >
-                {pipelineSummary(row.original.definition)}
-              </DataTableCellLink>
-            ),
-            size: 220,
-          }
-        ),
-        helper.accessor(pipelineLevelCount, {
-          id: "stages",
+        helper.accessor("type", {
           header: ({ column }) => (
             <DataTableColumnHeader
-              title="Levels"
+              title="Type"
               sorted={column.getIsSorted()}
               onSort={column.getToggleSortingHandler()}
               pin={headerPin(column)}
               filter={{
-                type: "number",
-                value: columnFilters.stages,
+                type: "enum",
+                value: columnFilters.type,
+                options: nodeTypes.map((item) => ({
+                  value: item,
+                  label: nodeTypeLabels[item],
+                })),
                 onChange: (value) =>
                   setColumnFilters((current) => ({
                     ...current,
-                    stages: value,
+                    type: value,
                   })),
               }}
             />
@@ -326,14 +302,14 @@ export default function PipelineDefinitionList() {
           cell: ({ row }) => (
             <DataTableCellLink
               to={hrefFor(row.original)}
-              className="text-muted-foreground tabular-nums"
+              className="text-muted-foreground"
             >
-              {pipelineLevelCount(row.original)}
+              {nodeTypeLabel(row.original.type)}
             </DataTableCellLink>
           ),
-          size: 120,
+          size: 140,
         }),
-        helper.accessor((pipeline) => publicationStatus(pipeline.active), {
+        helper.accessor((node) => publicationStatus(node.active), {
           id: "status",
           header: ({ column }) => (
             <DataTableColumnHeader
@@ -351,7 +327,7 @@ export default function PipelineDefinitionList() {
                 onChange: (value) =>
                   setColumnFilters((current) => ({
                     ...current,
-                    status: value as PipelineColumnFilters["status"],
+                    status: value as NodeColumnFilters["status"],
                   })),
               }}
             />
@@ -389,7 +365,7 @@ export default function PipelineDefinitionList() {
                     View
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => openEditPipeline(row.original.id)}
+                    onClick={() => openEditNode(row.original.id)}
                   >
                     <PencilIcon />
                     Edit
@@ -400,14 +376,14 @@ export default function PipelineDefinitionList() {
           ),
         }),
       ]),
-    [columnFilters, hrefFor, network, networksById, openEditPipeline]
+    [columnFilters, hrefFor, network, networksById, openEditNode]
   )
 
   const table = useTable({
     features: managedTableFeatures,
     columns,
     data: rows,
-    getRowId: (pipeline) => pipeline.id,
+    getRowId: (node) => node.id,
     defaultColumn: {
       minSize: 80,
       size: 160,
@@ -445,7 +421,10 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
+        value: stringFilterChipValue(
+          columnFilters.name.op,
+          columnFilters.name.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -454,7 +433,10 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "slug",
         label: "Slug",
-        value: stringFilterChipValue(columnFilters.slug.op, columnFilters.slug.value),
+        value: stringFilterChipValue(
+          columnFilters.slug.op,
+          columnFilters.slug.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
@@ -463,21 +445,23 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "network",
         label: "Network",
-        value: stringFilterChipValue(columnFilters.network.op, columnFilters.network.value),
+        value: stringFilterChipValue(
+          columnFilters.network.op,
+          columnFilters.network.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, network: undefined })),
       })
     }
-    if (columnFilters.stages) {
+    if (columnFilters.type) {
       chips.push({
-        id: "stages",
-        label: "Levels",
-        value: numberFilterChipValue(
-          columnFilters.stages.op,
-          columnFilters.stages.value
-        ),
+        id: "type",
+        label: "Type",
+        value: isNodeType(columnFilters.type)
+          ? nodeTypeLabels[columnFilters.type]
+          : columnFilters.type,
         onRemove: () =>
-          setColumnFilters((current) => ({ ...current, stages: undefined })),
+          setColumnFilters((current) => ({ ...current, type: undefined })),
       })
     }
     if (columnFilters.status) {
@@ -494,42 +478,42 @@ export default function PipelineDefinitionList() {
 
   return (
     <DataTablePage
-      title="Pipeline Definitions"
+      title="Node Definitions"
       description={
         organization
-          ? `Pipelines that orchestrate node definitions in ${organization.name}.`
+          ? `Reusable pipeline steps in ${organization.name}.`
           : network
-            ? `Pipeline definitions used by the ${network.name} network.`
-            : "Pipelines that orchestrate node definitions in BFS levels."
+            ? `Reusable pipeline steps for the ${network.name} network.`
+            : "Reusable typed nodes that pipelines orchestrate in BFS levels."
       }
       action={
-        <Button onClick={() => openCreatePipeline(network?.id)}>
+        <Button onClick={() => openCreateNode(network?.id)}>
           <PlusIcon />
-          Create pipeline
+          Create node
         </Button>
       }
     >
       <DataTableToolbar
         query={query}
         onQueryChange={setQuery}
-        searchPlaceholder="Search pipelines..."
+        searchPlaceholder="Search name or slug..."
         searchClassName="sm:max-w-3xl"
         chips={<DataTableActiveFilters filters={activeFilters} />}
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading pipelines...",
+          loadingLabel: "Loading nodes...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
-          singular: "pipeline",
+          singular: "node",
         })}
         onRefresh={refetch}
         isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
-          {getHumaErrorMessage(error, "Failed to load pipelines")}
+          {getHumaErrorMessage(error, "Failed to load node definitions")}
         </p>
       ) : (
         <>
@@ -538,10 +522,10 @@ export default function PipelineDefinitionList() {
             isRefreshing={isFetching}
             empty={
               isLoading
-                ? "Loading pipelines..."
+                ? "Loading nodes..."
                 : filtersActive
-                  ? "No pipelines match this view."
-                  : "No pipeline definitions yet."
+                  ? "No nodes match this view."
+                  : "No node definitions yet. Create one to reuse it in pipelines."
             }
           />
           <DataTablePagination table={table} />
@@ -550,4 +534,3 @@ export default function PipelineDefinitionList() {
     </DataTablePage>
   )
 }
-

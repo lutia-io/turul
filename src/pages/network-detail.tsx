@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from "react"
 import { Link } from "react-router"
 import {
   ArrowRightIcon,
+  BoxIcon,
   Building2Icon,
   FileIcon,
   FileJsonIcon,
@@ -29,29 +30,33 @@ import {
 } from "@/lib/activity"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
-  getPipelineStages,
   jsonSchemaPropertyCount,
-  pipelineSourceLabel,
   publicationStatus,
 } from "@/lib/json-definition"
 import {
+  apiPipelineCurrentLevel,
+  apiPipelineLevelSteps,
+  apiPipelineStatus,
   apiWorkflowCurrentStep,
   apiWorkflowStatus,
   apiWorkflowSteps,
   formatRelativeTime,
-  listPipelineRunViews,
+  matchesPipelineScope,
   matchesWorkflowScope,
 } from "@/lib/runs"
 import {
   parseWorkflowDefinition,
   workflowSummary,
 } from "@/lib/workflow-definition"
+import { pipelineSummary } from "@/lib/pipeline-definition"
+import { nodeTypeLabel } from "@/lib/node-definition"
 import {
   networkWorkspacePath,
   schemaScopeLabel,
   useNetworkWorkspace,
   useWorkspaceFiles,
   useWorkspaceOrganizations,
+  useWorkspacePipelineRuns,
   useWorkspaceRecords,
   useWorkspaceSchemas,
   useWorkspaceWorkflowRuns,
@@ -317,6 +322,11 @@ export default function NetworkDetail() {
     isFetching: isRunsFetching,
   } = useWorkspaceWorkflowRuns()
   const {
+    runs: pipelineRuns,
+    refetch: refetchPipelineRuns,
+    isFetching: isPipelineRunsFetching,
+  } = useWorkspacePipelineRuns()
+  const {
     records,
     refetch: refetchRecords,
     isFetching: isRecordsFetching,
@@ -337,6 +347,7 @@ export default function NetworkDetail() {
     openCreateSchema,
     openCreateWorkflow,
     openCreatePipeline,
+    openCreateNode,
     openEditNetwork,
     openEditOrganization,
   } = useCreateEntity()
@@ -346,6 +357,7 @@ export default function NetworkDetail() {
     void refetchRecords()
     void refetchFiles()
     void refetchRuns()
+    void refetchPipelineRuns()
   }
 
   function refreshDefinitions() {
@@ -357,7 +369,8 @@ export default function NetworkDetail() {
     isWorkspaceFetching ||
     isRecordsFetching ||
     isFilesFetching ||
-    isRunsFetching
+    isRunsFetching ||
+    isPipelineRunsFetching
 
   const scopedRecords = useMemo(
     () =>
@@ -388,6 +401,15 @@ export default function NetworkDetail() {
         : [],
     [network, organizationId, workflowRuns]
   )
+  const scopedPipelines = useMemo(
+    () =>
+      network
+        ? pipelineRuns.filter((run) =>
+            matchesPipelineScope(run, network.id, organizationId)
+          )
+        : [],
+    [network, organizationId, pipelineRuns]
+  )
   const runningWorkflows = scopedWorkflows.filter(
     (run) => run.status === "running"
   ).length
@@ -405,9 +427,9 @@ export default function NetworkDetail() {
       bucketActivity({
         records: scopedRecords,
         files: scopedFiles,
-        runs: scopedWorkflows,
+        runs: [...scopedWorkflows, ...scopedPipelines],
       }),
-    [scopedFiles, scopedRecords, scopedWorkflows]
+    [scopedFiles, scopedPipelines, scopedRecords, scopedWorkflows]
   )
   const activityTotals = useMemo(() => summarizeActivity(activity), [activity])
   const runStatusData = useMemo(
@@ -447,15 +469,11 @@ export default function NetworkDetail() {
   const accentColor = organization?.color ?? network.color
   const tone = getBadgeColor(accentColor)
   const HeaderIcon = organization ? Building2Icon : GalleryVerticalEndIcon
-  const pipelineViews = listPipelineRunViews({
-    networkId: network.id,
-    organizationId,
-  })
-  const runningPipelines = pipelineViews.filter(
-    (view) => view.run.status === "Running"
+  const runningPipelines = scopedPipelines.filter(
+    (run) => run.status === "running"
   ).length
-  const queuedPipelines = pipelineViews.filter(
-    (view) => view.run.status === "Queued"
+  const queuedPipelines = scopedPipelines.filter(
+    (run) => run.status === "pending"
   ).length
   const organizationCounts = countByStatus(
     network.organizations,
@@ -495,6 +513,16 @@ export default function NetworkDetail() {
         color: accentColor,
         icon: LayersIcon,
       })),
+    ...(network.nodeDefinitions ?? [])
+      .filter((nodeDefinition) => !nodeDefinition.active)
+      .map((nodeDefinition) => ({
+        id: nodeDefinition.id,
+        name: nodeDefinition.name,
+        kind: "Node definition",
+        to: href(`node-definitions/${nodeDefinition.id}`),
+        color: accentColor,
+        icon: BoxIcon,
+      })),
   ]
   const activeRuns = [
     ...scopedWorkflows
@@ -519,21 +547,28 @@ export default function NetworkDetail() {
           updatedAt: run.completedAt ?? run.createdAt,
         }
       }),
-    ...listPipelineRunViews({
-      networkId: network.id,
-      organizationId,
-      filter: "active",
-    }).map((view) => ({
-      id: view.run.id,
-      name: view.definition.name,
-      kind: "Pipeline",
-      status: view.run.status,
-      href: href(`pipelines/${view.run.id}`),
-      color: accentColor,
-      icon: LayersIcon,
-      current: view.current?.name,
-      updatedAt: view.run.updatedAt,
-    })),
+    ...scopedPipelines
+      .filter((run) => run.status === "pending" || run.status === "running")
+      .map((run) => {
+        const definition = network.pipelineDefinitions.find(
+          (item) => item.id === run.pipelineDefinitionId
+        )
+        const steps = apiPipelineLevelSteps(run.definition)
+        const current = steps.find(
+          (step) => step.order === apiPipelineCurrentLevel(run)
+        )
+        return {
+          id: run.id,
+          name: definition?.name ?? "Pipeline",
+          kind: "Pipeline",
+          status: apiPipelineStatus(run.status),
+          href: href(`pipelines/${run.id}`),
+          color: accentColor,
+          icon: LayersIcon,
+          current: current?.name,
+          updatedAt: run.completedAt ?? run.createdAt,
+        }
+      }),
   ].sort(
     (left, right) =>
       new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
@@ -788,7 +823,7 @@ export default function NetworkDetail() {
               isLoading={isSchemasFetching || isWorkflowsFetching}
               className="rounded-xl"
             >
-              <div className="grid gap-3 lg:grid-cols-3">
+              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
                 <DefinitionColumn
                   title="Schemas"
                   viewAll={href("schemas")}
@@ -835,11 +870,28 @@ export default function NetworkDetail() {
                     (pipelineDefinition) => ({
                       id: pipelineDefinition.id,
                       name: pipelineDefinition.name,
-                      subtitle: `${pipelineSourceLabel(pipelineDefinition.definition)} · ${getPipelineStages(pipelineDefinition.definition).length} stages`,
+                      subtitle: pipelineSummary(pipelineDefinition.definition),
                       status: publicationStatus(pipelineDefinition.active),
                       color: accentColor,
                       icon: LayersIcon,
                       to: href(`pipeline-definitions/${pipelineDefinition.id}`),
+                    })
+                  )}
+                />
+                <DefinitionColumn
+                  title="Nodes"
+                  viewAll={href("node-definitions")}
+                  onAdd={() => openCreateNode(network.id)}
+                  empty="No node definitions yet."
+                  items={(network.nodeDefinitions ?? []).map(
+                    (nodeDefinition) => ({
+                      id: nodeDefinition.id,
+                      name: nodeDefinition.name,
+                      subtitle: nodeTypeLabel(nodeDefinition.type),
+                      status: publicationStatus(nodeDefinition.active),
+                      color: accentColor,
+                      icon: BoxIcon,
+                      to: href(`node-definitions/${nodeDefinition.id}`),
                     })
                   )}
                 />
