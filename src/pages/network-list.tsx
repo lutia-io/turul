@@ -10,14 +10,13 @@ import {
   PencilIcon,
   PlusIcon,
   Trash2Icon,
-  UsersIcon,
   WorkflowIcon,
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
 import { StatusBadge } from "@/components/json-definition-card"
 import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -48,6 +47,7 @@ import {
   networkWorkspacePath,
   useWorkspaceNetworks,
 } from "@/lib/network-workspace"
+import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import { useDeleteNetworkMutation } from "@/store/network-slice"
@@ -76,20 +76,6 @@ function organizationInitials(name: string) {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`
 }
 
-function formatDateTime(value?: string) {
-  if (!value) {
-    return undefined
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return undefined
-  }
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
-}
-
 function organizationSlug(organization: OrganizationDetails) {
   return organization.slug || undefined
 }
@@ -110,26 +96,38 @@ function countLabel(count: number, singular: string) {
   return `${count} ${count === 1 ? singular : `${singular}s`}`
 }
 
-function DetailItem({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value?: ReactNode
-  mono?: boolean
-}) {
-  if (value == null || value === "") {
+function activityLabel(createdAt?: string, updatedAt?: string) {
+  if (updatedAt && updatedAt !== createdAt) {
+    return `Updated ${formatRelativeTime(updatedAt)}`
+  }
+  if (createdAt) {
+    return `Created ${formatRelativeTime(createdAt)}`
+  }
+  return undefined
+}
+
+function MetaList({ items }: { items: ReactNode[] }) {
+  const visible = items.filter(
+    (item) => item != null && item !== false && item !== ""
+  )
+
+  if (visible.length === 0) {
     return null
   }
 
   return (
-    <div className="rounded-xl border bg-background px-3.5 py-3 shadow-xs">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={cn("mt-1 font-medium wrap-break-word", mono && "font-mono text-sm")}>
-        {value}
-      </p>
-    </div>
+    <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+      {visible.map((item, index) => (
+        <span key={index} className="inline-flex min-w-0 items-center gap-x-1.5">
+          {index > 0 ? (
+            <span aria-hidden="true" className="text-border">
+              ·
+            </span>
+          ) : null}
+          <span className="min-w-0 wrap-break-word">{item}</span>
+        </span>
+      ))}
+    </p>
   )
 }
 
@@ -197,79 +195,61 @@ function OrganizationCard({
   })
   const slug = organizationSlug(organization)
   const kind = organizationKind(organization)
-  const created = formatDateTime(organization.createdAt)
-  const updated = formatDateTime(organization.updatedAt)
 
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-xl border bg-background p-3.5 shadow-xs">
-      <div className="flex items-start gap-3">
+    <div className="group flex min-w-0 items-center gap-2 rounded-xl border bg-background p-3 shadow-xs transition-colors hover:bg-muted/50">
+      <Link
+        to={workspacePath}
+        className="flex min-w-0 flex-1 items-center gap-3"
+      >
         <div
           className={cn(
-            "flex size-12 shrink-0 items-center justify-center rounded-lg text-sm font-semibold tracking-tight",
+            "flex size-10 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tracking-tight",
             tone.bg,
             tone.text
           )}
         >
           {organizationInitials(organization.name)}
         </div>
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="font-medium wrap-break-word">{organization.name}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="min-w-0 truncate font-medium">{organization.name}</p>
             <StatusBadge status={organization.status} />
           </div>
-          {organization.description ? (
-            <p className="text-sm text-pretty text-muted-foreground">
-              {organization.description}
-            </p>
-          ) : null}
+          <MetaList
+            items={[
+              slug ? <span className="font-mono">{slug}</span> : null,
+              kind,
+              organization.location,
+              organization.members > 0
+                ? countLabel(organization.members, "member")
+                : null,
+            ]}
+          />
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="ghost" size="icon-sm" />}
-          >
-            <MoreHorizontalIcon />
-            <span className="sr-only">Organization actions</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-44">
-            <DropdownMenuItem render={<Link to={workspacePath} />}>
-              <Building2Icon />
-              Open workspace
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => openEditOrganization(organization.id)}
-            >
-              <PencilIcon />
-              Edit organization
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <DetailItem label="Slug" value={slug} mono />
-        <DetailItem label="Type" value={kind} />
-        <DetailItem label="Location" value={organization.location} />
-        <DetailItem
-          label="Members"
-          value={
-            organization.members > 0
-              ? countLabel(organization.members, "member")
-              : undefined
-          }
-        />
-        <DetailItem label="Created" value={created} />
-        <DetailItem
-          label="Updated"
-          value={updated && updated !== created ? updated : undefined}
-        />
-      </div>
-      <Link
-        to={workspacePath}
-        className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-      >
-        Open workspace
-        <ArrowRightIcon className="size-3.5" />
+        <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon-sm" />}
+        >
+          <MoreHorizontalIcon />
+          <span className="sr-only">Organization actions</span>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-44">
+          <DropdownMenuItem render={<Link to={workspacePath} />}>
+            <Building2Icon />
+            View workspace
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => openEditOrganization(organization.id)}
+          >
+            <PencilIcon />
+            Edit organization
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
@@ -347,44 +327,44 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const tone = getBadgeColor(network.color)
   const slug = networkSlug(network)
-  const created = formatDateTime(network.createdAt)
-  const updated = formatDateTime(network.updatedAt)
+  const networkPath = networkWorkspacePath({ networkId: network.id })
   const organizationCount = network.organizations.length
 
   return (
     <Card>
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3.5">
-          <div
-            className={cn(
-              "flex size-12 shrink-0 items-center justify-center rounded-lg",
-              tone.bg,
-              tone.text
-            )}
-          >
-            <GalleryVerticalEndIcon className="size-5" />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-lg">{network.name}</CardTitle>
-              <StatusBadge status={network.status} />
+      <CardHeader className="border-b">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-3.5">
+            <div
+              className={cn(
+                "flex size-12 shrink-0 items-center justify-center rounded-lg",
+                tone.bg,
+                tone.text
+              )}
+            >
+              <GalleryVerticalEndIcon className="size-5" />
             </div>
-            {network.description ? (
-              <CardDescription className="max-w-2xl text-pretty">
-                {network.description}
-              </CardDescription>
-            ) : null}
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-lg">{network.name}</CardTitle>
+                <StatusBadge status={network.status} />
+              </div>
+              {network.description ? (
+                <CardDescription className="max-w-2xl text-pretty">
+                  {network.description}
+                </CardDescription>
+              ) : null}
+              <MetaList
+                items={[
+                  slug ? <span className="font-mono">{slug}</span> : null,
+                  network.industry,
+                  network.headquarters,
+                  network.coverage,
+                  activityLabel(network.createdAt, network.updatedAt),
+                ]}
+              />
+            </div>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => openCreateOrganization(network.id)}
-          >
-            <PlusIcon />
-            Add organization
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="outline" size="icon-sm" />}
@@ -393,6 +373,10 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
               <span className="sr-only">Network actions</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem render={<Link to={networkPath} />}>
+                <GalleryVerticalEndIcon />
+                View network
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openEditNetwork(network.id)}>
                 <PencilIcon />
                 Edit network
@@ -409,65 +393,52 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <DetailItem label="Slug" value={slug} mono />
-          <DetailItem label="Industry" value={network.industry} />
-          <DetailItem label="Headquarters" value={network.headquarters} />
-          <DetailItem label="Coverage" value={network.coverage} />
-          <DetailItem label="Created" value={created} />
-          <DetailItem
-            label="Updated"
-            value={updated && updated !== created ? updated : undefined}
-          />
-        </div>
+      <CardContent className="flex flex-col gap-4">
         <NetworkCounts network={network} />
-        {organizationCount > 0 ? (
-          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {network.organizations.map((organization) => (
-              <OrganizationCard
-                key={organization.id}
-                networkId={network.id}
-                organization={organization}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-8 text-center">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <Building2Icon className="size-4" />
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium">
+            {organizationCount > 0
+              ? countLabel(organizationCount, "organization")
+              : "Organizations"}
+          </p>
+          {organizationCount > 0 ? (
+            <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {network.organizations.map((organization) => (
+                <OrganizationCard
+                  key={organization.id}
+                  networkId={network.id}
+                  organization={organization}
+                />
+              ))}
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">No organizations yet</p>
-              <p className="text-sm text-muted-foreground">
-                Add an organization to start collaborating in this network.
-              </p>
+          ) : (
+            <div className="flex items-center gap-3 rounded-xl border border-dashed px-3.5 py-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <Building2Icon className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">No organizations yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Add an organization to start collaborating in this network.
+                </p>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => openCreateOrganization(network.id)}
-            >
-              <PlusIcon />
-              Add organization
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
-      <CardFooter className="justify-between gap-3">
-        <Link
-          to={`/app/networks/${network.id}`}
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      <CardFooter className="flex-wrap justify-between gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => openCreateOrganization(network.id)}
         >
-          Open network
-          <ArrowRightIcon className="size-3.5" />
+          <PlusIcon />
+          Add organization
+        </Button>
+        <Link to={networkPath} className={buttonVariants({ size: "sm" })}>
+          View network
+          <ArrowRightIcon />
         </Link>
-        {organizationCount > 0 ? (
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <UsersIcon className="size-3.5" />
-            {countLabel(organizationCount, "organization")}
-          </span>
-        ) : null}
       </CardFooter>
       <DeleteNetworkDialog
         network={network}
@@ -480,9 +451,9 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
 
 function NetworkListSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {Array.from({ length: 2 }).map((_, index) => (
-        <Skeleton key={index} className="h-[22rem] rounded-xl" />
+        <Skeleton key={index} className="h-72 rounded-xl" />
       ))}
     </div>
   )
@@ -494,8 +465,8 @@ export default function NetworkList() {
     useWorkspaceNetworks()
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             All Networks
@@ -543,7 +514,7 @@ export default function NetworkList() {
         </Card>
       ) : (
         <LoadingFrame isLoading={isFetching} className="rounded-xl">
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4">
             {networks.map((network) => (
               <NetworkCard key={network.id} network={network} />
             ))}

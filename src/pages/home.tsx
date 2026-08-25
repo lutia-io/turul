@@ -5,6 +5,7 @@ import {
   Building2Icon,
   FileIcon,
   FileJsonIcon,
+  GalleryVerticalEndIcon,
   LayersIcon,
   ListIcon,
   PlusIcon,
@@ -120,79 +121,143 @@ function StatCard({
 
 function NetworkCard({ network }: { network: Network }) {
   const tone = getBadgeColor(network.color)
+  const networkPath = networkWorkspacePath({ networkId: network.id })
   const previewOrgs = network.organizations.slice(0, 4)
   const remaining = network.organizations.length - previewOrgs.length
+  const counts = [
+    {
+      to: networkWorkspacePath({ networkId: network.id, rest: "schemas" }),
+      label: "Schemas",
+      value: network.schemas.length,
+      icon: FileJsonIcon,
+    },
+    {
+      to: networkWorkspacePath({
+        networkId: network.id,
+        rest: "workflow-definitions",
+      }),
+      label: "Workflows",
+      value: network.workflowDefinitions.length,
+      icon: WorkflowIcon,
+    },
+    {
+      to: networkWorkspacePath({
+        networkId: network.id,
+        rest: "pipeline-definitions",
+      }),
+      label: "Pipelines",
+      value: network.pipelineDefinitions.length,
+      icon: LayersIcon,
+    },
+  ]
+  const meta = [
+    network.industry,
+    network.headquarters,
+    network.organizations.length > 0
+      ? `${network.organizations.length} ${
+          network.organizations.length === 1 ? "organization" : "organizations"
+        }`
+      : null,
+  ].filter(Boolean)
 
   return (
-    <Link to={`/app/networks/${network.id}`} className="block">
-      <Card size="sm" className="transition-colors hover:bg-muted/50">
-        <CardHeader>
-          <div className="flex min-w-0 items-start gap-3">
-            <div
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                tone.bg,
-                tone.text
-              )}
-            >
-              <ListIcon className="size-4" />
-            </div>
-            <CardDescription className="truncate">
-              {network.summary || "Network workspace"}
-            </CardDescription>
+    <Card size="sm">
+      <CardHeader className="border-b">
+        <div className="flex min-w-0 items-start gap-3">
+          <div
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center rounded-lg",
+              tone.bg,
+              tone.text
+            )}
+          >
+            <GalleryVerticalEndIcon className="size-4" />
           </div>
-          <CardAction>
-            <ArrowRightIcon className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover/card:opacity-100" />
-          </CardAction>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground tabular-nums">
-              {network.organizations.length}
-            </span>{" "}
-            orgs
-            <span className="mx-1.5 text-border">·</span>
-            <span className="font-medium text-foreground tabular-nums">
-              {network.schemas.length}
-            </span>{" "}
-            schemas
-            <span className="mx-1.5 text-border">·</span>
-            <span className="font-medium text-foreground tabular-nums">
-              {network.workflowDefinitions.length}
-            </span>{" "}
-            workflows
-          </p>
-          {previewOrgs.length > 0 ? (
-            <div className="flex shrink-0 items-center">
-              <div className="flex -space-x-1.5">
-                {previewOrgs.map((organization) => {
-                  const orgTone = getBadgeColor(organization.color)
-                  return (
-                    <span
-                      key={organization.id}
-                      title={organization.name}
-                      className={cn(
-                        "flex size-6 items-center justify-center rounded-md ring-2 ring-card",
-                        orgTone.bg,
-                        orgTone.text
-                      )}
-                    >
-                      <Building2Icon className="size-3" />
-                      <span className="sr-only">{organization.name}</span>
-                    </span>
-                  )
-                })}
-              </div>
-              {remaining > 0 ? (
-                <span className="ml-1.5 text-[11px] text-muted-foreground">
-                  +{remaining}
-                </span>
-              ) : null}
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle>{network.name}</CardTitle>
+              <StatusBadge status={network.status} />
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
-    </Link>
+            {network.description || network.summary ? (
+              <CardDescription className="line-clamp-2 text-pretty">
+                {network.description || network.summary}
+              </CardDescription>
+            ) : null}
+            {meta.length > 0 ? (
+              <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                {meta.map((item, index) => (
+                  <span
+                    key={item}
+                    className="inline-flex min-w-0 items-center gap-x-1.5"
+                  >
+                    {index > 0 ? (
+                      <span aria-hidden="true" className="text-border">
+                        ·
+                      </span>
+                    ) : null}
+                    <span className="min-w-0 truncate">{item}</span>
+                  </span>
+                ))}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="grid grid-cols-3 gap-2">
+          {counts.map((item) => (
+            <Link
+              key={item.label}
+              to={item.to}
+              className="rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
+            >
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <item.icon className="size-3.5" />
+                <p className="truncate text-xs">{item.label}</p>
+              </div>
+              <p className="mt-1 text-lg font-semibold tracking-tight tabular-nums">
+                {item.value}
+              </p>
+            </Link>
+          ))}
+        </div>
+        {previewOrgs.length > 0 ? (
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex -space-x-1.5">
+              {previewOrgs.map((organization) => {
+                const orgTone = getBadgeColor(organization.color)
+                return (
+                  <span
+                    key={organization.id}
+                    title={organization.name}
+                    className={cn(
+                      "flex size-6 items-center justify-center rounded-md ring-2 ring-card",
+                      orgTone.bg,
+                      orgTone.text
+                    )}
+                  >
+                    <Building2Icon className="size-3" />
+                    <span className="sr-only">{organization.name}</span>
+                  </span>
+                )
+              })}
+            </div>
+            <p className="min-w-0 truncate text-xs text-muted-foreground">
+              {previewOrgs.map((organization) => organization.name).join(", ")}
+              {remaining > 0 ? ` +${remaining}` : ""}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No organizations yet</p>
+        )}
+      </CardContent>
+      <CardFooter className="justify-end">
+        <Link to={networkPath} className={buttonVariants({ size: "sm" })}>
+          View network
+          <ArrowRightIcon />
+        </Link>
+      </CardFooter>
+    </Card>
   )
 }
 
@@ -601,7 +666,7 @@ export default function Home() {
                     <ArrowRightIcon />
                   </Link>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   {isNetworksError ? (
                     <p className="text-sm text-destructive">
                       {getHumaErrorMessage(

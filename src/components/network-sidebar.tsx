@@ -259,8 +259,8 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain label="Operations" items={navMain} />
         <NavMain label="Definitions" items={definitionItems} />
+        <NavMain label="Operations" items={navMain} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
