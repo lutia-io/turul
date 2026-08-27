@@ -5,10 +5,7 @@ import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
-export function AppShell({
-  sidebar,
-  children,
-}: {
+export function AppShell({ sidebar, children }: {
   sidebar: ReactNode
   children?: ReactNode
 }) {

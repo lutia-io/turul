@@ -18,7 +18,7 @@ import {
 import { type Network } from "@/data/networks"
 import { useCreateEntity } from "@/components/create-entity"
 import { StatusBadge } from "@/components/json-definition-card"
-import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
+import { RefreshButton } from "@/components/refresh-button"
 import { RunStatusPill } from "@/components/run-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -32,7 +32,11 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ActivityChart, RunStatusChart } from "@/components/workspace-charts"
-import { bucketActivity, summarizeActivity } from "@/lib/activity"
+import {
+  ACTIVITY_DAYS,
+  bucketActivity,
+  summarizeActivity,
+} from "@/lib/activity"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
   networkWorkspacePath,
@@ -43,17 +47,9 @@ import {
 } from "@/lib/network-workspace"
 import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaErrorMessage } from "@/store/api"
-import { selectAuthEmail } from "@/store/auth-slice"
+import { getHumaErrorMessage, useMeQuery } from "@/store/api"
+import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useAppSelector } from "@/store/hooks"
-
-function displayNameFromEmail(email: string | null) {
-  if (!email) {
-    return null
-  }
-
-  return email.split("@")[0] || email
-}
 
 function greetingForHour(hour: number) {
   if (hour < 12) return "Good morning"
@@ -117,6 +113,43 @@ function StatCard({
         </CardFooter>
       </Card>
     </Link>
+  )
+}
+
+function StatCardSkeleton({
+  label,
+  color,
+  icon: Icon,
+}: {
+  label: string
+  color: BadgeColor
+  icon: LucideIcon
+}) {
+  const tone = getBadgeColor(color)
+
+  return (
+    <Card size="sm" className="h-full">
+      <CardHeader>
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className="text-2xl font-semibold tracking-tight">
+          <Skeleton className="h-8 w-14" />
+        </CardTitle>
+        <CardAction>
+          <div
+            className={cn(
+              "flex size-9 items-center justify-center rounded-lg",
+              tone.bg,
+              tone.text
+            )}
+          >
+            <Icon className="size-4" />
+          </div>
+        </CardAction>
+      </CardHeader>
+      <CardFooter>
+        <Skeleton className="h-3 w-32" />
+      </CardFooter>
+    </Card>
   )
 }
 
@@ -316,13 +349,135 @@ function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Skeleton key={index} className="h-[108px] rounded-xl" />
-        ))}
+        <StatCardSkeleton label="Networks" color="purple" icon={ListIcon} />
+        <StatCardSkeleton
+          label="Organizations"
+          color="cyan"
+          icon={Building2Icon}
+        />
+        <StatCardSkeleton label="Records" color="blue" icon={TableIcon} />
+        <StatCardSkeleton label="Files" color="gray" icon={FileIcon} />
+        <StatCardSkeleton label="Workflows" color="teal" icon={WorkflowIcon} />
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_22rem]">
-        <Skeleton className="h-[360px] rounded-xl" />
-        <Skeleton className="h-[360px] rounded-xl" />
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>Workspace activity</CardTitle>
+            <CardDescription>
+              Records, files, and workflow runs over the last {ACTIVITY_DAYS}{" "}
+              days.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[220px] w-full rounded-lg" />
+          </CardContent>
+          <CardFooter>
+            <Skeleton className="h-4 w-56" />
+          </CardFooter>
+        </Card>
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>Workflow health</CardTitle>
+            <CardDescription>Run status across the workspace.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col items-center justify-center">
+            <Skeleton className="size-[220px] rounded-full" />
+          </CardContent>
+          <CardFooter className="flex-col items-stretch gap-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between gap-3"
+              >
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-8" />
+              </div>
+            ))}
+          </CardFooter>
+        </Card>
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">
+              Your networks
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Open a network to inspect organizations, schemas, and definitions.
+            </p>
+          </div>
+          <Card size="sm">
+            <CardHeader className="border-b">
+              <div className="flex items-start gap-3">
+                <Skeleton className="size-10 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-4 w-full max-w-md" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="grid grid-cols-3 gap-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} className="h-16 rounded-xl" />
+                ))}
+              </div>
+              <Skeleton className="h-4 w-48" />
+            </CardContent>
+          </Card>
+        </section>
+        <aside className="flex flex-col gap-6">
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Needs attention
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Failed runs and unpublished definitions.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex min-h-[64px] items-center gap-3 rounded-xl bg-card px-3 py-2 ring-1 ring-foreground/10"
+                >
+                  <Skeleton className="size-9 shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                Recent runs
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Latest workflow executions.
+              </p>
+            </div>
+            <Card size="sm">
+              <CardContent className="flex flex-col divide-y">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </section>
+        </aside>
       </div>
     </div>
   )
@@ -341,11 +496,11 @@ type AttentionItem = {
 
 export default function Home() {
   const { openCreateNetwork } = useCreateEntity()
-  const email = useAppSelector(selectAuthEmail)
-  const userName = displayNameFromEmail(email)
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const { data: me } = useMeQuery(undefined, { skip: !isAuthenticated })
+  const userName = me?.firstName.trim() || null
   const {
     networks,
-    isLoading: isNetworksLoading,
     isFetching: isNetworksFetching,
     isError: isNetworksError,
     error: networksError,
@@ -355,24 +510,19 @@ export default function Home() {
     records,
     refetch: refetchRecords,
     isFetching: isRecordsFetching,
-    isLoading: isRecordsLoading,
   } = useWorkspaceRecords()
   const {
     files,
     refetch: refetchFiles,
     isFetching: isFilesFetching,
-    isLoading: isFilesLoading,
   } = useWorkspaceFiles()
   const {
     runs: workflowRuns,
     refetch: refetchRuns,
     isFetching: isRunsFetching,
-    isLoading: isRunsLoading,
   } = useWorkspaceWorkflowRuns()
   const greeting = greetingForHour(new Date().getHours())
   const currentNetwork = networks[0]
-  const isInitialLoading =
-    isNetworksLoading || isRecordsLoading || isFilesLoading || isRunsLoading
   const isRefreshing =
     isNetworksFetching || isRecordsFetching || isFilesFetching || isRunsFetching
 
@@ -533,11 +683,9 @@ export default function Home() {
 
   const subtitle = isNetworksError
     ? getHumaErrorMessage(networksError, "Failed to load networks")
-    : isInitialLoading
-      ? "Loading your workspace..."
-      : currentNetwork
-        ? `${networks.length} network${networks.length === 1 ? "" : "s"} · ${organizations.length} organizations · ${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"} need attention.`
-        : "Create a network to start collecting records, files, and runs."
+    : currentNetwork
+      ? `${networks.length} network${networks.length === 1 ? "" : "s"} · ${organizations.length} organizations · ${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"} need attention.`
+      : "Create a network to start collecting records, files, and runs."
 
   return (
     <div className="flex flex-1 flex-col gap-6 bg-muted/40 p-4 sm:p-6">
@@ -546,14 +694,18 @@ export default function Home() {
           <h1 className="text-2xl font-semibold tracking-tight">
             {userName ? `${greeting}, ${userName}` : greeting}
           </h1>
-          <p
-            className={cn(
-              "mt-1 max-w-2xl text-sm",
-              isNetworksError ? "text-destructive" : "text-muted-foreground"
-            )}
-          >
-            {subtitle}
-          </p>
+          {isRefreshing && !isNetworksError ? (
+            <Skeleton className="mt-1 h-5 w-80 max-w-full" />
+          ) : (
+            <p
+              className={cn(
+                "mt-1 max-w-2xl text-sm",
+                isNetworksError ? "text-destructive" : "text-muted-foreground"
+              )}
+            >
+              {subtitle}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <RefreshButton
@@ -568,7 +720,7 @@ export default function Home() {
         </div>
       </div>
 
-      {isInitialLoading ? (
+      {isRefreshing ? (
         <DashboardSkeleton />
       ) : !isNetworksError && networks.length === 0 ? (
         <Card className="items-center px-6 py-12 text-center">
@@ -588,204 +740,199 @@ export default function Home() {
           </Button>
         </Card>
       ) : (
-        <LoadingFrame isLoading={isRefreshing} className="rounded-xl">
-          <div className="flex flex-col gap-6">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <StatCard
-                to="/app/networks"
-                label="Networks"
-                value={networks.length}
-                detail={
-                  networkCounts.draft > 0
-                    ? `${networkCounts.live} active · ${networkCounts.draft} draft`
-                    : `${networkCounts.live} active`
-                }
-                color="purple"
-                icon={ListIcon}
-              />
-              <StatCard
-                to={workspaceHref()}
-                label="Organizations"
-                value={organizations.length}
-                detail={
-                  organizationCounts.draft > 0
-                    ? `${organizationCounts.live} active · ${organizationCounts.draft} draft`
-                    : `${organizationCounts.live} members`
-                }
-                color="cyan"
-                icon={Building2Icon}
-              />
-              <StatCard
-                to={workspaceHref("records")}
-                label="Records"
-                value={records.length}
-                detail={`${activityTotals.recordsThisWeek} created this week`}
-                color="blue"
-                icon={TableIcon}
-              />
-              <StatCard
-                to={workspaceHref("files")}
-                label="Files"
-                value={files.length}
-                detail={`${activityTotals.filesThisWeek} uploaded this week`}
-                color="gray"
-                icon={FileIcon}
-              />
-              <StatCard
-                to={workspaceHref("workflows")}
-                label="Workflows"
-                value={workflowRuns.length}
-                detail={
-                  failedWorkflows > 0
-                    ? `${runningWorkflows} running · ${failedWorkflows} failed`
-                    : queuedWorkflows > 0
-                      ? `${runningWorkflows} running · ${queuedWorkflows} queued`
-                      : `${runningWorkflows} running`
-                }
-                color="teal"
-                icon={WorkflowIcon}
-              />
-            </div>
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard
+              to="/app/networks"
+              label="Networks"
+              value={networks.length}
+              detail={
+                networkCounts.draft > 0
+                  ? `${networkCounts.live} active · ${networkCounts.draft} draft`
+                  : `${networkCounts.live} active`
+              }
+              color="purple"
+              icon={ListIcon}
+            />
+            <StatCard
+              to={workspaceHref()}
+              label="Organizations"
+              value={organizations.length}
+              detail={
+                organizationCounts.draft > 0
+                  ? `${organizationCounts.live} active · ${organizationCounts.draft} draft`
+                  : `${organizationCounts.live} members`
+              }
+              color="cyan"
+              icon={Building2Icon}
+            />
+            <StatCard
+              to={workspaceHref("records")}
+              label="Records"
+              value={records.length}
+              detail={`${activityTotals.recordsThisWeek} created this week`}
+              color="blue"
+              icon={TableIcon}
+            />
+            <StatCard
+              to={workspaceHref("files")}
+              label="Files"
+              value={files.length}
+              detail={`${activityTotals.filesThisWeek} uploaded this week`}
+              color="gray"
+              icon={FileIcon}
+            />
+            <StatCard
+              to={workspaceHref("workflows")}
+              label="Workflows"
+              value={workflowRuns.length}
+              detail={
+                failedWorkflows > 0
+                  ? `${runningWorkflows} running · ${failedWorkflows} failed`
+                  : queuedWorkflows > 0
+                    ? `${runningWorkflows} running · ${queuedWorkflows} queued`
+                    : `${runningWorkflows} running`
+              }
+              color="teal"
+              icon={WorkflowIcon}
+            />
+          </div>
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_22rem]">
-              <ActivityChart
-                data={activity}
-                total={activityTotals.total}
-                change={activityTotals.change}
-              />
-              <RunStatusChart
-                data={runStatusData}
-                total={workflowRuns.length}
-              />
-            </div>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_22rem]">
+            <ActivityChart
+              data={activity}
+              total={activityTotals.total}
+              change={activityTotals.change}
+            />
+            <RunStatusChart data={runStatusData} total={workflowRuns.length} />
+          </div>
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <section className="flex flex-col gap-3">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">
+                    Your networks
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Open a network to inspect organizations, schemas, and
+                    definitions.
+                  </p>
+                </div>
+                <Link
+                  to="/app/networks"
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "sm" }),
+                    "hidden shrink-0 sm:inline-flex"
+                  )}
+                >
+                  View all
+                  <ArrowRightIcon />
+                </Link>
+              </div>
+              <div className="flex flex-col gap-3">
+                {isNetworksError ? (
+                  <p className="text-sm text-destructive">
+                    {getHumaErrorMessage(
+                      networksError,
+                      "Failed to load networks"
+                    )}
+                  </p>
+                ) : (
+                  networks.map((network) => (
+                    <NetworkCard key={network.id} network={network} />
+                  ))
+                )}
+              </div>
+            </section>
+
+            <aside className="flex flex-col gap-6">
+              <section className="flex flex-col gap-3">
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">
+                    Needs attention
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Failed runs and unpublished definitions.
+                  </p>
+                </div>
+                {attentionItems.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {attentionItems.slice(0, 6).map((item) => (
+                      <AttentionCard
+                        key={item.id}
+                        to={item.to}
+                        name={item.name}
+                        kind={item.kind}
+                        networkName={item.networkName}
+                        color={item.color}
+                        icon={item.icon}
+                        status={item.status}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nothing waiting on review.
+                  </p>
+                )}
+              </section>
+
               <section className="flex flex-col gap-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
                     <h2 className="text-base font-semibold tracking-tight">
-                      Your networks
+                      Recent runs
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                      Open a network to inspect organizations, schemas, and
-                      definitions.
+                      Latest workflow executions.
                     </p>
                   </div>
                   <Link
-                    to="/app/networks"
+                    to={workspaceHref("workflows")}
                     className={cn(
                       buttonVariants({ variant: "ghost", size: "sm" }),
-                      "hidden shrink-0 sm:inline-flex"
+                      "shrink-0"
                     )}
                   >
-                    View all
+                    View
                     <ArrowRightIcon />
                   </Link>
                 </div>
-                <div className="flex flex-col gap-3">
-                  {isNetworksError ? (
-                    <p className="text-sm text-destructive">
-                      {getHumaErrorMessage(
-                        networksError,
-                        "Failed to load networks"
-                      )}
-                    </p>
-                  ) : (
-                    networks.map((network) => (
-                      <NetworkCard key={network.id} network={network} />
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <aside className="flex flex-col gap-6">
-                <section className="flex flex-col gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold tracking-tight">
-                      Needs attention
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Failed runs and unpublished definitions.
-                    </p>
-                  </div>
-                  {attentionItems.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {attentionItems.slice(0, 6).map((item) => (
-                        <AttentionCard
-                          key={item.id}
-                          to={item.to}
-                          name={item.name}
-                          kind={item.kind}
-                          networkName={item.networkName}
-                          color={item.color}
-                          icon={item.icon}
-                          status={item.status}
-                        />
+                {recentRuns.length > 0 ? (
+                  <Card size="sm">
+                    <CardContent className="flex flex-col divide-y">
+                      {recentRuns.map(({ run, name, networkName }) => (
+                        <Link
+                          key={run.id}
+                          to={`/app/networks/${run.networkId}/workflows/${run.id}`}
+                          className="flex items-center gap-3 py-2 transition-colors first:pt-0 last:pb-0 hover:bg-muted/60"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {name}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {formatRelativeTime(run.createdAt)}
+                              {networkName ? ` · ${networkName}` : ""}
+                            </p>
+                          </div>
+                          <RunStatusPill
+                            status={apiWorkflowStatus(run.status)}
+                          />
+                        </Link>
                       ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Nothing waiting on review.
-                    </p>
-                  )}
-                </section>
-
-                <section className="flex flex-col gap-3">
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold tracking-tight">
-                        Recent runs
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Latest workflow executions.
-                      </p>
-                    </div>
-                    <Link
-                      to={workspaceHref("workflows")}
-                      className={cn(
-                        buttonVariants({ variant: "ghost", size: "sm" }),
-                        "shrink-0"
-                      )}
-                    >
-                      View
-                      <ArrowRightIcon />
-                    </Link>
-                  </div>
-                  {recentRuns.length > 0 ? (
-                    <Card size="sm">
-                      <CardContent className="flex flex-col divide-y">
-                        {recentRuns.map(({ run, name, networkName }) => (
-                          <Link
-                            key={run.id}
-                            to={`/app/networks/${run.networkId}/workflows/${run.id}`}
-                            className="flex items-center gap-3 py-2 transition-colors first:pt-0 last:pb-0 hover:bg-muted/60"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">
-                                {name}
-                              </p>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {formatRelativeTime(run.createdAt)}
-                                {networkName ? ` · ${networkName}` : ""}
-                              </p>
-                            </div>
-                            <RunStatusPill
-                              status={apiWorkflowStatus(run.status)}
-                            />
-                          </Link>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No workflow runs yet.
-                    </p>
-                  )}
-                </section>
-              </aside>
-            </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No workflow runs yet.
+                  </p>
+                )}
+              </section>
+            </aside>
           </div>
-        </LoadingFrame>
+        </div>
       )}
     </div>
   )

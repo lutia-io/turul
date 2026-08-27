@@ -48,6 +48,9 @@ export type LogoutRequest = {
 export type MeResponse = {
   principalType: string
   id: string
+  firstName: string
+  lastName: string
+  email: string
   networkId?: string
   organizationId?: string
 }
