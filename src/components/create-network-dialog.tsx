@@ -103,7 +103,7 @@ export function CreateNetworkDialog({
                 id={`${formId}-name`}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Acme Logistics"
+                placeholder="Neighborhood Cafe"
                 autoFocus
                 required
                 disabled={isLoading}

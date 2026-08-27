@@ -1,6 +1,4 @@
-"use client"
-
-import { type FormEvent } from "react"
+import { type SubmitEvent } from "react"
 import { Link, useLocation, useNavigate } from "react-router"
 
 import { cn } from "@/lib/utils"
@@ -15,16 +13,14 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { getHumaErrorMessage, useLoginUserMutation } from "@/store/api"
+import { Loader } from "lucide-react"
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+export function LoginForm({ className, ...props}: React.ComponentProps<"div">) {
   const [loginUser, { isLoading, error }] = useLoginUserMutation()
   const navigate = useNavigate()
   const location = useLocation() as { state?: { from?: { pathname: string } } }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const email = String(form.get("email") ?? "").trim()
@@ -57,7 +53,6 @@ export function LoginForm({
               type="email"
               placeholder="john.doe@example.com"
               autoComplete="email"
-              required
               disabled={isLoading}
               aria-invalid={error ? true : undefined}
             />
@@ -69,7 +64,6 @@ export function LoginForm({
               name="password"
               type="password"
               autoComplete="current-password"
-              required
               disabled={isLoading}
               aria-invalid={error ? true : undefined}
             />
@@ -77,7 +71,7 @@ export function LoginForm({
           {error ? <FieldError>{getHumaErrorMessage(error)}</FieldError> : null}
           <Field>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? <Loader className="size-4 animate-spin" /> : "Login"}
             </Button>
           </Field>
           <FieldSeparator>Or</FieldSeparator>
@@ -104,10 +98,6 @@ export function LoginForm({
           </FieldDescription>
         </FieldGroup>
       </form>
-      <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
-      </FieldDescription>
     </div>
   )
 }

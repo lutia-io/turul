@@ -3,347 +3,169 @@ import { emitWorkspace } from "@/data/networks"
 import type { JsonObject } from "@/lib/json-definition"
 import { uniqueId } from "@/lib/slug"
 
-const dhlManifests: StoredRecord[] = [
-  ["SIN", "HKG", 4, 18.4, "DAP", "dhl-apac", 20],
-  ["HKG", "NRT", 2, 9.1, "DDP", "dhl-apac", 18],
-  ["PVG", "SIN", 6, 41.0, "FOB", "dhl-apac", 16],
-  ["FRA", "AMS", 3, 12.8, "DAP", "dhl-emea", 15],
-  ["AMS", "LHR", 1, 3.2, "EXW", "dhl-emea", 12],
-  ["MAD", "FRA", 8, 55.6, "DDP", "dhl-emea", 10],
-  ["JFK", "ORD", 5, 22.0, "DAP", "dhl-na", 9],
-  ["LAX", "DFW", 2, 7.7, "FOB", "dhl-na", 7],
-  ["GRU", "BOG", 4, 19.5, "DAP", "dhl-latam", 6],
-  ["MEX", "GRU", 3, 14.2, "EXW", "dhl-latam", 5],
-  ["JNB", "LOS", 7, 38.9, "DDP", "dhl-africa", 4],
-  ["LOS", "NBO", 2, 8.4, "DAP", "dhl-africa", 2],
-].map(
-  (
-    [
-      originHub,
-      destinationHub,
-      pieces,
-      weightKg,
-      incoterms,
-      organizationId,
-      hours,
-    ],
-    index
-  ) =>
-    record({
-      id: `rec-dhl-manifest-${String(index + 1).padStart(2, "0")}`,
-      schemaId: "dhl-shipment-manifest",
-      organizationId,
-      networkId: "dhl",
-      hours: hours as number,
-      key: `${organizationId}:manifest:SHP-10${120 + index}`,
-      data: {
-        shipmentId: `SHP-10${120 + index}`,
-        originHub,
-        destinationHub,
-        pieces,
-        weightKg,
-        incoterms,
-        readyAt: recordReady(hours as number, 2),
-      },
-    })
-)
-
 function recordReady(hours: number, offsetHours: number) {
   return new Date(
     Date.now() - (hours - offsetHours) * 60 * 60 * 1000
   ).toISOString()
 }
 
-const dhlTracking: StoredRecord[] = [
-  ["SHP-10120", "SIN", "picked_up", "dhl-apac", 19],
-  ["SHP-10120", "HKG", "in_transit", "dhl-apac", 14],
-  ["SHP-10123", "FRA", "at_hub", "dhl-emea", 11],
-  ["SHP-10126", "JFK", "picked_up", "dhl-na", 8],
-  ["SHP-10126", "ORD", "in_transit", "dhl-na", 6],
-  ["SHP-10128", "GRU", "at_hub", "dhl-latam", 5],
-  ["SHP-10130", "JNB", "out_for_delivery", "dhl-africa", 3],
-  ["SHP-10121", "NRT", "delivered", "dhl-apac", 1],
-].map(([shipmentId, facilityCode, milestone, organizationId, hours], index) =>
+const logisticsPurchaseOrders: StoredRecord[] = [
+  ["PO-8841", "Northwind Components", "BRK-220", 240, "confirmed", 30],
+  ["PO-8848", "Cedar Parts Co", "HNG-014", 80, "open", 18],
+  ["PO-8852", "Metro Auto", "FLT-9", 16, "received", 8],
+].map(([poNumber, supplier, sku, quantity, status, hours], index) =>
   record({
-    id: `rec-dhl-track-${String(index + 1).padStart(2, "0")}`,
-    schemaId: "dhl-tracking-event",
-    organizationId,
-    networkId: "dhl",
+    id: `rec-log-po-${String(index + 1).padStart(2, "0")}`,
+    schemaId: "logistics-purchase-order",
+    organizationId: "logistics-origin",
+    networkId: "logistics",
     hours,
-    key: `${organizationId}:scan:${shipmentId}:${facilityCode}`,
-    data: {
-      eventId: `EVT-7${400 + index}`,
-      shipmentId,
-      facilityCode,
-      milestone,
-      scannedAt: recordReady(hours, 0.2),
-    },
+    data: { poNumber, supplier, sku, quantity, status },
   })
 )
 
-const dhlCustoms: StoredRecord[] = [
+const logisticsShipments: StoredRecord[] = [
   record({
-    id: "rec-dhl-customs-01",
-    schemaId: "dhl-customs-declaration",
-    organizationId: "dhl-apac",
-    networkId: "dhl",
-    hours: 17,
-    key: "dhl-apac:customs:DEC-4401",
+    id: "rec-log-ship-01",
+    schemaId: "logistics-shipment",
+    organizationId: "logistics-origin",
+    networkId: "logistics",
+    hours: 16,
+    key: "logistics-origin:shipment:SHP-4412",
     data: {
-      declarationId: "DEC-4401",
-      shipmentId: "SHP-10120",
-      originCountry: "SG",
-      destinationCountry: "HK",
-      declaredValue: 4200,
-      currency: "USD",
-      hsCodes: ["8471.30", "8517.62"],
-      documentFileId: "file-dhl-customs-01",
+      shipmentId: "SHP-4412",
+      origin: "logistics-origin",
+      destination: "logistics-hub",
+      status: "in_transit",
+      pieces: 4,
+      weightKg: 18.4,
+      consignee: "Harbor Retail",
+      readyAt: recordReady(16, 2),
     },
   }),
   record({
-    id: "rec-dhl-customs-02",
-    schemaId: "dhl-customs-declaration",
-    organizationId: "dhl-emea",
-    networkId: "dhl",
-    hours: 11,
-    key: "dhl-emea:customs:DEC-4408",
+    id: "rec-log-ship-02",
+    schemaId: "logistics-shipment",
+    organizationId: "logistics-origin",
+    networkId: "logistics",
+    hours: 10,
     data: {
-      declarationId: "DEC-4408",
-      shipmentId: "SHP-10123",
-      originCountry: "DE",
-      destinationCountry: "NL",
-      declaredValue: 890,
-      currency: "EUR",
-      hsCodes: ["6204.42"],
-      documentFileId: "file-dhl-customs-02",
+      shipmentId: "SHP-4415",
+      origin: "logistics-origin",
+      destination: "logistics-last-mile",
+      status: "ready",
+      pieces: 2,
+      weightKg: 9.1,
+      consignee: "Pine Street Clinic",
+      readyAt: recordReady(10, 0),
     },
   }),
   record({
-    id: "rec-dhl-customs-03",
-    schemaId: "dhl-customs-declaration",
-    organizationId: "dhl-emea",
-    networkId: "dhl",
-    hours: 8,
+    id: "rec-log-ship-03",
+    schemaId: "logistics-shipment",
+    organizationId: "logistics-hub",
+    networkId: "logistics",
+    hours: 2,
+    key: "logistics-hub:shipment:SHP-4418",
     data: {
-      declarationId: "DEC-4412",
-      shipmentId: "SHP-10125",
-      originCountry: "ES",
-      destinationCountry: "DE",
-      declaredValue: 15600,
-      currency: "EUR",
-      hsCodes: ["8708.29", "4016.93"],
+      shipmentId: "SHP-4418",
+      origin: "logistics-origin",
+      destination: "logistics-last-mile",
+      status: "at_hub",
+      pieces: 6,
+      weightKg: 41.0,
+      consignee: "Austin Grocery Co",
+      readyAt: recordReady(14, 2),
     },
   }),
   record({
-    id: "rec-dhl-customs-04",
-    schemaId: "dhl-customs-declaration",
-    organizationId: "dhl-latam",
-    networkId: "dhl",
+    id: "rec-log-ship-04",
+    schemaId: "logistics-shipment",
+    organizationId: "logistics-last-mile",
+    networkId: "logistics",
     hours: 5,
     data: {
-      declarationId: "DEC-4420",
-      shipmentId: "SHP-10128",
-      originCountry: "BR",
-      destinationCountry: "CO",
-      declaredValue: 2100,
-      currency: "USD",
-      hsCodes: ["0901.11"],
+      shipmentId: "SHP-4409",
+      origin: "logistics-hub",
+      destination: "logistics-last-mile",
+      status: "out_for_delivery",
+      pieces: 1,
+      weightKg: 3.2,
+      consignee: "Elena Ruiz",
+      readyAt: recordReady(20, 2),
+    },
+  }),
+  record({
+    id: "rec-log-ship-05",
+    schemaId: "logistics-shipment",
+    organizationId: "logistics-last-mile",
+    networkId: "logistics",
+    hours: 28,
+    data: {
+      shipmentId: "SHP-4398",
+      origin: "logistics-origin",
+      destination: "logistics-last-mile",
+      status: "delivered",
+      pieces: 3,
+      weightKg: 12.8,
+      consignee: "Westside Pharmacy",
+      readyAt: recordReady(40, 2),
     },
   }),
 ]
 
-const dhlLastMile: StoredRecord[] = [
+const logisticsTracking: StoredRecord[] = [
+  ["SHP-4412", "logistics-origin", "picked_up", 15],
+  ["SHP-4412", "logistics-hub", "in_transit", 11],
+  ["SHP-4418", "logistics-origin", "picked_up", 12],
+  ["SHP-4418", "logistics-hub", "at_hub", 2],
+  ["SHP-4409", "logistics-last-mile", "out_for_delivery", 4],
+].map(([shipmentId, organizationId, milestone, hours], index) =>
   record({
-    id: "rec-dhl-delivery-01",
-    schemaId: "dhl-last-mile-delivery",
-    organizationId: "dhl-na",
-    networkId: "dhl",
-    hours: 4,
-    key: "dhl-na:pod:DLV-8821",
-    data: {
-      deliveryId: "DLV-8821",
-      shipmentId: "SHP-10126",
-      recipientName: "Elena Vasquez",
-      status: "delivered",
-      signatureCaptured: true,
-      completedAt: recordReady(4, 0.1),
-      proofFileId: "file-dhl-pod-01",
-    },
-  }),
-  record({
-    id: "rec-dhl-delivery-02",
-    schemaId: "dhl-last-mile-delivery",
-    organizationId: "dhl-apac",
-    networkId: "dhl",
-    hours: 2,
-    key: "dhl-apac:pod:DLV-8824",
-    data: {
-      deliveryId: "DLV-8824",
-      shipmentId: "SHP-10121",
-      recipientName: "Hiro Sato",
-      status: "delivered",
-      signatureCaptured: true,
-      completedAt: recordReady(2, 0.05),
-      proofFileId: "file-dhl-pod-02",
-    },
-  }),
-  record({
-    id: "rec-dhl-delivery-03",
-    schemaId: "dhl-last-mile-delivery",
-    organizationId: "dhl-emea",
-    networkId: "dhl",
-    hours: 6,
-    data: {
-      deliveryId: "DLV-8819",
-      shipmentId: "SHP-10124",
-      recipientName: "Amira Hassan",
-      status: "attempted",
-      signatureCaptured: false,
-      completedAt: recordReady(6, 0.2),
-    },
-  }),
-  record({
-    id: "rec-dhl-delivery-04",
-    schemaId: "dhl-last-mile-delivery",
-    organizationId: "dhl-africa",
-    networkId: "dhl",
-    hours: 3,
-    data: {
-      deliveryId: "DLV-8830",
-      shipmentId: "SHP-10130",
-      recipientName: "Lerato Mokoena",
-      status: "attempted",
-      signatureCaptured: false,
-      completedAt: recordReady(3, 0),
-    },
-  }),
-  record({
-    id: "rec-dhl-delivery-05",
-    schemaId: "dhl-last-mile-delivery",
-    organizationId: "dhl-latam",
-    networkId: "dhl",
-    hours: 1,
-    data: {
-      deliveryId: "DLV-8833",
-      shipmentId: "SHP-10129",
-      recipientName: "Mateo Silva",
-      status: "refused",
-      signatureCaptured: false,
-      completedAt: recordReady(1, 0.1),
-    },
-  }),
-]
-
-const fedexWaybills: StoredRecord[] = [
-  ["7741 1234 8901", "MEM", "LHR", "priority", 3, 24.5, "fedex-express", 22],
-  ["7741 1234 8908", "MEM", "CDG", "standard", 1, 6.2, "fedex-express", 16],
-  ["7741 1234 8915", "IND", "NRT", "priority", 5, 41.0, "fedex-express", 12],
-  ["7741 1234 8922", "MEM", "FRA", "economy", 2, 11.8, "fedex-express", 8],
-  ["7741 1234 8930", "LAX", "SYD", "priority", 4, 33.4, "fedex-express", 5],
-  ["7741 1234 8937", "EWR", "MEX", "standard", 2, 9.9, "fedex-express", 2],
-].map(
-  (
-    [
-      waybillNumber,
-      originAirport,
-      destinationAirport,
-      serviceLevel,
-      pieces,
-      chargeableWeightKg,
-      organizationId,
-      hours,
-    ],
-    index
-  ) =>
-    record({
-      id: `rec-fedex-awb-${String(index + 1).padStart(2, "0")}`,
-      schemaId: "fedex-air-waybill",
-      organizationId,
-      networkId: "fedex",
-      hours: hours as number,
-      key: `${organizationId}:awb:${waybillNumber}`,
-      data: {
-        waybillNumber,
-        originAirport,
-        destinationAirport,
-        serviceLevel,
-        pieces,
-        chargeableWeightKg,
-      },
-    })
-)
-
-const fedexScans: StoredRecord[] = [
-  ["7948 1001", "MEMG", "pickup", "fedex-ground", 10],
-  ["7948 1001", "IND1", "sort", "fedex-ground", 8],
-  ["7948 1014", "LAXG", "pickup", "fedex-ground", 6],
-  ["7948 1022", "DFW3", "sort", "fedex-ground", 4],
-  ["7948 1022", "AUS2", "delivery", "fedex-ground", 1],
-].map(([trackingNumber, facilityId, scanType, organizationId, hours], index) =>
-  record({
-    id: `rec-fedex-scan-${String(index + 1).padStart(2, "0")}`,
-    schemaId: "fedex-ground-scan",
+    id: `rec-log-track-${String(index + 1).padStart(2, "0")}`,
+    schemaId: "logistics-tracking-event",
     organizationId,
-    networkId: "fedex",
+    networkId: "logistics",
     hours,
     data: {
-      scanId: `SCN-3${200 + index}`,
-      trackingNumber,
-      facilityId,
-      scanType,
+      eventId: `EVT-7${20 + index}`,
+      shipmentId,
+      facilityId: organizationId,
+      milestone,
       scannedAt: recordReady(hours, 0.1),
     },
   })
 )
 
-const fedexBols: StoredRecord[] = [
+const logisticsDispatches: StoredRecord[] = [
   record({
-    id: "rec-fedex-bol-01",
-    schemaId: "fedex-freight-bol",
-    organizationId: "fedex-freight",
-    networkId: "fedex",
-    hours: 28,
-    key: "fedex-freight:bol:77410",
+    id: "rec-log-disp-01",
+    schemaId: "logistics-dispatch-notice",
+    organizationId: "logistics-hub",
+    networkId: "logistics",
+    hours: 2,
+    key: "logistics-hub:dispatch:DSP-4418",
     data: {
-      bolNumber: "BOL-77410",
-      shipperName: "Summit Industrial",
-      consigneeName: "Prairie Distribution",
-      freightClass: "70",
-      handlingUnits: 6,
-      weightLbs: 1840,
-      scanFileId: "file-fedex-bol-01",
+      noticeId: "DSP-4418",
+      shipmentId: "SHP-4418",
+      carrierId: "logistics-last-mile",
+      consigneeEmail: "receiving@austingrocery.example",
+      status: "draft",
     },
   }),
   record({
-    id: "rec-fedex-bol-02",
-    schemaId: "fedex-freight-bol",
-    organizationId: "fedex-freight",
-    networkId: "fedex",
-    hours: 11,
-    key: "fedex-freight:bol:77418",
+    id: "rec-log-disp-02",
+    schemaId: "logistics-dispatch-notice",
+    organizationId: "logistics-hub",
+    networkId: "logistics",
+    hours: 6,
     data: {
-      bolNumber: "BOL-77418",
-      shipperName: "Northline Foods",
-      consigneeName: "Harbor Grocers",
-      freightClass: "55",
-      handlingUnits: 12,
-      weightLbs: 2460,
-      scanFileId: "file-fedex-bol-02",
-    },
-  }),
-  record({
-    id: "rec-fedex-bol-03",
-    schemaId: "fedex-freight-bol",
-    organizationId: "fedex-freight",
-    networkId: "fedex",
-    hours: 4,
-    data: {
-      bolNumber: "BOL-77425",
-      shipperName: "Cedar Parts Co",
-      consigneeName: "Metro Auto",
-      freightClass: "85",
-      handlingUnits: 3,
-      weightLbs: 620,
+      noticeId: "DSP-4409",
+      shipmentId: "SHP-4409",
+      carrierId: "logistics-last-mile",
+      consigneeEmail: "elena.ruiz@example.com",
+      status: "sent",
+      sentAt: recordReady(5, 0.2),
     },
   }),
 ]
@@ -776,14 +598,433 @@ const dentistClaims: StoredRecord[] = [
     })
 )
 
+const personalExpenses: StoredRecord[] = [
+  record({
+    id: "rec-pers-exp-01",
+    schemaId: "personal-expense",
+    organizationId: "personal-home",
+    networkId: "personal",
+    hours: 18,
+    key: "personal-home:expense:EXP-410",
+    data: {
+      expenseId: "EXP-410",
+      merchant: "PCC Market",
+      amountCents: 8420,
+      category: "groceries",
+      status: "paid",
+      dueOn: "2026-08-22",
+      receiptFileId: "file-personal-receipt-01",
+    },
+  }),
+  record({
+    id: "rec-pers-exp-02",
+    schemaId: "personal-expense",
+    organizationId: "personal-home",
+    networkId: "personal",
+    hours: 10,
+    key: "personal-home:expense:EXP-418",
+    data: {
+      expenseId: "EXP-418",
+      merchant: "Seattle City Light",
+      amountCents: 12650,
+      category: "utilities",
+      status: "due",
+      dueOn: "2026-08-29",
+    },
+  }),
+  record({
+    id: "rec-pers-exp-03",
+    schemaId: "personal-expense",
+    organizationId: "personal-home",
+    networkId: "personal",
+    hours: 6,
+    data: {
+      expenseId: "EXP-421",
+      merchant: "Capitol Hill Rentals",
+      amountCents: 245000,
+      category: "rent",
+      status: "due",
+      dueOn: "2026-09-01",
+    },
+  }),
+  record({
+    id: "rec-pers-exp-04",
+    schemaId: "personal-expense",
+    organizationId: "personal-work",
+    networkId: "personal",
+    hours: 4,
+    data: {
+      expenseId: "EXP-424",
+      merchant: "Alaska Airlines",
+      amountCents: 31800,
+      category: "travel",
+      status: "paid",
+      dueOn: "2026-08-20",
+      receiptFileId: "file-personal-receipt-02",
+    },
+  }),
+  record({
+    id: "rec-pers-exp-05",
+    schemaId: "personal-expense",
+    organizationId: "personal-family",
+    networkId: "personal",
+    hours: 2,
+    data: {
+      expenseId: "EXP-428",
+      merchant: "Taco Time",
+      amountCents: 2850,
+      category: "dining",
+      status: "reimbursed",
+      dueOn: "2026-08-24",
+    },
+  }),
+]
+
+const personalTasks: StoredRecord[] = [
+  ["Renew car tabs", "home", "open", "personal-home", 8],
+  ["Send August invoice", "work", "doing", "personal-work", 5],
+  ["Book dentist for Maya", "family", "open", "personal-family", 3],
+  ["Replace furnace filter", "home", "done", "personal-home", 2],
+  ["Prep client deck", "work", "open", "personal-work", 1],
+].map(([title, area, status, organizationId, hours], index) =>
+  record({
+    id: `rec-pers-task-${String(index + 1).padStart(2, "0")}`,
+    schemaId: "personal-task",
+    organizationId,
+    networkId: "personal",
+    hours,
+    data: {
+      taskId: `TSK-3${10 + index}`,
+      title,
+      area,
+      status,
+      dueAt: recordReady(hours, -12),
+    },
+  })
+)
+
+const personalContacts: StoredRecord[] = [
+  [
+    "Jordan Hale",
+    "family",
+    "206-555-0142",
+    "jordan@example.com",
+    "personal-family",
+    40,
+  ],
+  [
+    "Maya Hale",
+    "family",
+    "206-555-0188",
+    "maya@example.com",
+    "personal-family",
+    40,
+  ],
+  [
+    "Northwind HVAC",
+    "vendor",
+    "206-555-2201",
+    "service@northwind.example",
+    "personal-home",
+    20,
+  ],
+  [
+    "Priya Shah",
+    "work",
+    "415-555-0190",
+    "priya@studio.example",
+    "personal-work",
+    12,
+  ],
+].map(
+  ([displayName, relationship, phone, email, organizationId, hours], index) =>
+    record({
+      id: `rec-pers-contact-${String(index + 1).padStart(2, "0")}`,
+      schemaId: "personal-contact",
+      organizationId,
+      networkId: "personal",
+      hours,
+      data: {
+        contactId: `CON-7${20 + index}`,
+        displayName,
+        relationship,
+        phone,
+        email,
+      },
+    })
+)
+
+const personalSubscriptions: StoredRecord[] = [
+  ["iCloud+", 299, "monthly", "2026-09-04", "personal-home", 14],
+  ["NYT", 1799, "monthly", "2026-09-12", "personal-home", 9],
+  ["Figma", 14400, "yearly", "2026-11-01", "personal-work", 6],
+].map(
+  (
+    [vendor, amountCents, cadence, nextChargeOn, organizationId, hours],
+    index
+  ) =>
+    record({
+      id: `rec-pers-sub-${String(index + 1).padStart(2, "0")}`,
+      schemaId: "personal-subscription",
+      organizationId,
+      networkId: "personal",
+      hours,
+      data: {
+        subscriptionId: `SUB-5${50 + index}`,
+        vendor,
+        amountCents,
+        cadence,
+        nextChargeOn,
+      },
+    })
+)
+
+const portfolioInvestors: StoredRecord[] = [
+  record({
+    id: "rec-pe-inv-01",
+    schemaId: "portfolio-investor",
+    organizationId: "portfolio-ir",
+    networkId: "portfolio",
+    hours: 80,
+    key: "portfolio-ir:investor:INV-110",
+    data: {
+      investorId: "INV-110",
+      legalName: "Northshore Family Office",
+      email: "notices@northshore.example",
+      type: "family_office",
+    },
+  }),
+  record({
+    id: "rec-pe-inv-02",
+    schemaId: "portfolio-investor",
+    organizationId: "portfolio-ir",
+    networkId: "portfolio",
+    hours: 80,
+    key: "portfolio-ir:investor:INV-118",
+    data: {
+      investorId: "INV-118",
+      legalName: "Helena Cho",
+      email: "helena.cho@example.com",
+      type: "individual",
+    },
+  }),
+  record({
+    id: "rec-pe-inv-03",
+    schemaId: "portfolio-investor",
+    organizationId: "portfolio-ir",
+    networkId: "portfolio",
+    hours: 72,
+    data: {
+      investorId: "INV-124",
+      legalName: "Midwest Teachers Pension",
+      email: "alts@mtp.example",
+      type: "institution",
+    },
+  }),
+  record({
+    id: "rec-pe-inv-04",
+    schemaId: "portfolio-investor",
+    organizationId: "portfolio-ir",
+    networkId: "portfolio",
+    hours: 60,
+    data: {
+      investorId: "INV-131",
+      legalName: "Riverbend Endowment",
+      email: "invest@riverbend.example",
+      type: "institution",
+    },
+  }),
+]
+
+const portfolioFunds: StoredRecord[] = [
+  record({
+    id: "rec-pe-fund-01",
+    schemaId: "portfolio-fund",
+    organizationId: "portfolio-fund-iii",
+    networkId: "portfolio",
+    hours: 90,
+    key: "portfolio:fund:FUND-III",
+    data: {
+      fundId: "portfolio-fund-iii",
+      name: "Alder Fund III",
+      vintageYear: 2019,
+      status: "harvesting",
+    },
+  }),
+  record({
+    id: "rec-pe-fund-02",
+    schemaId: "portfolio-fund",
+    organizationId: "portfolio-opportunity",
+    networkId: "portfolio",
+    hours: 90,
+    key: "portfolio:fund:FUND-OPP",
+    data: {
+      fundId: "portfolio-opportunity",
+      name: "Alder Opportunity Fund",
+      vintageYear: 2023,
+      status: "investing",
+    },
+  }),
+]
+
+const portfolioCommitments: StoredRecord[] = [
+  ["CMT-201", "INV-110", "portfolio-fund-iii", 500000000, "funded", 70],
+  ["CMT-202", "INV-118", "portfolio-fund-iii", 150000000, "funded", 70],
+  ["CMT-203", "INV-124", "portfolio-fund-iii", 2500000000, "funded", 70],
+  ["CMT-210", "INV-110", "portfolio-opportunity", 250000000, "committed", 40],
+  ["CMT-211", "INV-131", "portfolio-opportunity", 800000000, "funded", 36],
+].map(
+  ([commitmentId, investorId, fundId, commitmentCents, status, hours], index) =>
+    record({
+      id: `rec-pe-cmt-${String(index + 1).padStart(2, "0")}`,
+      schemaId: "portfolio-commitment",
+      organizationId: "portfolio-ir",
+      networkId: "portfolio",
+      hours,
+      data: { commitmentId, investorId, fundId, commitmentCents, status },
+    })
+)
+
+const portfolioProperties: StoredRecord[] = [
+  record({
+    id: "rec-pe-prop-01",
+    schemaId: "portfolio-property",
+    organizationId: "portfolio-fund-iii",
+    networkId: "portfolio",
+    hours: 48,
+    key: "portfolio-fund-iii:property:PROP-412",
+    data: {
+      propertyId: "PROP-412",
+      name: "412 W Lake",
+      city: "Chicago",
+      fundId: "portfolio-fund-iii",
+      status: "held",
+      salePriceCents: 0,
+    },
+  }),
+  record({
+    id: "rec-pe-prop-02",
+    schemaId: "portfolio-property",
+    organizationId: "portfolio-opportunity",
+    networkId: "portfolio",
+    hours: 20,
+    data: {
+      propertyId: "PROP-088",
+      name: "88 Harbor Blvd",
+      city: "Tampa",
+      fundId: "portfolio-opportunity",
+      status: "under_contract",
+      salePriceCents: 1840000000,
+    },
+  }),
+  record({
+    id: "rec-pe-prop-03",
+    schemaId: "portfolio-property",
+    organizationId: "portfolio-fund-iii",
+    networkId: "portfolio",
+    hours: 3,
+    key: "portfolio-fund-iii:property:PROP-2100",
+    data: {
+      propertyId: "PROP-2100",
+      name: "2100 Peachtree",
+      city: "Atlanta",
+      fundId: "portfolio-fund-iii",
+      status: "sold",
+      salePriceCents: 3125000000,
+      soldOn: "2026-08-24",
+      closingFileId: "file-pe-closing-01",
+    },
+  }),
+  record({
+    id: "rec-pe-prop-04",
+    schemaId: "portfolio-property",
+    organizationId: "portfolio-fund-iii",
+    networkId: "portfolio",
+    hours: 14,
+    data: {
+      propertyId: "PROP-014",
+      name: "14 Pine Ridge",
+      city: "Denver",
+      fundId: "portfolio-fund-iii",
+      status: "held",
+      salePriceCents: 0,
+    },
+  }),
+  record({
+    id: "rec-pe-prop-05",
+    schemaId: "portfolio-property",
+    organizationId: "portfolio-opportunity",
+    networkId: "portfolio",
+    hours: 8,
+    data: {
+      propertyId: "PROP-901",
+      name: "901 Market",
+      city: "San Francisco",
+      fundId: "portfolio-opportunity",
+      status: "held",
+      salePriceCents: 0,
+    },
+  }),
+]
+
+const portfolioNotices: StoredRecord[] = [
+  record({
+    id: "rec-pe-notice-01",
+    schemaId: "portfolio-distribution-notice",
+    organizationId: "portfolio-ir",
+    networkId: "portfolio",
+    hours: 2,
+    key: "portfolio-ir:notice:N-2100-110",
+    data: {
+      noticeId: "N-2100-110",
+      propertyId: "PROP-2100",
+      fundId: "portfolio-fund-iii",
+      investorId: "INV-110",
+      amountCents: 49600000,
+      status: "sent",
+      sentAt: recordReady(2, 0.2),
+      noticeFileId: "file-pe-notice-01",
+    },
+  }),
+  record({
+    id: "rec-pe-notice-02",
+    schemaId: "portfolio-distribution-notice",
+    organizationId: "portfolio-ir",
+    networkId: "portfolio",
+    hours: 2,
+    data: {
+      noticeId: "N-2100-118",
+      propertyId: "PROP-2100",
+      fundId: "portfolio-fund-iii",
+      investorId: "INV-118",
+      amountCents: 14880000,
+      status: "sent",
+      sentAt: recordReady(2, 0.2),
+      noticeFileId: "file-pe-notice-02",
+    },
+  }),
+  record({
+    id: "rec-pe-notice-03",
+    schemaId: "portfolio-distribution-notice",
+    organizationId: "portfolio-ir",
+    networkId: "portfolio",
+    hours: 2,
+    data: {
+      noticeId: "N-2100-124",
+      propertyId: "PROP-2100",
+      fundId: "portfolio-fund-iii",
+      investorId: "INV-124",
+      amountCents: 248000000,
+      status: "draft",
+    },
+  }),
+]
+
 export let records: StoredRecord[] = [
-  ...dhlManifests,
-  ...dhlTracking,
-  ...dhlCustoms,
-  ...dhlLastMile,
-  ...fedexWaybills,
-  ...fedexScans,
-  ...fedexBols,
+  ...logisticsPurchaseOrders,
+  ...logisticsShipments,
+  ...logisticsTracking,
+  ...logisticsDispatches,
   ...cafeMenu,
   ...cafeOrders,
   ...cafeLoyalty,
@@ -795,6 +1036,15 @@ export let records: StoredRecord[] = [
   ...dentistAppointments,
   ...dentistPlans,
   ...dentistClaims,
+  ...personalExpenses,
+  ...personalTasks,
+  ...personalContacts,
+  ...personalSubscriptions,
+  ...portfolioInvestors,
+  ...portfolioFunds,
+  ...portfolioCommitments,
+  ...portfolioProperties,
+  ...portfolioNotices,
 ]
 
 export function getRecord(recordId: string) {

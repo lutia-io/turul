@@ -82,129 +82,150 @@ export type Network = {
 }
 
 export const networks: Record<string, Network> = {
-  dhl: {
-    id: "dhl",
-    name: "DHL",
-    summary: "Global logistics network",
+  logistics: {
+    id: "logistics",
+    name: "Logistics",
+    summary: "Multi-node supply chain",
     description:
-      "Global logistics network connecting carriers, warehouses, and last-mile partners.",
+      "Supply chain network connecting origin warehouses, regional hubs, last-mile carriers, and customs around shipments and dispatch notices.",
     industry: "Logistics & Supply Chain",
-    headquarters: "Bonn, Germany",
-    coverage: "220+ countries",
+    headquarters: "Memphis, United States",
+    coverage: "4 nodes",
     status: "Active",
     color: "yellow",
     organizations: [
       {
-        id: "dhl-apac",
-        name: "DHL APAC",
-        type: "Express delivery",
-        location: "Singapore",
-        members: 12,
+        id: "logistics-origin",
+        name: "Origin DC",
+        type: "Warehouse",
+        location: "Chicago, United States",
+        members: 11,
         description:
-          "Asia-Pacific express operations covering regional hubs, customs, and last-mile partners.",
+          "Origin distribution center that releases outbound shipments and inbound ASNs.",
         status: "Active",
         color: "yellow",
       },
       {
-        id: "dhl-emea",
-        name: "DHL EMEA",
-        type: "Warehousing & distribution",
-        location: "Bonn, Germany",
-        members: 8,
+        id: "logistics-hub",
+        name: "Regional Hub",
+        type: "Sortation",
+        location: "Memphis, United States",
+        members: 9,
         description:
-          "Europe, Middle East, and Africa warehousing and distribution for DHL network partners.",
-        status: "Active",
-        color: "red",
-      },
-      {
-        id: "dhl-na",
-        name: "DHL NA",
-        type: "Air & ocean freight",
-        location: "Plantation, United States",
-        members: 6,
-        description:
-          "North American air and ocean freight coordination across DHL forwarding partners.",
+          "Regional sort hub that scans inbound freight and dispatches the next hop.",
         status: "Active",
         color: "orange",
       },
       {
-        id: "dhl-latam",
-        name: "DHL LATAM",
-        type: "Road freight",
-        location: "Mexico City, Mexico",
-        members: 4,
+        id: "logistics-last-mile",
+        name: "Last Mile",
+        type: "Delivery",
+        location: "Austin, United States",
+        members: 7,
         description:
-          "Latin American road freight and cross-border distribution for DHL network members.",
-        status: "Active",
-        color: "pink",
-      },
-      {
-        id: "dhl-africa",
-        name: "DHL AFRICA",
-        type: "Parcel & last mile",
-        location: "Johannesburg, South Africa",
-        members: 5,
-        description:
-          "African parcel and last-mile operations connecting regional carriers to the DHL network.",
+          "Last-mile operator that receives hub dispatches and captures proof of delivery.",
         status: "Active",
         color: "teal",
+      },
+      {
+        id: "logistics-customs",
+        name: "Customs Broker",
+        type: "Brokerage",
+        location: "Laredo, United States",
+        members: 4,
+        description:
+          "Cross-border brokerage that clears declarations before hub release.",
+        status: "Active",
+        color: "blue",
       },
     ],
     schemas: [
       defineSchema({
-        id: "dhl-shipment-manifest",
-        name: "Shipment Manifest",
-        slug: "shipment-manifest",
-        color: "purple",
+        id: "logistics-purchase-order",
+        name: "Purchase Order",
+        slug: "purchase-order",
+        color: "orange",
         description:
-          "Canonical shipment manifest used by DHL network partners for hub handoffs, customs, and last-mile dispatch.",
+          "Supplier purchase orders that become inbound shipments at the origin DC.",
         properties: {
-          shipmentId: {
+          poNumber: { type: "string", description: "Purchase order number" },
+          supplier: { type: "string", description: "Supplier name" },
+          sku: { type: "string", description: "Ordered SKU" },
+          quantity: { type: "integer", description: "Units ordered" },
+          status: {
             type: "string",
-            description: "Network-unique shipment identifier",
-          },
-          originHub: { type: "string", description: "Origin hub code" },
-          destinationHub: {
-            type: "string",
-            description: "Destination hub code",
-          },
-          pieces: {
-            type: "integer",
-            description: "Number of pieces in the consignment",
-          },
-          weightKg: {
-            type: "number",
-            description: "Total chargeable weight in kilograms",
-          },
-          incoterms: {
-            type: "string",
-            enum: ["DAP", "DDP", "EXW", "FOB"],
-            description: "Shipping terms",
-          },
-          readyAt: {
-            type: "string",
-            format: "date-time",
-            description: "When the shipment is ready for pickup",
+            enum: ["open", "confirmed", "received"],
+            description: "PO status",
           },
         },
       }),
       defineSchema({
-        id: "dhl-tracking-event",
+        id: "logistics-shipment",
+        name: "Shipment",
+        slug: "shipment",
+        color: "yellow",
+        description:
+          "Canonical shipment moving from origin DC through the hub to last mile. A hub scan triggers a dispatch notice.",
+        properties: {
+          origin: {
+            type: "string",
+            description: "Origin node",
+          },
+          destination: {
+            type: "string",
+            description: "Destination node",
+          },
+          status: {
+            type: "string",
+            enum: [
+              "ready",
+              "in_transit",
+              "at_hub",
+              "out_for_delivery",
+              "delivered",
+            ],
+            description: "Shipment status",
+          },
+          pieces: {
+            type: "integer",
+            description: "Number of pieces",
+          },
+          weightKg: {
+            type: "number",
+            description: "Chargeable weight in kilograms",
+          },
+          consignee: {
+            type: "string",
+            description: "Consignee name",
+          },
+          shipmentId: {
+            type: "string",
+            description: "Network shipment identifier",
+          },
+          readyAt: {
+            type: "string",
+            format: "date-time",
+            description: "When the shipment was released",
+          },
+        },
+      }),
+      defineSchema({
+        id: "logistics-tracking-event",
         name: "Tracking Event",
         slug: "tracking-event",
         color: "blue",
         internal: true,
         description:
-          "Scan and milestone events published as parcels move through DHL carriers, warehouses, and last-mile partners.",
+          "Scan events published as freight moves through origin, hub, and last mile.",
         properties: {
-          eventId: { type: "string", description: "Unique scan event id" },
+          eventId: { type: "string", description: "Scan event identifier" },
           shipmentId: {
             type: "string",
-            description: "Related shipment identifier",
+            description: "Related shipment",
           },
-          facilityCode: {
+          facilityId: {
             type: "string",
-            description: "Facility or vehicle code that produced the scan",
+            description: "Node that produced the scan",
           },
           milestone: {
             type: "string",
@@ -215,148 +236,93 @@ export const networks: Record<string, Network> = {
               "out_for_delivery",
               "delivered",
             ],
-            description: "Normalized tracking milestone",
+            description: "Normalized milestone",
           },
           scannedAt: {
             type: "string",
             format: "date-time",
-            description: "When the event was captured",
+            description: "When the scan occurred",
           },
         },
       }),
       defineSchema({
-        id: "dhl-customs-declaration",
-        name: "Customs Declaration",
-        slug: "customs-declaration",
-        color: "cyan",
+        id: "logistics-dispatch-notice",
+        name: "Dispatch Notice",
+        slug: "dispatch-notice",
+        color: "teal",
         description:
-          "Cross-border customs declaration payload shared with APAC and EMEA brokerage partners.",
+          "Notice created when a shipment is scanned at the hub, then sent to the last-mile carrier.",
         properties: {
-          declarationId: {
+          noticeId: { type: "string", description: "Dispatch notice id" },
+          shipmentId: { type: "string", description: "Related shipment" },
+          carrierId: {
             type: "string",
-            description: "Brokerage declaration identifier",
+            description: "Last-mile operator to notify",
           },
-          shipmentId: {
+          consigneeEmail: {
             type: "string",
-            description: "Related shipment identifier",
-          },
-          originCountry: {
-            type: "string",
-            description: "ISO 3166-1 origin country",
-          },
-          destinationCountry: {
-            type: "string",
-            description: "ISO 3166-1 destination country",
-          },
-          declaredValue: {
-            type: "number",
-            description: "Total declared value",
-          },
-          currency: { type: "string", description: "ISO 4217 currency code" },
-          hsCodes: {
-            type: "array",
-            items: { type: "string" },
-            description: "Harmonized system codes on the declaration",
-          },
-          documentFileId: {
-            type: "string",
-            format: "file",
-            description: "Uploaded customs document",
-          },
-        },
-        required: [
-          "declarationId",
-          "shipmentId",
-          "originCountry",
-          "destinationCountry",
-        ],
-      }),
-      defineSchema({
-        id: "dhl-last-mile-delivery",
-        name: "Last-mile Delivery",
-        slug: "last-mile-delivery",
-        color: "gray",
-        active: false,
-        description:
-          "Proof-of-delivery, exception, and recipient capture records used by regional last-mile operators.",
-        properties: {
-          deliveryId: { type: "string", description: "Last-mile stop id" },
-          shipmentId: {
-            type: "string",
-            description: "Related shipment identifier",
-          },
-          recipientName: {
-            type: "string",
-            description: "Name captured at delivery",
+            description: "Consignee notification email",
           },
           status: {
             type: "string",
-            enum: ["delivered", "attempted", "refused", "returned"],
-            description: "Delivery outcome",
+            enum: ["draft", "sent"],
+            description: "Notice status",
           },
-          signatureCaptured: {
-            type: "boolean",
-            description: "Whether a signature was collected",
-          },
-          completedAt: {
+          sentAt: {
             type: "string",
             format: "date-time",
-            description: "When the stop was closed",
-          },
-          proofFileId: {
-            type: "string",
-            format: "file",
-            description: "Proof-of-delivery image or PDF",
+            description: "When the notice was sent",
           },
         },
       }),
     ],
     workflowDefinitions: [
       defineWorkflow({
-        id: "dhl-customs-clearance",
+        id: "logistics-hub-dispatch",
+        name: "Hub Dispatch",
+        slug: "hub-dispatch",
+        schemaId: "logistics-shipment",
+        trigger: { type: "event", event: "shipment.at_hub" },
+        steps: [
+          {
+            id: "identify",
+            type: "transform",
+            name: "Identify last-mile partner",
+          },
+          { id: "notice", type: "task", name: "Create dispatch notice" },
+          { id: "email", type: "notify", name: "Email last-mile carrier" },
+          { id: "track", type: "notify", name: "Publish tracking event" },
+        ],
+      }),
+      defineWorkflow({
+        id: "logistics-customs-clearance",
         name: "Customs Clearance",
         slug: "customs-clearance",
-        schemaId: "dhl-customs-declaration",
-        trigger: { type: "event", event: "shipment.manifest.received" },
+        schemaId: "logistics-shipment",
+        trigger: { type: "event", event: "shipment.cross_border" },
         steps: [
           { id: "validate", type: "validate", name: "Validate declaration" },
-          { id: "broker-review", type: "task", name: "Brokerage review" },
-          { id: "submit", type: "http", name: "Submit to customs" },
-          { id: "hold-check", type: "gateway", name: "Check hold status" },
-          { id: "release", type: "transform", name: "Release shipment" },
+          { id: "broker", type: "task", name: "Brokerage review" },
+          { id: "release", type: "http", name: "Release to hub" },
         ],
       }),
       defineWorkflow({
-        id: "dhl-hub-sort",
-        name: "Hub Sort & Dispatch",
-        slug: "hub-sort-dispatch",
-        schemaId: "dhl-shipment-manifest",
-        trigger: { type: "event", event: "scan.at_hub" },
-        steps: [
-          { id: "identify", type: "validate", name: "Identify shipment" },
-          { id: "sort", type: "transform", name: "Assign sort lane" },
-          { id: "dispatch", type: "http", name: "Dispatch to next hop" },
-          { id: "notify", type: "notify", name: "Publish tracking event" },
-        ],
-      }),
-      defineWorkflow({
-        id: "dhl-last-mile",
+        id: "logistics-last-mile",
         name: "Last-mile Delivery",
         slug: "last-mile-delivery",
-        schemaId: "dhl-last-mile-delivery",
-        trigger: { type: "event", event: "shipment.out_for_delivery" },
+        schemaId: "logistics-dispatch-notice",
+        trigger: { type: "event", event: "dispatch.sent" },
         steps: [
           { id: "assign", type: "task", name: "Assign courier" },
           { id: "route", type: "transform", name: "Build stop list" },
           { id: "capture", type: "http", name: "Capture proof of delivery" },
-          { id: "close", type: "transform", name: "Close delivery stop" },
         ],
       }),
       defineWorkflow({
-        id: "dhl-exception-recovery",
+        id: "logistics-exception",
         name: "Exception Recovery",
         slug: "exception-recovery",
-        schemaId: "dhl-tracking-event",
+        schemaId: "logistics-tracking-event",
         active: false,
         trigger: { type: "event", event: "delivery.exception.raised" },
         steps: [
@@ -368,267 +334,41 @@ export const networks: Record<string, Network> = {
     ],
     pipelineDefinitions: [
       definePipeline({
-        id: "dhl-manifest-ingest",
+        id: "logistics-manifest-ingest",
         name: "Manifest Ingest",
         slug: "manifest-ingest",
-        source: { type: "api", name: "Partner API" },
+        source: { type: "api", name: "Warehouse WMS" },
         stages: [
-          { id: "extract", type: "extract", name: "Pull manifests" },
-          { id: "validate", type: "validate", name: "Validate against schema" },
-          { id: "normalize", type: "transform", name: "Normalize partners" },
-          { id: "publish", type: "publish", name: "Publish to workflows" },
+          { id: "extract", type: "extract", name: "Pull outbound manifests" },
+          {
+            id: "validate",
+            type: "validate",
+            name: "Validate shipment schema",
+          },
+          { id: "publish", type: "publish", name: "Publish to hub workflows" },
         ],
       }),
       definePipeline({
-        id: "dhl-tracking-stream",
-        name: "Tracking Event Stream",
-        slug: "tracking-event-stream",
-        source: { type: "stream", name: "Scan events" },
+        id: "logistics-scan-stream",
+        name: "Scan Event Stream",
+        slug: "scan-event-stream",
+        source: { type: "stream", name: "Hub scans" },
         stages: [
           { id: "ingest", type: "extract", name: "Ingest scans" },
           { id: "normalize", type: "transform", name: "Normalize milestones" },
-          { id: "dedupe", type: "transform", name: "Dedupe event ids" },
           { id: "publish", type: "publish", name: "Publish tracking stream" },
         ],
       }),
       definePipeline({
-        id: "dhl-customs-transform",
-        name: "Customs Transform",
-        slug: "customs-transform",
-        source: { type: "file", name: "XML declarations" },
-        stages: [
-          { id: "parse", type: "extract", name: "Parse XML" },
-          { id: "map", type: "transform", name: "Map to canonical schema" },
-          { id: "validate", type: "validate", name: "Validate declaration" },
-          { id: "publish", type: "publish", name: "Hand off to brokerage" },
-        ],
-      }),
-      definePipeline({
-        id: "dhl-partner-edi-sync",
-        name: "Partner EDI Sync",
-        slug: "partner-edi-sync",
+        id: "logistics-asn-ingest",
+        name: "ASN Ingest",
+        slug: "asn-ingest",
         active: false,
-        source: { type: "mailbox", name: "EDI mailbox" },
+        source: { type: "file", name: "Supplier ASN" },
         stages: [
-          { id: "fetch", type: "extract", name: "Fetch EDI documents" },
-          { id: "translate", type: "transform", name: "Translate to JSON" },
-          { id: "publish", type: "publish", name: "Sync partner records" },
-        ],
-      }),
-    ],
-  },
-  fedex: {
-    id: "fedex",
-    name: "FedEx",
-    summary: "Express delivery network",
-    description:
-      "Express delivery network for time-critical freight and parcels.",
-    industry: "Express Delivery",
-    headquarters: "Memphis, United States",
-    coverage: "220+ countries",
-    status: "Active",
-    color: "purple",
-    organizations: [
-      {
-        id: "fedex-express",
-        name: "FedEx Express",
-        type: "Express delivery",
-        location: "Memphis, United States",
-        members: 9,
-        description:
-          "Time-critical international express delivery across the FedEx air network.",
-        status: "Active",
-        color: "purple",
-      },
-      {
-        id: "fedex-ground",
-        name: "FedEx Ground",
-        type: "Ground shipping",
-        location: "Pittsburgh, United States",
-        members: 7,
-        description:
-          "Business-to-business and residential ground shipping across North America.",
-        status: "Active",
-        color: "green",
-      },
-      {
-        id: "fedex-freight",
-        name: "FedEx Freight",
-        type: "Less-than-truckload",
-        location: "Memphis, United States",
-        members: 5,
-        description:
-          "Less-than-truckload freight services for regional and long-haul shipments.",
-        status: "Active",
-        color: "orange",
-      },
-    ],
-    schemas: [
-      defineSchema({
-        id: "fedex-air-waybill",
-        name: "Air Waybill",
-        slug: "air-waybill",
-        color: "blue",
-        description:
-          "International air waybill schema used by FedEx Express for time-critical freight and parcel movements.",
-        properties: {
-          waybillNumber: {
-            type: "string",
-            description: "Air waybill number",
-          },
-          originAirport: {
-            type: "string",
-            description: "IATA origin airport",
-          },
-          destinationAirport: {
-            type: "string",
-            description: "IATA destination airport",
-          },
-          serviceLevel: {
-            type: "string",
-            enum: ["priority", "standard", "economy"],
-            description: "Express service level",
-          },
-          pieces: { type: "integer", description: "Number of pieces" },
-          chargeableWeightKg: {
-            type: "number",
-            description: "Chargeable weight in kilograms",
-          },
-        },
-      }),
-      defineSchema({
-        id: "fedex-ground-scan",
-        name: "Ground Scan Event",
-        slug: "ground-scan-event",
-        color: "teal",
-        description:
-          "Facility scan events for FedEx Ground pickup, sort, and delivery across North America.",
-        properties: {
-          scanId: { type: "string", description: "Facility scan identifier" },
-          trackingNumber: {
-            type: "string",
-            description: "Ground tracking number",
-          },
-          facilityId: {
-            type: "string",
-            description: "Originating facility",
-          },
-          scanType: {
-            type: "string",
-            enum: ["pickup", "sort", "delivery"],
-            description: "Scan classification",
-          },
-          scannedAt: {
-            type: "string",
-            format: "date-time",
-            description: "When the scan occurred",
-          },
-        },
-      }),
-      defineSchema({
-        id: "fedex-freight-bol",
-        name: "Freight Bill of Lading",
-        slug: "freight-bill-of-lading",
-        color: "red",
-        description:
-          "Less-than-truckload bill of lading exchanged with FedEx Freight terminals and shippers.",
-        properties: {
-          bolNumber: { type: "string", description: "Bill of lading number" },
-          shipperName: { type: "string", description: "Shipper legal name" },
-          consigneeName: {
-            type: "string",
-            description: "Consignee legal name",
-          },
-          freightClass: {
-            type: "string",
-            description: "NMFC freight class",
-          },
-          handlingUnits: {
-            type: "integer",
-            description: "Number of handling units",
-          },
-          weightLbs: {
-            type: "number",
-            description: "Total weight in pounds",
-          },
-          scanFileId: {
-            type: "string",
-            format: "file",
-            description: "Scanned bill of lading",
-          },
-        },
-      }),
-    ],
-    workflowDefinitions: [
-      defineWorkflow({
-        id: "fedex-express-intake",
-        name: "Express Air Intake",
-        slug: "express-air-intake",
-        schemaId: "fedex-air-waybill",
-        trigger: { type: "event", event: "air_waybill.created" },
-        steps: [
-          { id: "validate", type: "validate", name: "Validate waybill" },
-          { id: "capacity", type: "task", name: "Book air capacity" },
-          { id: "milestone", type: "notify", name: "Publish first milestone" },
-        ],
-      }),
-      defineWorkflow({
-        id: "fedex-ground-sort",
-        name: "Ground Sort",
-        slug: "ground-sort",
-        schemaId: "fedex-ground-scan",
-        trigger: { type: "event", event: "facility.scan" },
-        steps: [
-          { id: "accept", type: "validate", name: "Accept scan" },
-          { id: "sort", type: "transform", name: "Assign outbound door" },
-          { id: "publish", type: "notify", name: "Publish sort event" },
-        ],
-      }),
-      defineWorkflow({
-        id: "fedex-freight-tender",
-        name: "Freight Tender",
-        slug: "freight-tender",
-        schemaId: "fedex-freight-bol",
-        trigger: { type: "event", event: "bill_of_lading.received" },
-        steps: [
-          { id: "tender", type: "http", name: "Tender to terminal" },
-          { id: "pickup", type: "task", name: "Confirm pickup" },
-          { id: "track", type: "notify", name: "Track to delivery" },
-        ],
-      }),
-    ],
-    pipelineDefinitions: [
-      definePipeline({
-        id: "fedex-waybill-ingest",
-        name: "Air Waybill Ingest",
-        slug: "air-waybill-ingest",
-        source: { type: "edi", name: "EDI X12" },
-        stages: [
-          { id: "extract", type: "extract", name: "Read X12 waybills" },
-          { id: "validate", type: "validate", name: "Validate waybill schema" },
-          { id: "publish", type: "publish", name: "Feed express intake" },
-        ],
-      }),
-      definePipeline({
-        id: "fedex-ground-scan-stream",
-        name: "Ground Scan Stream",
-        slug: "ground-scan-stream",
-        source: { type: "stream", name: "Facility scans" },
-        stages: [
-          { id: "ingest", type: "extract", name: "Ingest facility scans" },
-          { id: "normalize", type: "transform", name: "Normalize scan types" },
-          { id: "publish", type: "publish", name: "Publish unified stream" },
-        ],
-      }),
-      definePipeline({
-        id: "fedex-freight-bol-transform",
-        name: "Freight BOL Transform",
-        slug: "freight-bol-transform",
-        source: { type: "file", name: "XML bills of lading" },
-        stages: [
-          { id: "parse", type: "extract", name: "Parse BOL XML" },
-          { id: "map", type: "transform", name: "Map to freight schema" },
-          { id: "publish", type: "publish", name: "Publish to terminals" },
+          { id: "parse", type: "extract", name: "Parse ASN files" },
+          { id: "map", type: "transform", name: "Map to purchase orders" },
+          { id: "publish", type: "publish", name: "Stage inbound receiving" },
         ],
       }),
     ],
@@ -1353,6 +1093,551 @@ export const networks: Record<string, Network> = {
           { id: "select", type: "extract", name: "Select upcoming visits" },
           { id: "dispatch", type: "publish", name: "Dispatch reminders" },
           { id: "record", type: "transform", name: "Record confirmations" },
+        ],
+      }),
+    ],
+  },
+  personal: {
+    id: "personal",
+    name: "Personal",
+    summary: "Household workspace",
+    description:
+      "Personal workspace connecting home, work, and family around expenses, tasks, and contacts.",
+    industry: "Personal",
+    headquarters: "Seattle, United States",
+    coverage: "1 household",
+    status: "Active",
+    color: "purple",
+    organizations: [
+      {
+        id: "personal-home",
+        name: "Home",
+        type: "Household",
+        location: "Seattle, United States",
+        members: 3,
+        description:
+          "Household bills, groceries, and the day-to-day running of the house.",
+        status: "Active",
+        color: "orange",
+      },
+      {
+        id: "personal-work",
+        name: "Work",
+        type: "Career",
+        location: "Seattle, United States",
+        members: 1,
+        description:
+          "Freelance invoices, contracts, and work tasks kept next to household records.",
+        status: "Active",
+        color: "blue",
+      },
+      {
+        id: "personal-family",
+        name: "Family",
+        type: "Shared",
+        location: "Seattle, United States",
+        members: 4,
+        description:
+          "Shared calendar, contacts, and reminders for family members.",
+        status: "Active",
+        color: "pink",
+      },
+    ],
+    schemas: [
+      defineSchema({
+        id: "personal-expense",
+        name: "Expense",
+        slug: "expense",
+        color: "purple",
+        description:
+          "Household and work expenses with category, due date, and optional receipt.",
+        properties: {
+          expenseId: { type: "string", description: "Expense identifier" },
+          merchant: { type: "string", description: "Payee or merchant" },
+          amountCents: {
+            type: "integer",
+            description: "Amount in cents",
+          },
+          category: {
+            type: "string",
+            enum: ["groceries", "utilities", "rent", "dining", "travel"],
+            description: "Spend category",
+          },
+          status: {
+            type: "string",
+            enum: ["due", "paid", "reimbursed"],
+            description: "Payment status",
+          },
+          dueOn: {
+            type: "string",
+            format: "date",
+            description: "When the bill is due",
+          },
+          receiptFileId: {
+            type: "string",
+            format: "file",
+            description: "Uploaded receipt",
+          },
+        },
+      }),
+      defineSchema({
+        id: "personal-task",
+        name: "Task",
+        slug: "task",
+        color: "teal",
+        description:
+          "Open work across home, career, and family with a due date and status.",
+        properties: {
+          taskId: { type: "string", description: "Task identifier" },
+          title: { type: "string", description: "What needs doing" },
+          area: {
+            type: "string",
+            enum: ["home", "work", "family"],
+            description: "Which area owns the task",
+          },
+          status: {
+            type: "string",
+            enum: ["open", "doing", "done"],
+            description: "Task status",
+          },
+          dueAt: {
+            type: "string",
+            format: "date-time",
+            description: "When it is due",
+          },
+        },
+      }),
+      defineSchema({
+        id: "personal-contact",
+        name: "Contact",
+        slug: "contact",
+        color: "cyan",
+        description:
+          "People the household keeps in one place—family, sitters, and vendors.",
+        properties: {
+          contactId: { type: "string", description: "Contact identifier" },
+          displayName: { type: "string", description: "Display name" },
+          relationship: {
+            type: "string",
+            enum: ["family", "work", "vendor", "friend"],
+            description: "How they relate to the household",
+          },
+          phone: { type: "string", description: "Phone number" },
+          email: { type: "string", description: "Email address" },
+        },
+      }),
+      defineSchema({
+        id: "personal-subscription",
+        name: "Subscription",
+        slug: "subscription",
+        color: "gray",
+        active: false,
+        internal: true,
+        description:
+          "Recurring charges watched so renewals can be cancelled or paid on time.",
+        properties: {
+          subscriptionId: {
+            type: "string",
+            description: "Subscription identifier",
+          },
+          vendor: { type: "string", description: "Service vendor" },
+          amountCents: {
+            type: "integer",
+            description: "Recurring amount in cents",
+          },
+          cadence: {
+            type: "string",
+            enum: ["monthly", "yearly"],
+            description: "Billing cadence",
+          },
+          nextChargeOn: {
+            type: "string",
+            format: "date",
+            description: "Next charge date",
+          },
+        },
+      }),
+    ],
+    workflowDefinitions: [
+      defineWorkflow({
+        id: "personal-bill-reminder",
+        name: "Bill Reminder",
+        slug: "bill-reminder",
+        schemaId: "personal-expense",
+        trigger: { type: "schedule", event: "expense.due_in_3_days" },
+        steps: [
+          { id: "notify", type: "notify", name: "Send due reminder" },
+          { id: "pay", type: "task", name: "Mark paid or snooze" },
+        ],
+      }),
+      defineWorkflow({
+        id: "personal-expense-reimburse",
+        name: "Expense Reimburse",
+        slug: "expense-reimburse",
+        schemaId: "personal-expense",
+        trigger: { type: "event", event: "expense.marked_work" },
+        steps: [
+          { id: "attach", type: "task", name: "Attach receipt" },
+          { id: "submit", type: "http", name: "Submit for reimbursement" },
+          { id: "close", type: "transform", name: "Mark reimbursed" },
+        ],
+      }),
+      defineWorkflow({
+        id: "personal-task-follow-up",
+        name: "Task Follow-up",
+        slug: "task-follow-up",
+        schemaId: "personal-task",
+        trigger: { type: "schedule", event: "task.overdue" },
+        steps: [
+          { id: "bump", type: "notify", name: "Nudge the owner" },
+          { id: "reschedule", type: "task", name: "Reschedule or close" },
+        ],
+      }),
+      defineWorkflow({
+        id: "personal-subscription-renewal",
+        name: "Subscription Renewal",
+        slug: "subscription-renewal",
+        schemaId: "personal-subscription",
+        active: false,
+        trigger: { type: "schedule", event: "subscription.renews_in_7_days" },
+        steps: [
+          { id: "review", type: "task", name: "Review the charge" },
+          { id: "cancel", type: "http", name: "Cancel or keep" },
+        ],
+      }),
+    ],
+    pipelineDefinitions: [
+      definePipeline({
+        id: "personal-bank-ingest",
+        name: "Bank CSV Ingest",
+        slug: "bank-csv-ingest",
+        source: { type: "file", name: "Bank export" },
+        stages: [
+          { id: "parse", type: "extract", name: "Parse CSV rows" },
+          { id: "validate", type: "validate", name: "Validate expense schema" },
+          {
+            id: "publish",
+            type: "publish",
+            name: "Publish household expenses",
+          },
+        ],
+      }),
+      definePipeline({
+        id: "personal-calendar-sync",
+        name: "Calendar Sync",
+        slug: "calendar-sync",
+        source: { type: "api", name: "Calendar" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull calendar events" },
+          { id: "map", type: "transform", name: "Map to tasks" },
+          { id: "publish", type: "publish", name: "Publish due tasks" },
+        ],
+      }),
+      definePipeline({
+        id: "personal-receipt-capture",
+        name: "Receipt Capture",
+        slug: "receipt-capture",
+        active: false,
+        source: { type: "file", name: "Receipt photos" },
+        stages: [
+          { id: "ingest", type: "extract", name: "Ingest receipts" },
+          { id: "match", type: "transform", name: "Match to expenses" },
+          { id: "publish", type: "publish", name: "Attach files" },
+        ],
+      }),
+    ],
+  },
+  portfolio: {
+    id: "portfolio",
+    name: "Private Equity",
+    summary: "Real estate private equity firm",
+    description:
+      "Real estate private equity firm connecting the GP, funds, and investor relations around properties, commitments, and distribution notices.",
+    industry: "Real Estate / Private Equity",
+    headquarters: "Chicago, United States",
+    coverage: "14 properties",
+    status: "Active",
+    color: "blue",
+    organizations: [
+      {
+        id: "portfolio-gp",
+        name: "Alder Partners",
+        type: "General partner",
+        location: "Chicago, United States",
+        members: 9,
+        description:
+          "General partner originating deals, setting fund strategy, and approving asset sales.",
+        status: "Active",
+        color: "blue",
+      },
+      {
+        id: "portfolio-fund-iii",
+        name: "Fund III",
+        type: "Closed-end fund",
+        location: "Chicago, United States",
+        members: 6,
+        description:
+          "2019 vintage core-plus fund holding multifamily and industrial assets through harvest.",
+        status: "Active",
+        color: "purple",
+      },
+      {
+        id: "portfolio-opportunity",
+        name: "Opportunity Fund",
+        type: "Value-add fund",
+        location: "Austin, United States",
+        members: 5,
+        description:
+          "Value-add fund for recapitalizations and shorter-hold dispositions.",
+        status: "Active",
+        color: "teal",
+      },
+      {
+        id: "portfolio-ir",
+        name: "Investor Relations",
+        type: "LP servicing",
+        location: "Chicago, United States",
+        members: 4,
+        description:
+          "Investor relations desk that maintains LP records and sends capital calls and distribution notices.",
+        status: "Active",
+        color: "orange",
+      },
+    ],
+    schemas: [
+      defineSchema({
+        id: "portfolio-investor",
+        name: "Investor",
+        slug: "investor",
+        color: "orange",
+        description:
+          "Limited partner records used to email capital calls and distribution notices.",
+        properties: {
+          investorId: { type: "string", description: "Investor identifier" },
+          legalName: {
+            type: "string",
+            description: "Legal name on the subscription",
+          },
+          email: { type: "string", description: "Notice email address" },
+          type: {
+            type: "string",
+            enum: ["individual", "family_office", "institution"],
+            description: "Investor type",
+          },
+        },
+      }),
+      defineSchema({
+        id: "portfolio-fund",
+        name: "Fund",
+        slug: "fund",
+        color: "purple",
+        description:
+          "Closed-end vehicles that own properties and have a set of committed investors.",
+        properties: {
+          fundId: { type: "string", description: "Fund identifier" },
+          name: { type: "string", description: "Fund display name" },
+          vintageYear: { type: "integer", description: "Vintage year" },
+          status: {
+            type: "string",
+            enum: ["investing", "harvesting", "closed"],
+            description: "Fund lifecycle",
+          },
+        },
+      }),
+      defineSchema({
+        id: "portfolio-commitment",
+        name: "Commitment",
+        slug: "commitment",
+        color: "cyan",
+        description:
+          "An investor's committed capital in a specific fund—the join used to fan out notices.",
+        properties: {
+          commitmentId: {
+            type: "string",
+            description: "Commitment identifier",
+          },
+          investorId: { type: "string", description: "Investor identifier" },
+          fundId: { type: "string", description: "Fund the investor is in" },
+          commitmentCents: {
+            type: "integer",
+            description: "Committed capital in cents",
+          },
+          status: {
+            type: "string",
+            enum: ["committed", "funded", "exited"],
+            description: "Commitment status",
+          },
+        },
+      }),
+      defineSchema({
+        id: "portfolio-property",
+        name: "Property",
+        slug: "property",
+        color: "blue",
+        description:
+          "Investment properties owned by a fund. A sale triggers distribution notices to that fund's investors.",
+        properties: {
+          name: { type: "string", description: "Property name" },
+          city: { type: "string", description: "City" },
+          fundId: {
+            type: "string",
+            description: "Fund that owns the property",
+          },
+          status: {
+            type: "string",
+            enum: ["held", "under_contract", "sold"],
+            description: "Asset status",
+          },
+          salePriceCents: {
+            type: "integer",
+            description: "Sale price in cents",
+          },
+          soldOn: {
+            type: "string",
+            format: "date",
+            description: "Closing date when sold",
+          },
+          propertyId: { type: "string", description: "Property identifier" },
+          closingFileId: {
+            type: "string",
+            format: "file",
+            description: "Closing statement",
+          },
+        },
+      }),
+      defineSchema({
+        id: "portfolio-distribution-notice",
+        name: "Distribution Notice",
+        slug: "distribution-notice",
+        color: "teal",
+        description:
+          "Per-investor notice created when a property is sold, then emailed to limited partners in that fund.",
+        properties: {
+          noticeId: { type: "string", description: "Notice identifier" },
+          propertyId: { type: "string", description: "Sold property" },
+          fundId: {
+            type: "string",
+            description: "Fund that owned the property",
+          },
+          investorId: {
+            type: "string",
+            description: "Investor receiving the notice",
+          },
+          amountCents: {
+            type: "integer",
+            description: "Distribution amount in cents",
+          },
+          status: {
+            type: "string",
+            enum: ["draft", "sent"],
+            description: "Notice status",
+          },
+          sentAt: {
+            type: "string",
+            format: "date-time",
+            description: "When the email was sent",
+          },
+          noticeFileId: {
+            type: "string",
+            format: "file",
+            description: "PDF notice attached to the email",
+          },
+        },
+      }),
+    ],
+    workflowDefinitions: [
+      defineWorkflow({
+        id: "portfolio-distribution-notice",
+        name: "Distribution Notice",
+        slug: "distribution-notice",
+        schemaId: "portfolio-property",
+        trigger: { type: "event", event: "property.sold" },
+        steps: [
+          { id: "investors", type: "transform", name: "Match fund investors" },
+          { id: "allocate", type: "transform", name: "Allocate sale proceeds" },
+          { id: "notice", type: "task", name: "Create distribution notices" },
+          { id: "email", type: "notify", name: "Email investors" },
+        ],
+      }),
+      defineWorkflow({
+        id: "portfolio-capital-call",
+        name: "Capital Call",
+        slug: "capital-call",
+        schemaId: "portfolio-commitment",
+        trigger: { type: "event", event: "acquisition.funded" },
+        steps: [
+          { id: "prorate", type: "transform", name: "Prorate by commitment" },
+          { id: "notice", type: "task", name: "Issue capital call notices" },
+          { id: "email", type: "notify", name: "Email investors" },
+        ],
+      }),
+      defineWorkflow({
+        id: "portfolio-acquisition-close",
+        name: "Acquisition Close",
+        slug: "acquisition-close",
+        schemaId: "portfolio-property",
+        trigger: { type: "event", event: "property.under_contract" },
+        steps: [
+          { id: "diligence", type: "task", name: "Complete diligence" },
+          { id: "wire", type: "http", name: "Wire closing funds" },
+          { id: "record", type: "transform", name: "Mark property held" },
+        ],
+      }),
+      defineWorkflow({
+        id: "portfolio-k1-package",
+        name: "K-1 Package",
+        slug: "k1-package",
+        schemaId: "portfolio-investor",
+        active: false,
+        trigger: { type: "schedule", event: "tax_year.closed" },
+        steps: [
+          { id: "assemble", type: "task", name: "Assemble K-1 packets" },
+          { id: "email", type: "notify", name: "Email investors" },
+        ],
+      }),
+    ],
+    pipelineDefinitions: [
+      definePipeline({
+        id: "portfolio-closing-ingest",
+        name: "Closing Statement Ingest",
+        slug: "closing-statement-ingest",
+        source: { type: "file", name: "Escrow closing package" },
+        stages: [
+          { id: "parse", type: "extract", name: "Parse closing statement" },
+          {
+            id: "validate",
+            type: "validate",
+            name: "Validate property schema",
+          },
+          { id: "sold", type: "transform", name: "Mark property sold" },
+          { id: "publish", type: "publish", name: "Publish to workflows" },
+        ],
+      }),
+      definePipeline({
+        id: "portfolio-investor-crm",
+        name: "Investor CRM Sync",
+        slug: "investor-crm-sync",
+        source: { type: "api", name: "LP portal" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull investor records" },
+          { id: "validate", type: "validate", name: "Validate emails" },
+          { id: "publish", type: "publish", name: "Sync commitments" },
+        ],
+      }),
+      definePipeline({
+        id: "portfolio-fund-admin",
+        name: "Fund Admin Export",
+        slug: "fund-admin-export",
+        active: false,
+        source: { type: "api", name: "Fund administrator" },
+        stages: [
+          {
+            id: "extract",
+            type: "extract",
+            name: "Pull capital account activity",
+          },
+          { id: "map", type: "transform", name: "Map to notices" },
+          { id: "publish", type: "publish", name: "Publish distributions" },
         ],
       }),
     ],

@@ -160,7 +160,7 @@ export function CreateOrganizationDialog({
                 id={`${formId}-name`}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="DHL APAC"
+                placeholder="Downtown Cafe"
                 autoFocus
                 required
                 disabled={isLoading}
