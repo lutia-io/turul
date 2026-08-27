@@ -167,6 +167,7 @@ const organizationUserApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: "OrganizationUser", id },
         { type: "OrganizationUser", id: "LIST" },
+        "Me",
       ],
     }),
   }),

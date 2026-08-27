@@ -55,6 +55,23 @@ export type MeResponse = {
   organizationId?: string
 }
 
+export type UpdateUserRequest = {
+  id: string
+  firstName: string
+  lastName: string
+}
+
+export type UpdateUserResponse = {
+  id: string
+}
+
+export type UpdatePasswordRequest = {
+  id: string
+  principalType: string
+  currentPassword: string
+  newPassword: string
+}
+
 export type HumaError = {
   message: string
 }
@@ -235,6 +252,25 @@ export const api = createApi({
       query: () => "/auth/me",
       providesTags: ["Me"],
     }),
+    updateUser: build.mutation<UpdateUserResponse, UpdateUserRequest>({
+      query: ({ id, ...body }) => ({
+        url: `/user/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["Me"],
+    }),
+    updatePassword: build.mutation<void, UpdatePasswordRequest>({
+      query: ({ id, principalType, currentPassword, newPassword }) => ({
+        url:
+          principalType === "organization_user"
+            ? `/organization-user/${id}/password`
+            : `/user/${id}/password`,
+        method: "POST",
+        body: { currentPassword, newPassword },
+        responseHandler: (response) => response.text(),
+      }),
+    }),
   }),
 })
 
@@ -245,6 +281,8 @@ export const {
   useRefreshMutation,
   useLogoutMutation,
   useMeQuery,
+  useUpdateUserMutation,
+  useUpdatePasswordMutation,
 } = api
 
 function isHumaError(data: unknown): data is HumaError {

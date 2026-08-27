@@ -6,7 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react"
-import { useNavigate } from "react-router"
+import { useNavigate, useParams } from "react-router"
 
 import { CheckboxField } from "@/components/checkbox-field"
 import { Button } from "@/components/ui/button"
@@ -49,8 +49,7 @@ import {
 } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
-  useNetworkWorkspace,
-  useWorkspaceNetworks,
+  useWorkspaceNetworkList,
   useWorkspaceSchemas,
   workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
@@ -103,9 +102,9 @@ export function WorkflowDefinitionDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const { networks } = useWorkspaceNetworks()
-  const { schemas } = useWorkspaceSchemas()
-  const { organizationId } = useNetworkWorkspace()
+  const { networks } = useWorkspaceNetworkList()
+  const { schemas } = useWorkspaceSchemas({ skip: !open })
+  const { organizationId } = useParams()
   const [createWorkflow, createState] = useCreateWorkflowDefinitionMutation()
   const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
   const isLoading = createState.isLoading || updateState.isLoading

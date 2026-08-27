@@ -46,6 +46,7 @@ export function LoginForm() {
           <Field data-invalid={error ? true : undefined}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
+              autoFocus
               id="email"
               name="email"
               type="email"

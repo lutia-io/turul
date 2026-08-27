@@ -361,9 +361,18 @@ export function schemaScopeLabel(
   )
 }
 
-export function useWorkspaceOrganizations() {
+type WorkspaceQueryOptions = {
+  skip?: boolean
+}
+
+function useWorkspaceQuerySkip(options?: WorkspaceQueryOptions) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListOrganizationsQuery(undefined, { skip: !isAuthenticated })
+  return !isAuthenticated || Boolean(options?.skip)
+}
+
+export function useWorkspaceOrganizations(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListOrganizationsQuery(undefined, { skip })
 
   return {
     ...query,
@@ -371,11 +380,9 @@ export function useWorkspaceOrganizations() {
   }
 }
 
-export function useWorkspaceOrganizationUsers() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListOrganizationUsersQuery(undefined, {
-    skip: !isAuthenticated,
-  })
+export function useWorkspaceOrganizationUsers(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListOrganizationUsersQuery(undefined, { skip })
 
   return {
     ...query,
@@ -385,9 +392,9 @@ export function useWorkspaceOrganizationUsers() {
   }
 }
 
-export function useWorkspaceFiles() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListFilesQuery(undefined, { skip: !isAuthenticated })
+export function useWorkspaceFiles(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListFilesQuery(undefined, { skip })
 
   return {
     ...query,
@@ -395,9 +402,9 @@ export function useWorkspaceFiles() {
   }
 }
 
-export function useWorkspaceRecords() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListRecordsQuery(undefined, { skip: !isAuthenticated })
+export function useWorkspaceRecords(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListRecordsQuery(undefined, { skip })
 
   return {
     ...query,
@@ -405,9 +412,9 @@ export function useWorkspaceRecords() {
   }
 }
 
-export function useWorkspaceSchemas() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListSchemasQuery(undefined, { skip: !isAuthenticated })
+export function useWorkspaceSchemas(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListSchemasQuery(undefined, { skip })
 
   return {
     ...query,
@@ -415,11 +422,9 @@ export function useWorkspaceSchemas() {
   }
 }
 
-export function useWorkspaceWorkflows() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListWorkflowDefinitionsQuery(undefined, {
-    skip: !isAuthenticated,
-  })
+export function useWorkspaceWorkflows(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListWorkflowDefinitionsQuery(undefined, { skip })
 
   return {
     ...query,
@@ -427,9 +432,9 @@ export function useWorkspaceWorkflows() {
   }
 }
 
-export function useWorkspaceWorkflowRuns() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListWorkflowsQuery(undefined, { skip: !isAuthenticated })
+export function useWorkspaceWorkflowRuns(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListWorkflowsQuery(undefined, { skip })
 
   return {
     ...query,
@@ -437,9 +442,9 @@ export function useWorkspaceWorkflowRuns() {
   }
 }
 
-export function useWorkspacePipelineRuns() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListPipelinesQuery(undefined, { skip: !isAuthenticated })
+export function useWorkspacePipelineRuns(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListPipelinesQuery(undefined, { skip })
 
   return {
     ...query,
@@ -447,11 +452,9 @@ export function useWorkspacePipelineRuns() {
   }
 }
 
-export function useWorkspacePipelines() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListPipelineDefinitionsQuery(undefined, {
-    skip: !isAuthenticated,
-  })
+export function useWorkspacePipelines(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListPipelineDefinitionsQuery(undefined, { skip })
 
   return {
     ...query,
@@ -459,11 +462,9 @@ export function useWorkspacePipelines() {
   }
 }
 
-export function useWorkspaceNodes() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListNodeDefinitionsQuery(undefined, {
-    skip: !isAuthenticated,
-  })
+export function useWorkspaceNodes(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListNodeDefinitionsQuery(undefined, { skip })
 
   return {
     ...query,
@@ -471,9 +472,9 @@ export function useWorkspaceNodes() {
   }
 }
 
-export function useWorkspaceNetworkList() {
-  const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListNetworksQuery(undefined, { skip: !isAuthenticated })
+export function useWorkspaceNetworkList(options?: WorkspaceQueryOptions) {
+  const skip = useWorkspaceQuerySkip(options)
+  const query = useListNetworksQuery(undefined, { skip })
 
   return {
     ...query,
@@ -481,63 +482,76 @@ export function useWorkspaceNetworkList() {
   }
 }
 
-export function useWorkspaceNetworks() {
-  const query = useWorkspaceNetworkList()
-  const organizationsQuery = useWorkspaceOrganizations()
-  const schemasQuery = useWorkspaceSchemas()
-  const workflowsQuery = useWorkspaceWorkflows()
-  const pipelinesQuery = useWorkspacePipelines()
-  const nodesQuery = useWorkspaceNodes()
+export function useWorkspaceNetworks(options?: WorkspaceQueryOptions) {
+  const query = useWorkspaceNetworkList(options)
+  const organizationsQuery = useWorkspaceOrganizations(options)
+
+  return {
+    ...query,
+    isLoading: query.isLoading || organizationsQuery.isLoading,
+    isFetching: query.isFetching || organizationsQuery.isFetching,
+    isError: query.isError || organizationsQuery.isError,
+    error: query.error ?? organizationsQuery.error,
+    refetch: () => {
+      void query.refetch()
+      void organizationsQuery.refetch()
+    },
+    networks: (query.data ?? []).map((network) =>
+      withNetworkOrganizations(
+        workspaceNetworkFromApi(network),
+        organizationsQuery.organizations
+      )
+    ),
+  }
+}
+
+export function useWorkspaceNetworksWithDefinitions(
+  options?: WorkspaceQueryOptions
+) {
+  const query = useWorkspaceNetworks(options)
+  const schemasQuery = useWorkspaceSchemas(options)
+  const workflowsQuery = useWorkspaceWorkflows(options)
+  const pipelinesQuery = useWorkspacePipelines(options)
+  const nodesQuery = useWorkspaceNodes(options)
 
   return {
     ...query,
     isLoading:
       query.isLoading ||
-      organizationsQuery.isLoading ||
       schemasQuery.isLoading ||
       workflowsQuery.isLoading ||
       pipelinesQuery.isLoading ||
       nodesQuery.isLoading,
     isFetching:
       query.isFetching ||
-      organizationsQuery.isFetching ||
       schemasQuery.isFetching ||
       workflowsQuery.isFetching ||
       pipelinesQuery.isFetching ||
       nodesQuery.isFetching,
     isError:
       query.isError ||
-      organizationsQuery.isError ||
       schemasQuery.isError ||
       workflowsQuery.isError ||
       pipelinesQuery.isError ||
       nodesQuery.isError,
     error:
       query.error ??
-      organizationsQuery.error ??
       schemasQuery.error ??
       workflowsQuery.error ??
       pipelinesQuery.error ??
       nodesQuery.error,
     refetch: () => {
-      void query.refetch()
-      void organizationsQuery.refetch()
+      query.refetch()
       void schemasQuery.refetch()
       void workflowsQuery.refetch()
       void pipelinesQuery.refetch()
       void nodesQuery.refetch()
     },
-    networks: (query.data ?? []).map((network) =>
+    networks: query.networks.map((network) =>
       withNetworkNodes(
         withNetworkPipelines(
           withNetworkWorkflows(
-            withNetworkSchemas(
-              withNetworkOrganizations(
-                workspaceNetworkFromApi(network),
-                organizationsQuery.organizations
-              ),
-              schemasQuery.schemas
-            ),
+            withNetworkSchemas(network, schemasQuery.schemas),
             workflowsQuery.workflows
           ),
           pipelinesQuery.pipelines

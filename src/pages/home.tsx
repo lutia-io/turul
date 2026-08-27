@@ -41,7 +41,7 @@ import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
   networkWorkspacePath,
   useWorkspaceFiles,
-  useWorkspaceNetworks,
+  useWorkspaceNetworksWithDefinitions,
   useWorkspaceRecords,
   useWorkspaceWorkflowRuns,
 } from "@/lib/network-workspace"
@@ -505,7 +505,7 @@ export default function Home() {
     isError: isNetworksError,
     error: networksError,
     refetch: refetchNetworks,
-  } = useWorkspaceNetworks()
+  } = useWorkspaceNetworksWithDefinitions()
   const {
     records,
     refetch: refetchRecords,
@@ -730,7 +730,7 @@ export default function Home() {
           <div className="flex max-w-md flex-col items-center gap-1.5">
             <CardTitle className="text-lg">No networks yet</CardTitle>
             <CardDescription className="text-pretty">
-              A network is the workspace for partner organizations, schemas,
+              A network is the workspace for organizations, schemas,
               records, and the workflows that run on them.
             </CardDescription>
           </div>

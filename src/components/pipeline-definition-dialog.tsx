@@ -40,7 +40,7 @@ import {
 import { stringifyDefinition } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
-  useWorkspaceNetworks,
+  useWorkspaceNetworkList,
   useWorkspaceNodes,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
@@ -93,8 +93,8 @@ export function PipelineDefinitionDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const { networks } = useWorkspaceNetworks()
-  const { nodes } = useWorkspaceNodes()
+  const { networks } = useWorkspaceNetworkList()
+  const { nodes } = useWorkspaceNodes({ skip: !open })
   const [createPipeline, createState] = useCreatePipelineDefinitionMutation()
   const [updatePipeline, updateState] = useUpdatePipelineDefinitionMutation()
   const isLoading = createState.isLoading || updateState.isLoading

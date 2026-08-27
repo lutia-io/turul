@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
   networkWorkspacePath,
-  useWorkspaceNetworks,
+  useWorkspaceNetworkList,
   useWorkspaceOrganizations,
 } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
@@ -46,8 +46,8 @@ export function CreateOrganizationUserDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const { networks } = useWorkspaceNetworks()
-  const { organizations } = useWorkspaceOrganizations()
+  const { networks } = useWorkspaceNetworkList()
+  const { organizations } = useWorkspaceOrganizations({ skip: !open })
   const editing = Boolean(organizationUserId)
   const lockNetwork = Boolean(networkId) || editing
   const lockOrganization = Boolean(organizationId) || editing

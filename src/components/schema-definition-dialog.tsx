@@ -68,7 +68,7 @@ import {
 } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
-  useWorkspaceNetworks,
+  useWorkspaceNetworkList,
   useWorkspaceOrganizations,
   workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
@@ -304,8 +304,8 @@ export function SchemaDefinitionDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const { networks } = useWorkspaceNetworks()
-  const { organizations } = useWorkspaceOrganizations()
+  const { networks } = useWorkspaceNetworkList()
+  const { organizations } = useWorkspaceOrganizations({ skip: !open })
   const [createSchema, createState] = useCreateSchemaMutation()
   const [updateSchema, updateState] = useUpdateSchemaMutation()
   const isLoading = createState.isLoading || updateState.isLoading

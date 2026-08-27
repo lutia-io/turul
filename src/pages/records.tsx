@@ -48,7 +48,7 @@ import {
   networkWorkspacePath,
   useNetworkWorkspace,
   useWorkspaceFiles,
-  useWorkspaceNetworks,
+  useWorkspaceNetworksWithDefinitions,
   useWorkspaceOrganizations,
   workspaceRecordFromApi,
 } from "@/lib/network-workspace"
@@ -207,7 +207,7 @@ export default function RecordsPage() {
     networks: workspaceNetworks,
     refetch: refetchNetworks,
     isFetching: isNetworksFetching,
-  } = useWorkspaceNetworks()
+  } = useWorkspaceNetworksWithDefinitions()
   const { organizations } = useWorkspaceOrganizations()
   const {
     files,

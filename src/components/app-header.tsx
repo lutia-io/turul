@@ -6,28 +6,35 @@ import { NavUser } from "@/components/nav-user"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { useLogoutMutation } from "@/store/api"
+import { useLogoutMutation, useMeQuery } from "@/store/api"
 import {
   clearCredentials,
-  selectAuthEmail,
+  selectIsAuthenticated,
   selectRefreshToken,
 } from "@/store/auth-slice"
 import { useAppDispatch, useAppSelector } from "@/store/hooks"
 
-function displayName(email: string | null) {
-  if (!email) {
+function displayName(me: {
+  firstName: string
+  lastName: string
+  email: string
+} | undefined) {
+  if (!me) {
     return "Account"
   }
 
-  return email.split("@")[0] || email
+  const name = `${me.firstName} ${me.lastName}`.trim()
+  return name || me.email || "Account"
 }
 
 export function AppHeader() {
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
-  const email = useAppSelector(selectAuthEmail)
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const { data: me } = useMeQuery(undefined, { skip: !isAuthenticated })
   const refreshToken = useAppSelector(selectRefreshToken)
   const [logout] = useLogoutMutation()
+  const name = displayName(me)
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -74,8 +81,8 @@ export function AppHeader() {
         </form>
         <NavUser
           user={{
-            name: displayName(email),
-            email: email ?? "",
+            name,
+            email: me?.email ?? "",
             avatar: "",
           }}
           onLogout={handleLogout}

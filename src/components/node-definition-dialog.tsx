@@ -53,7 +53,7 @@ import {
 } from "@/lib/node-definition"
 import {
   networkWorkspacePath,
-  useWorkspaceNetworks,
+  useWorkspaceNetworkList,
 } from "@/lib/network-workspace"
 import { slugifyId } from "@/lib/slug"
 import { getHumaErrorMessage } from "@/store/api"
@@ -95,7 +95,7 @@ export function NodeDefinitionDialog({
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const { networks } = useWorkspaceNetworks()
+  const { networks } = useWorkspaceNetworkList()
   const [createNode, createState] = useCreateNodeDefinitionMutation()
   const [updateNode, updateState] = useUpdateNodeDefinitionMutation()
   const isLoading = createState.isLoading || updateState.isLoading

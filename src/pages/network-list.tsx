@@ -3,14 +3,11 @@ import { Link } from "react-router"
 import {
   ArrowRightIcon,
   Building2Icon,
-  FileJsonIcon,
   GalleryVerticalEndIcon,
-  LayersIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
-  WorkflowIcon,
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
@@ -128,55 +125,6 @@ function MetaList({ items }: { items: ReactNode[] }) {
         </span>
       ))}
     </p>
-  )
-}
-
-function NetworkCounts({ network }: { network: Network }) {
-  const items = [
-    {
-      to: networkWorkspacePath({ networkId: network.id, rest: "schemas" }),
-      label: "Schemas",
-      value: network.schemas.length,
-      icon: FileJsonIcon,
-    },
-    {
-      to: networkWorkspacePath({
-        networkId: network.id,
-        rest: "workflow-definitions",
-      }),
-      label: "Workflows",
-      value: network.workflowDefinitions.length,
-      icon: WorkflowIcon,
-    },
-    {
-      to: networkWorkspacePath({
-        networkId: network.id,
-        rest: "pipeline-definitions",
-      }),
-      label: "Pipelines",
-      value: network.pipelineDefinitions.length,
-      icon: LayersIcon,
-    },
-  ]
-
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      {items.map((item) => (
-        <Link
-          key={item.label}
-          to={item.to}
-          className="rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
-        >
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <item.icon className="size-3.5" />
-            <p className="truncate text-xs">{item.label}</p>
-          </div>
-          <p className="mt-1 text-lg font-semibold tracking-tight tabular-nums">
-            {item.value}
-          </p>
-        </Link>
-      ))}
-    </div>
   )
 }
 
@@ -414,7 +362,6 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <NetworkCounts network={network} />
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium">
             {organizationCount > 0
@@ -465,8 +412,7 @@ function NetworkListSkeleton() {
 
 export default function NetworkList() {
   const { openCreateNetwork } = useCreateEntity()
-  const { networks, isLoading, isFetching, isError, error, refetch } =
-    useWorkspaceNetworks()
+  const { networks, isLoading, isFetching, isError, error, refetch } = useWorkspaceNetworks()
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
@@ -507,8 +453,8 @@ export default function NetworkList() {
           <div className="flex max-w-md flex-col items-center gap-1.5">
             <CardTitle className="text-lg">No networks yet</CardTitle>
             <CardDescription className="text-pretty">
-              A network is the workspace for partner organizations, schemas,
-              records, and the workflows that run on them.
+              A network is the workspace for partner organizations to
+              collaborate.
             </CardDescription>
           </div>
           <Button onClick={openCreateNetwork}>
