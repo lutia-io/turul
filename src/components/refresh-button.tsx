@@ -1,5 +1,5 @@
 import { type ReactNode } from "react"
-import { Loader2Icon, RefreshCwIcon } from "lucide-react"
+import { Loader, RefreshCwIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -15,7 +15,7 @@ export function RefreshButton({
   size?: "icon" | "icon-sm"
   label?: string
 }) {
-  const Icon = isRefreshing ? Loader2Icon : RefreshCwIcon
+  const Icon = isRefreshing ? Loader : RefreshCwIcon
 
   return (
     <Button
@@ -54,7 +54,7 @@ export function LoadingFrame({
           aria-busy="true"
           aria-live="polite"
         >
-          <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+          <Loader className="size-6 animate-spin text-muted-foreground" />
           <span className="sr-only">{label}</span>
         </div>
       ) : null}

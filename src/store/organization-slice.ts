@@ -161,6 +161,18 @@ const organizationApi = api.injectEndpoints({
         { type: "Organization", id: "LIST" },
       ],
     }),
+    deleteOrganization: build.mutation<void, string>({
+      query: (id) => ({
+        url: `/organization/${id}`,
+        method: "DELETE",
+        responseHandler: (response) => response.text(),
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: "Organization", id },
+        { type: "Organization", id: "LIST" },
+        { type: "OrganizationUser", id: "LIST" },
+      ],
+    }),
   }),
 })
 
@@ -169,4 +181,5 @@ export const {
   useGetOrganizationQuery,
   useCreateOrganizationMutation,
   useUpdateOrganizationMutation,
+  useDeleteOrganizationMutation,
 } = organizationApi
