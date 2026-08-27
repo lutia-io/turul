@@ -1,7 +1,6 @@
 import { type SubmitEvent } from "react"
 import { Link, useNavigate } from "react-router"
 
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -14,10 +13,7 @@ import { Input } from "@/components/ui/input"
 import { getHumaErrorMessage, useCreateUserMutation } from "@/store/api"
 import { Loader } from "lucide-react"
 
-export function SignupForm({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+export function SignupForm() {
   const [createUser, { isLoading, error }] = useCreateUserMutation()
   const navigate = useNavigate()
 
@@ -38,7 +34,7 @@ export function SignupForm({
   }
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className="flex flex-col gap-6">
       <form onSubmit={handleSubmit}>
         <FieldGroup>
           <div className="flex flex-col items-center gap-1 text-center">
@@ -77,7 +73,7 @@ export function SignupForm({
               id="email"
               name="email"
               type="email"
-              placeholder="john.doe@example.com"
+              placeholder="john@example.com"
               autoComplete="email"
               disabled={isLoading}
               aria-invalid={error ? true : undefined}

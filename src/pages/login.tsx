@@ -23,11 +23,7 @@ export default function Login() {
           </div>
         </div>
         <div className="relative hidden bg-white lg:block">
-          <img
-            src={buildSvg}
-            alt="Person signing in on a laptop next to a secure lock"
-            className="absolute inset-0 size-full object-contain p-10 lg:p-16"
-          />
+          <img src={buildSvg} className="absolute inset-0 size-full object-contain p-10 lg:p-16" />
         </div>
       </div>
     </div>
