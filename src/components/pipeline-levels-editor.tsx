@@ -16,6 +16,9 @@ export type PipelineLevelDraft = {
   nodeIds: string[]
 }
 
+export type CreatePipelineNodeTarget =
+  { kind: "empty" } | { kind: "level"; levelKey: string }
+
 export function newPipelineLevel(
   existing: PipelineLevelDraft[] = []
 ): PipelineLevelDraft {
@@ -25,19 +28,76 @@ export function newPipelineLevel(
   }
 }
 
+function fillFirstEmptyOrAppend(nodeIds: string[], nodeId: string) {
+  const emptyIndex = nodeIds.findIndex((id) => !id)
+  if (emptyIndex >= 0) {
+    const next = [...nodeIds]
+    next[emptyIndex] = nodeId
+    return next
+  }
+  return [...nodeIds, nodeId]
+}
+
+export function insertCreatedNode(
+  levels: PipelineLevelDraft[],
+  nodeId: string,
+  target: CreatePipelineNodeTarget
+): PipelineLevelDraft[] {
+  if (target.kind === "empty") {
+    if (levels.length === 0) {
+      return [{ ...newPipelineLevel(), nodeIds: [nodeId] }]
+    }
+    const levelWithEmpty = levels.find((level) =>
+      level.nodeIds.some((id) => !id)
+    )
+    const targetLevel = levelWithEmpty ?? levels[0]
+    return levels.map((level) =>
+      level.key === targetLevel.key
+        ? { ...level, nodeIds: fillFirstEmptyOrAppend(level.nodeIds, nodeId) }
+        : level
+    )
+  }
+
+  if (!levels.some((level) => level.key === target.levelKey)) {
+    return [...levels, { ...newPipelineLevel(levels), nodeIds: [nodeId] }]
+  }
+
+  return levels.map((level) =>
+    level.key === target.levelKey
+      ? { ...level, nodeIds: fillFirstEmptyOrAppend(level.nodeIds, nodeId) }
+      : level
+  )
+}
+
 export function PipelineLevelsEditor({
   levels,
   nodes,
   onChange,
+  onCreateNode,
+  createDisabled,
 }: {
   levels: PipelineLevelDraft[]
   nodes: NodeDefinition[]
   onChange: (levels: PipelineLevelDraft[]) => void
+  onCreateNode: (target: CreatePipelineNodeTarget) => void
+  createDisabled?: boolean
 }) {
-  const nodeItems = nodes.map((node) => ({
-    value: node.id,
-    label: `${node.name} (${nodeTypeLabel(node.type)})`,
-  }))
+  const pendingIds = [
+    ...new Set(
+      levels.flatMap((level) =>
+        level.nodeIds.filter(
+          (id) => id && !nodes.some((node) => node.id === id)
+        )
+      )
+    ),
+  ]
+  const nodeItems = [
+    ...nodes.map((node) => ({
+      value: node.id,
+      label: `${node.name} (${nodeTypeLabel(node.type)})`,
+    })),
+    ...pendingIds.map((id) => ({ value: id, label: "New node" })),
+  ]
 
   function updateLevel(key: string, nodeIds: string[]) {
     onChange(
@@ -49,12 +109,25 @@ export function PipelineLevelsEditor({
     onChange([...levels, newPipelineLevel(levels)])
   }
 
-  if (nodes.length === 0) {
+  const hasAssignedNodes = levels.some((level) => level.nodeIds.some(Boolean))
+
+  if (nodes.length === 0 && !hasAssignedNodes) {
     return (
-      <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-        Create a node definition in this network before adding it to a
-        pipeline.
-      </p>
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-4 py-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          Create a node definition in this network before adding it to a
+          pipeline.
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          disabled={createDisabled}
+          onClick={() => onCreateNode({ kind: "empty" })}
+        >
+          <PlusIcon />
+          Create node
+        </Button>
+      </div>
     )
   }
 
@@ -82,8 +155,7 @@ export function PipelineLevelsEditor({
             <div>
               <p className="text-sm font-medium">Level {levelIndex}</p>
               <p className="text-xs text-muted-foreground">
-                Order is the 0-based index later levels read as{" "}
-                {"{{ .Input."}
+                Order is the 0-based index later levels read as {"{{ .Input."}
                 {levelIndex === 0 ? "0" : String(levelIndex)}
                 {" }}"}
               </p>
@@ -132,6 +204,11 @@ export function PipelineLevelsEditor({
                         </span>
                       </SelectItem>
                     ))}
+                    {pendingIds.map((id) => (
+                      <SelectItem key={id} value={id}>
+                        New node
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button
@@ -151,15 +228,29 @@ export function PipelineLevelsEditor({
                 </Button>
               </div>
             ))}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => updateLevel(level.key, [...level.nodeIds, ""])}
-            >
-              <PlusIcon />
-              Add node
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => updateLevel(level.key, [...level.nodeIds, ""])}
+              >
+                <PlusIcon />
+                Add node
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={createDisabled}
+                onClick={() =>
+                  onCreateNode({ kind: "level", levelKey: level.key })
+                }
+              >
+                <PlusIcon />
+                Create node
+              </Button>
+            </div>
           </div>
         </div>
       ))}

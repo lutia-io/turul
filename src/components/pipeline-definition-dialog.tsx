@@ -1,4 +1,11 @@
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react"
 import { useNavigate } from "react-router"
 
 import { CheckboxField } from "@/components/checkbox-field"
@@ -7,9 +14,12 @@ import {
   DefinitionJsonPane,
   definitionDialogClassName,
 } from "@/components/definition-dialog-layout"
+import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
 import {
   PipelineLevelsEditor,
+  insertCreatedNode,
   newPipelineLevel,
+  type CreatePipelineNodeTarget,
   type PipelineLevelDraft,
 } from "@/components/pipeline-levels-editor"
 import { Button } from "@/components/ui/button"
@@ -111,9 +121,14 @@ export function PipelineDefinitionDialog({
   const [levels, setLevels] = useState<PipelineLevelDraft[]>([
     newPipelineLevel(),
   ])
+  const [createNodeOpen, setCreateNodeOpen] = useState(false)
+  const [createNodeKey, setCreateNodeKey] = useState(0)
+  const createNodeTargetRef = useRef<CreatePipelineNodeTarget | null>(null)
 
   useEffect(() => {
     if (!open) {
+      setCreateNodeOpen(false)
+      createNodeTargetRef.current = null
       return
     }
     const current =
@@ -123,9 +138,7 @@ export function PipelineDefinitionDialog({
     const parsed = current
       ? parsePipelineDefinition(current.definition)
       : undefined
-    setSelectedNetworkId(
-      networkId ?? current?.networkId ?? firstNetworkId
-    )
+    setSelectedNetworkId(networkId ?? current?.networkId ?? firstNetworkId)
     setName(current?.name ?? "")
     setActive(current?.active ?? true)
     setLevels(draftsFromDefinition(parsed))
@@ -147,6 +160,18 @@ export function PipelineDefinitionDialog({
     value: item.id,
     label: item.name,
   }))
+
+  function openCreateNode(target: CreatePipelineNodeTarget) {
+    createNodeTargetRef.current = target
+    setCreateNodeKey((key) => key + 1)
+    setCreateNodeOpen(true)
+  }
+
+  function handleNodeCreated(nodeId: string) {
+    const target = createNodeTargetRef.current ?? { kind: "empty" }
+    createNodeTargetRef.current = null
+    setLevels((current) => insertCreatedNode(current, nodeId, target))
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -183,7 +208,16 @@ export function PipelineDefinitionDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && createNodeOpen) {
+          setCreateNodeOpen(false)
+          return
+        }
+        onOpenChange(nextOpen)
+      }}
+    >
       <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
@@ -282,14 +316,16 @@ export function PipelineDefinitionDialog({
               <div>
                 <h3 className="text-sm font-medium">Levels</h3>
                 <p className="text-xs text-muted-foreground">
-                  All nodes in a level run. After the barrier, later levels
-                  read previous outputs as {"{{ .Input.0 }}"}, {"{{ .Input.1 }}"}.
+                  All nodes in a level run. After the barrier, later levels read
+                  previous outputs as {"{{ .Input.0 }}"}, {"{{ .Input.1 }}"}.
                 </p>
               </div>
               <PipelineLevelsEditor
                 levels={levels}
                 nodes={networkNodes}
                 onChange={setLevels}
+                onCreateNode={openCreateNode}
+                createDisabled={!selectedNetworkId}
               />
             </div>
           </DefinitionDialogBody>
@@ -302,10 +338,7 @@ export function PipelineDefinitionDialog({
             <Button
               type="submit"
               disabled={
-                isLoading ||
-                !name.trim() ||
-                !selectedNetworkId ||
-                !definition
+                isLoading || !name.trim() || !selectedNetworkId || !definition
               }
             >
               {isLoading
@@ -319,6 +352,13 @@ export function PipelineDefinitionDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+      <NodeDefinitionDialog
+        key={createNodeKey}
+        open={createNodeOpen}
+        onOpenChange={setCreateNodeOpen}
+        networkId={selectedNetworkId || undefined}
+        onCreated={handleNodeCreated}
+      />
     </Dialog>
   )
 }

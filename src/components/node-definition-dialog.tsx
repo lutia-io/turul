@@ -87,11 +87,13 @@ export function NodeDefinitionDialog({
   onOpenChange,
   networkId,
   nodeDefinitionId,
+  onCreated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
   nodeDefinitionId?: string
+  onCreated?: (nodeId: string) => void
 }) {
   const navigate = useNavigate()
   const formId = useId()
@@ -122,12 +124,9 @@ export function NodeDefinitionDialog({
       return
     }
     const current = nodeDefinitionId ? existingQuery.currentData : undefined
-    const nextType =
-      current && isNodeType(current.type) ? current.type : "HTTP"
+    const nextType = current && isNodeType(current.type) ? current.type : "HTTP"
     const nextDefinition = current?.definition ?? defaultDefinition(nextType)
-    setSelectedNetworkId(
-      networkId ?? current?.networkId ?? firstNetworkId
-    )
+    setSelectedNetworkId(networkId ?? current?.networkId ?? firstNetworkId)
     setName(current?.name ?? "")
     setActive(current?.active ?? true)
     setType(nextType)
@@ -201,13 +200,16 @@ export function NodeDefinitionDialog({
         definition: composed.definition,
         networkId: selectedNetworkId,
       }).unwrap()
+      onCreated?.(created.id)
       onOpenChange(false)
-      navigate(
-        networkWorkspacePath({
-          networkId: selectedNetworkId,
-          rest: `node-definitions/${created.id}`,
-        })
-      )
+      if (!onCreated) {
+        navigate(
+          networkWorkspacePath({
+            networkId: selectedNetworkId,
+            rest: `node-definitions/${created.id}`,
+          })
+        )
+      }
     } catch {
       // RTK Query error is shown below.
     }
@@ -414,7 +416,7 @@ export function NodeDefinitionDialog({
                     disabled={isLoading}
                   />
                   <FieldDescription>
-                    Returned as {"{ \"message\": \"...\" }"}.
+                    Returned as {'{ "message": "..." }'}.
                   </FieldDescription>
                 </Field>
               ) : (
