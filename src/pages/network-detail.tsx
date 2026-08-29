@@ -19,7 +19,7 @@ import {
 import { useCreateEntity } from "@/components/create-entity"
 import { StatusBadge } from "@/components/json-definition-card"
 import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { ActivityChart, RunStatusChart } from "@/components/workspace-charts"
 import {
   ACTIVITY_DAYS,
@@ -579,63 +579,6 @@ export default function NetworkDetail() {
           </div>
         </div>
       </LoadingFrame>
-
-      <section id="organizations" className="flex flex-col gap-3">
-        <SectionHeader
-          title="Organizations"
-          description={`Members of the ${network.name} network.`}
-          action={
-            <div className="flex items-center gap-2">
-              <Link
-                to={href("organizations")}
-                className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-              >
-                <ArrowRightIcon />
-                <span className="sr-only">View all organizations</span>
-              </Link>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openCreateOrganization(network.id)}
-              >
-                <PlusIcon />
-                Add
-              </Button>
-            </div>
-          }
-        />
-        <LoadingFrame
-          isLoading={isOrganizationsFetching}
-          className="min-h-24 rounded-xl"
-        >
-          {network.organizations.length > 0 ? (
-            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {network.organizations.map((item) => (
-                <EntityCard
-                  key={item.id}
-                  to={networkWorkspacePath({
-                    networkId: network.id,
-                    organizationId: item.id,
-                  })}
-                  name={item.name}
-                  status={item.status}
-                  color={item.color}
-                  icon={Building2Icon}
-                  subtitle={
-                    [item.type, item.location].filter(Boolean).join(" · ") ||
-                    "Organization"
-                  }
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No organizations yet. Add one to start collaborating in this
-              network.
-            </p>
-          )}
-        </LoadingFrame>
-      </section>
 
       <section className="flex flex-col gap-3">
         <SectionHeader
