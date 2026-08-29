@@ -5,6 +5,7 @@ import {
   Building2Icon,
   GalleryVerticalEndIcon,
   MoreHorizontalIcon,
+  NetworkIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
@@ -462,11 +463,13 @@ export default function NetworkList() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton
-            onRefresh={refetch}
-            isRefreshing={isFetching}
-            size="icon"
-          />
+          {networks.length > 0 ? (
+            <RefreshButton
+              onRefresh={refetch}
+              isRefreshing={isFetching}
+              size="icon"
+            />
+          ) : null}
           <Button onClick={openCreateNetwork}>
             <PlusIcon />
             Create a network
@@ -483,7 +486,7 @@ export default function NetworkList() {
       ) : networks.length === 0 ? (
         <Card className="items-center px-6 py-12 text-center">
           <div className="flex size-12 items-center justify-center rounded-lg bg-violet-500 text-white">
-            <GalleryVerticalEndIcon className="size-5" />
+            <NetworkIcon className="size-5" />
           </div>
           <div className="flex max-w-md flex-col items-center gap-1.5">
             <CardTitle className="text-lg">No networks yet</CardTitle>

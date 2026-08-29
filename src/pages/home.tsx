@@ -9,6 +9,7 @@ import {
   GalleryVerticalEndIcon,
   LayersIcon,
   ListIcon,
+  NetworkIcon,
   PlusIcon,
   TableIcon,
   WorkflowIcon,
@@ -717,11 +718,13 @@ export default function Home() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton
-            onRefresh={refreshHome}
-            isRefreshing={isRefreshing}
-            size="icon"
-          />
+          {networks.length > 0 ? (
+            <RefreshButton
+              onRefresh={refreshHome}
+              isRefreshing={isRefreshing}
+              size="icon"
+            />
+          ) : null}
           <Button onClick={openCreateNetwork}>
             <PlusIcon />
             Create a network
@@ -734,7 +737,7 @@ export default function Home() {
       ) : !isNetworksError && networks.length === 0 ? (
         <Card className="items-center px-6 py-12 text-center">
           <div className="flex size-12 items-center justify-center rounded-lg bg-violet-500 text-white">
-            <ListIcon className="size-5" />
+            <NetworkIcon className="size-5" />
           </div>
           <div className="flex max-w-md flex-col items-center gap-1.5">
             <CardTitle className="text-lg">No networks yet</CardTitle>
