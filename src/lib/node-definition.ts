@@ -69,7 +69,9 @@ export type HttpDefinitionDraft = {
   bodyText: string
 }
 
-export function httpDraftFromDefinition(definition: JsonObject): HttpDefinitionDraft {
+export function httpDraftFromDefinition(
+  definition: JsonObject
+): HttpDefinitionDraft {
   const method =
     typeof definition.method === "string" && isHttpMethod(definition.method)
       ? definition.method
@@ -90,9 +92,10 @@ export function httpDraftFromDefinition(definition: JsonObject): HttpDefinitionD
   }
 }
 
-export function httpDefinitionFromDraft(
-  draft: HttpDefinitionDraft
-): { definition?: JsonObject; error?: string } {
+export function httpDefinitionFromDraft(draft: HttpDefinitionDraft): {
+  definition?: JsonObject
+  error?: string
+} {
   let headers: JsonObject = {}
   if (draft.headersText.trim()) {
     try {

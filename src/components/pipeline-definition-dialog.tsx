@@ -226,8 +226,8 @@ export function PipelineDefinitionDialog({
               : "Create a pipeline definition"}
           </DialogTitle>
           <DialogDescription>
-            Orchestrate node definitions in BFS levels. Every node in a level
-            runs; the next level receives those outputs by index.
+            Orchestrate nodes in BFS levels. Every node in a level runs; the
+            next level receives those outputs by index.
           </DialogDescription>
         </DialogHeader>
         <form

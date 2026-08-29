@@ -1,5 +1,4 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
-import { useNavigate } from "react-router"
 
 import { CheckboxField } from "@/components/checkbox-field"
 import { Button } from "@/components/ui/button"
@@ -51,10 +50,7 @@ import {
   type HttpDefinitionDraft,
   type NodeType,
 } from "@/lib/node-definition"
-import {
-  networkWorkspacePath,
-  useWorkspaceNetworkList,
-} from "@/lib/network-workspace"
+import { useWorkspaceNetworkList } from "@/lib/network-workspace"
 import { slugifyId } from "@/lib/slug"
 import { getHumaErrorMessage } from "@/store/api"
 import {
@@ -95,7 +91,6 @@ export function NodeDefinitionDialog({
   nodeDefinitionId?: string
   onCreated?: (nodeId: string) => void
 }) {
-  const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
   const [createNode, createState] = useCreateNodeDefinitionMutation()
@@ -202,14 +197,6 @@ export function NodeDefinitionDialog({
       }).unwrap()
       onCreated?.(created.id)
       onOpenChange(false)
-      if (!onCreated) {
-        navigate(
-          networkWorkspacePath({
-            networkId: selectedNetworkId,
-            rest: `node-definitions/${created.id}`,
-          })
-        )
-      }
     } catch {
       // RTK Query error is shown below.
     }
@@ -219,12 +206,10 @@ export function NodeDefinitionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-          <DialogTitle>
-            {editing ? "Edit node definition" : "Create a node definition"}
-          </DialogTitle>
+          <DialogTitle>{editing ? "Edit node" : "Create a node"}</DialogTitle>
           <DialogDescription>
-            Reusable pipeline steps. HTTP and no-op nodes run today; mapper and
-            file types can be stored but are not executed yet.
+            Pipeline steps. HTTP and no-op nodes run today; mapper and file
+            types can be stored but are not executed yet.
           </DialogDescription>
         </DialogHeader>
         <form

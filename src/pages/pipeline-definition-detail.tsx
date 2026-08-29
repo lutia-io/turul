@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { Link, useParams } from "react-router"
 import {
   BoxIcon,
@@ -7,6 +7,7 @@ import {
   LayersIcon,
   PencilIcon,
   PlayIcon,
+  PlusIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -23,6 +24,7 @@ import {
   PublicationPills,
 } from "@/components/definition-detail"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
+import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
 import { RunStatusPill } from "@/components/run-card"
 import { RunPipelineDialog } from "@/components/run-pipeline-dialog"
 import { Button } from "@/components/ui/button"
@@ -38,15 +40,22 @@ import {
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
 import { nodeTypeLabel } from "@/lib/node-definition"
-import { pipelineNodeCount, pipelineSummary } from "@/lib/pipeline-definition"
+import {
+  appendNodeToPipelineLevel,
+  pipelineNodeCount,
+  pipelineSummary,
+} from "@/lib/pipeline-definition"
 import { apiPipelineStatus, formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
-import { useGetPipelineDefinitionQuery } from "@/store/pipeline-slice"
+import {
+  useGetPipelineDefinitionQuery,
+  useUpdatePipelineDefinitionMutation,
+} from "@/store/pipeline-slice"
 
-type DefinitionView = "levels" | "json"
+type PipelineView = "levels" | "json"
 
 export default function PipelineDefinitionDetail() {
   const { pipelineDefinitionId } = useParams()
@@ -58,9 +67,20 @@ export default function PipelineDefinitionDetail() {
   } = useNetworkWorkspace()
   const { nodes } = useWorkspaceNodes()
   const { runs } = useWorkspacePipelineRuns()
-  const { openEditPipeline } = useCreateEntity()
+  const { openEditPipeline, openEditNode } = useCreateEntity()
+  const [updatePipeline] = useUpdatePipelineDefinitionMutation()
   const [runOpen, setRunOpen] = useState(false)
-  const [definitionView, setDefinitionView] = useState<DefinitionView>("levels")
+  const [pipelineView, setPipelineView] = useState<PipelineView>("levels")
+  const [createNodeOpen, setCreateNodeOpen] = useState(false)
+  const [createNodeKey, setCreateNodeKey] = useState(0)
+  const createNodeLevelRef = useRef(0)
+
+  function openCreateNode(levelIndex: number) {
+    createNodeLevelRef.current = levelIndex
+    setCreateNodeKey((key) => key + 1)
+    setCreateNodeOpen(true)
+  }
+
   const pipelineQuery = useGetPipelineDefinitionQuery(
     pipelineDefinitionId ?? "",
     { skip: !isAuthenticated || !pipelineDefinitionId }
@@ -146,16 +166,14 @@ export default function PipelineDefinitionDetail() {
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
-            variant={definitionView === "json" ? "secondary" : "outline"}
+            variant={pipelineView === "json" ? "secondary" : "outline"}
             size="sm"
             onClick={() =>
-              setDefinitionView((view) =>
-                view === "levels" ? "json" : "levels"
-              )
+              setPipelineView((view) => (view === "levels" ? "json" : "levels"))
             }
           >
             <FileJsonIcon />
-            {definitionView === "json" ? "Levels" : "JSON"}
+            {pipelineView === "json" ? "Levels" : "JSON"}
           </Button>
           <Button
             variant="outline"
@@ -272,7 +290,7 @@ export default function PipelineDefinitionDetail() {
           </>
         }
       >
-        {definitionView === "json" ? (
+        {pipelineView === "json" ? (
           <JsonDefinitionCard
             definition={visiblePipeline.definition}
             label="JSONB definition"
@@ -283,12 +301,23 @@ export default function PipelineDefinitionDetail() {
             <SectionHeading
               icon={LayersIcon}
               title="Levels"
-              description="Levels run in order. Nodes in the same level run together. Later levels read earlier outputs by 0-based index."
+              description="Levels run in order. Open a node to edit it. Nodes in the same level run together."
             />
             {levels.length === 0 ? (
-              <p className="mt-6 text-sm text-muted-foreground">
-                This pipeline definition does not declare any levels.
-              </p>
+              <div className="mt-6">
+                <LevelCard
+                  level={[]}
+                  levelIndex={0}
+                  totalLevels={1}
+                  nodesById={nodesById}
+                  onSelectNode={openEditNode}
+                  onAddNode={
+                    visiblePipeline.internal
+                      ? undefined
+                      : () => openCreateNode(0)
+                  }
+                />
+              </div>
             ) : (
               <div className="mt-6 flex flex-col">
                 {levels.map((level, levelIndex) => (
@@ -299,7 +328,12 @@ export default function PipelineDefinitionDetail() {
                       levelIndex={levelIndex}
                       totalLevels={levels.length}
                       nodesById={nodesById}
-                      href={href}
+                      onSelectNode={openEditNode}
+                      onAddNode={
+                        visiblePipeline.internal
+                          ? undefined
+                          : () => openCreateNode(levelIndex)
+                      }
                     />
                   </div>
                 ))}
@@ -315,6 +349,24 @@ export default function PipelineDefinitionDetail() {
         pipelineDefinitionId={visiblePipeline.id}
         networkId={network.id}
         organizationId={organizationId}
+      />
+      <NodeDefinitionDialog
+        key={createNodeKey}
+        open={createNodeOpen}
+        onOpenChange={setCreateNodeOpen}
+        networkId={network.id}
+        onCreated={(nodeId) => {
+          void updatePipeline({
+            id: visiblePipeline.id,
+            name: visiblePipeline.name,
+            active: visiblePipeline.active,
+            definition: appendNodeToPipelineLevel(
+              visiblePipeline.definition,
+              createNodeLevelRef.current,
+              nodeId
+            ),
+          })
+        }}
       />
     </DefinitionPage>
   )
@@ -359,16 +411,17 @@ function LevelCard({
   levelIndex,
   totalLevels,
   nodesById,
-  href,
+  onSelectNode,
+  onAddNode,
 }: {
   level: PipelineLevelNode[]
   levelIndex: number
   totalLevels: number
   nodesById: Map<string, NodeDefinition>
-  href: (rest?: string) => string
+  onSelectNode: (nodeId: string) => void
+  onAddNode?: () => void
 }) {
   const parallel = level.length > 1
-  const outputPath = `{{ .Input.${levelIndex} }}`
 
   return (
     <div className="overflow-hidden rounded-xl border border-l-4 border-l-violet-500 bg-muted/20">
@@ -393,41 +446,51 @@ function LevelCard({
           <p className="text-xs text-muted-foreground tabular-nums">
             {level.length} {level.length === 1 ? "node" : "nodes"}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-            {outputPath}
-          </p>
         </div>
       </div>
-      <div
-        className={cn(
-          "p-3",
-          parallel ? "grid gap-2 sm:grid-cols-2" : "flex flex-col"
-        )}
-      >
+      <div className="grid gap-2 p-3 sm:grid-cols-2">
         {level.map((ref, nodeIndex) => (
           <NodeCard
             key={`${ref.id}-${nodeIndex}`}
             node={nodesById.get(ref.id)}
             nodeId={ref.id}
-            nodeIndex={nodeIndex}
-            href={href}
+            onSelect={onSelectNode}
           />
         ))}
+        {onAddNode ? <AddNodeCard onClick={onAddNode} /> : null}
       </div>
     </div>
+  )
+}
+
+function AddNodeCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-w-0 items-start gap-3 rounded-xl border border-dashed bg-transparent p-4 text-left transition-colors hover:bg-muted/40"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-muted/80">
+        <PlusIcon className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">Add node</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          Create a step in this level
+        </span>
+      </span>
+    </button>
   )
 }
 
 function NodeCard({
   node,
   nodeId,
-  nodeIndex,
-  href,
+  onSelect,
 }: {
   node?: NodeDefinition
   nodeId: string
-  nodeIndex: number
-  href: (rest?: string) => string
+  onSelect: (nodeId: string) => void
 }) {
   const body = (
     <>
@@ -451,12 +514,9 @@ function NodeCard({
           </p>
         </div>
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3">
+      <dl className="mt-4">
         <MetaPart label="Type">
           {node ? nodeTypeLabel(node.type) : "Unknown"}
-        </MetaPart>
-        <MetaPart label="Index">
-          <span className="font-mono">[{nodeIndex}]</span>
         </MetaPart>
       </dl>
     </>
@@ -471,12 +531,13 @@ function NodeCard({
   }
 
   return (
-    <Link
-      to={href(`node-definitions/${node.id}`)}
-      className="rounded-xl border bg-background p-4 shadow-xs transition-colors hover:bg-muted/40"
+    <button
+      type="button"
+      onClick={() => onSelect(node.id)}
+      className="rounded-xl border bg-background p-4 text-left shadow-xs transition-colors hover:bg-muted/40"
     >
       {body}
-    </Link>
+    </button>
   )
 }
 

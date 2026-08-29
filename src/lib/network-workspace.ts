@@ -110,7 +110,7 @@ export function networkSectionRest(rest: string) {
   }
 
   if (rest === "node-definitions" || rest.startsWith("node-definitions/")) {
-    return "node-definitions"
+    return "pipeline-definitions"
   }
 
   if (rest === "workflows" || rest.startsWith("workflows/")) {

@@ -45,6 +45,7 @@ import {
   useWorkspaceRecords,
   useWorkspaceWorkflowRuns,
 } from "@/lib/network-workspace"
+import { pipelinesUsingNode } from "@/lib/pipeline-definition"
 import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage, useMeQuery } from "@/store/api"
@@ -638,16 +639,24 @@ export default function Home() {
         })),
       ...(network.nodeDefinitions ?? [])
         .filter((nodeDefinition) => !nodeDefinition.active)
-        .map((nodeDefinition) => ({
-          id: nodeDefinition.id,
-          name: nodeDefinition.name,
-          kind: "Node",
-          networkName: network.name,
-          to: `/app/networks/${network.id}/node-definitions/${nodeDefinition.id}`,
-          color: "purple" as const,
-          icon: BoxIcon,
-          status: "Draft",
-        })),
+        .map((nodeDefinition) => {
+          const match = pipelinesUsingNode(
+            network.pipelineDefinitions,
+            nodeDefinition.id
+          )[0]
+          return {
+            id: nodeDefinition.id,
+            name: nodeDefinition.name,
+            kind: "Node",
+            networkName: network.name,
+            to: match
+              ? `/app/networks/${network.id}/pipeline-definitions/${match.pipeline.id}`
+              : `/app/networks/${network.id}/pipeline-definitions`,
+            color: "purple" as const,
+            icon: BoxIcon,
+            status: "Draft",
+          }
+        }),
     ])
 
     return [...failedRuns, ...drafts]
@@ -730,8 +739,8 @@ export default function Home() {
           <div className="flex max-w-md flex-col items-center gap-1.5">
             <CardTitle className="text-lg">No networks yet</CardTitle>
             <CardDescription className="text-pretty">
-              A network is the workspace for organizations, schemas,
-              records, and the workflows that run on them.
+              A network is the workspace for organizations, schemas, records,
+              and the workflows that run on them.
             </CardDescription>
           </div>
           <Button onClick={openCreateNetwork}>

@@ -115,8 +115,7 @@ export function PipelineLevelsEditor({
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-4 py-8 text-center">
         <p className="text-sm text-muted-foreground">
-          Create a node definition in this network before adding it to a
-          pipeline.
+          Create a node to add it to this pipeline.
         </p>
         <Button
           type="button"

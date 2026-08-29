@@ -33,10 +33,7 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import type { PipelineDefinition } from "@/data/networks"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
-import {
-  getPipelineLevels,
-  publicationStatus,
-} from "@/lib/json-definition"
+import { getPipelineLevels, publicationStatus } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
@@ -282,28 +279,22 @@ export default function PipelineDefinitionList() {
               ),
             ]
           : []),
-        helper.accessor(
-          (pipeline) => pipelineSummary(pipeline.definition),
-          {
-            id: "source",
-            enableSorting: false,
-            header: ({ column }) => (
-              <DataTableColumnHeader
-                title="Definition"
-                pin={headerPin(column)}
-              />
-            ),
-            cell: ({ row }) => (
-              <DataTableCellLink
-                to={hrefFor(row.original)}
-                className="text-muted-foreground"
-              >
-                {pipelineSummary(row.original.definition)}
-              </DataTableCellLink>
-            ),
-            size: 220,
-          }
-        ),
+        helper.accessor((pipeline) => pipelineSummary(pipeline.definition), {
+          id: "source",
+          enableSorting: false,
+          header: ({ column }) => (
+            <DataTableColumnHeader title="Definition" pin={headerPin(column)} />
+          ),
+          cell: ({ row }) => (
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="text-muted-foreground"
+            >
+              {pipelineSummary(row.original.definition)}
+            </DataTableCellLink>
+          ),
+          size: 220,
+        }),
         helper.accessor(pipelineLevelCount, {
           id: "stages",
           header: ({ column }) => (
@@ -445,7 +436,10 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
+        value: stringFilterChipValue(
+          columnFilters.name.op,
+          columnFilters.name.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -454,7 +448,10 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "slug",
         label: "Slug",
-        value: stringFilterChipValue(columnFilters.slug.op, columnFilters.slug.value),
+        value: stringFilterChipValue(
+          columnFilters.slug.op,
+          columnFilters.slug.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
@@ -463,7 +460,10 @@ export default function PipelineDefinitionList() {
       chips.push({
         id: "network",
         label: "Network",
-        value: stringFilterChipValue(columnFilters.network.op, columnFilters.network.value),
+        value: stringFilterChipValue(
+          columnFilters.network.op,
+          columnFilters.network.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, network: undefined })),
       })
@@ -497,10 +497,10 @@ export default function PipelineDefinitionList() {
       title="Pipeline Definitions"
       description={
         organization
-          ? `Pipelines that orchestrate node definitions in ${organization.name}.`
+          ? `Pipelines and their nodes in ${organization.name}.`
           : network
-            ? `Pipeline definitions used by the ${network.name} network.`
-            : "Pipelines that orchestrate node definitions in BFS levels."
+            ? `Pipelines and their nodes for the ${network.name} network.`
+            : "Pipelines and the nodes they run, grouped in BFS levels."
       }
       action={
         <Button onClick={() => openCreatePipeline(network?.id)}>
@@ -550,4 +550,3 @@ export default function PipelineDefinitionList() {
     </DataTablePage>
   )
 }
-

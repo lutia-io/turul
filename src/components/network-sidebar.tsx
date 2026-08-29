@@ -7,7 +7,6 @@ import {
   ArrowLeftIcon,
   Building2Icon,
   FileIcon,
-  BoxIcon,
   FileJsonIcon,
   GalleryVerticalEndIcon,
   LayersIcon,
@@ -204,17 +203,6 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
           })
         : "/app/networks",
       icon: <LayersIcon />,
-    },
-    {
-      title: "Node Definitions",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "node-definitions",
-          })
-        : "/app/networks",
-      icon: <BoxIcon />,
     },
   ]
 

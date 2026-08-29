@@ -1,7 +1,5 @@
-import {
-  getPipelineLevels,
-  type JsonObject,
-} from "@/lib/json-definition"
+import type { PipelineDefinition } from "@/data/networks"
+import { getPipelineLevels, type JsonObject } from "@/lib/json-definition"
 
 export type PipelineNodeRef = { id: string }
 
@@ -71,4 +69,37 @@ export function pipelineNodeCount(definition: JsonObject) {
     (count, level) => count + level.length,
     0
   )
+}
+
+export function appendNodeToPipelineLevel(
+  definition: JsonObject,
+  levelIndex: number,
+  nodeId: string
+): PipelineDefinitionBody {
+  const levels = getPipelineLevels(definition).map((level) =>
+    level.map((ref) => ({ id: ref.id }))
+  )
+  if (levels.length === 0) {
+    return { nodes: [[{ id: nodeId }]] }
+  }
+  while (levels.length <= levelIndex) {
+    levels.push([])
+  }
+  levels[levelIndex] = [...levels[levelIndex], { id: nodeId }]
+  return { nodes: levels }
+}
+
+export function pipelinesUsingNode(
+  pipelines: PipelineDefinition[],
+  nodeId: string
+) {
+  return pipelines.flatMap((pipeline) => {
+    const levelIndexes = getPipelineLevels(pipeline.definition).flatMap(
+      (level, index) => (level.some((ref) => ref.id === nodeId) ? [index] : [])
+    )
+    if (levelIndexes.length === 0) {
+      return []
+    }
+    return [{ pipeline, levelIndexes }]
+  })
 }

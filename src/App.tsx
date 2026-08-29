@@ -15,8 +15,7 @@ import {
   SchemaDetail,
   WorkflowDefinitionList,
   WorkflowDefinitionDetail,
-  NodeDefinitionList,
-  NodeDefinitionDetail,
+  NodeDefinitionRedirect,
   WorkflowList,
   WorkflowRunDetail,
   PipelineDefinitionList,
@@ -46,15 +45,19 @@ function networkWorkspaceRoutes() {
         path="workflow-definitions/:workflowDefinitionId"
         element={<WorkflowDefinitionDetail />}
       />
-      <Route path="node-definitions" element={<NodeDefinitionList />} />
+      <Route path="node-definitions" element={<NodeDefinitionRedirect />} />
       <Route
         path="node-definitions/:nodeDefinitionId"
-        element={<NodeDefinitionDetail />}
+        element={<NodeDefinitionRedirect />}
       />
       <Route path="pipeline-definitions" element={<PipelineDefinitionList />} />
       <Route
         path="pipeline-definitions/:pipelineDefinitionId"
         element={<PipelineDefinitionDetail />}
+      />
+      <Route
+        path="pipeline-definitions/:pipelineDefinitionId/nodes/:nodeDefinitionId"
+        element={<NodeDefinitionRedirect />}
       />
       <Route path="workflows" element={<WorkflowList />} />
       <Route path="workflows/:workflowRunId" element={<WorkflowRunDetail />} />
