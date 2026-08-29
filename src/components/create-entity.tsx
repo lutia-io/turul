@@ -34,6 +34,18 @@ type CreateState =
   | { kind: "node"; networkId?: string; nodeDefinitionId?: string }
   | null
 
+type DialogKind = NonNullable<CreateState>["kind"]
+
+const initialDialogKeys: Record<DialogKind, number> = {
+  network: 0,
+  organization: 0,
+  organizationUser: 0,
+  schema: 0,
+  workflow: 0,
+  pipeline: 0,
+  node: 0,
+}
+
 type CreateEntityContextValue = {
   openCreateNetwork: () => void
   openEditNetwork: (networkId: string) => void
@@ -61,54 +73,62 @@ const CreateEntityContext = createContext<CreateEntityContextValue | null>(null)
 
 export function CreateEntityProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CreateState>(null)
+  const [dialogKeys, setDialogKeys] = useState(initialDialogKeys)
 
-  const value = useMemo<CreateEntityContextValue>(
-    () => ({
+  const value = useMemo<CreateEntityContextValue>(() => {
+    function open(next: NonNullable<CreateState>) {
+      setDialogKeys((keys) => ({
+        ...keys,
+        [next.kind]: keys[next.kind] + 1,
+      }))
+      setState(next)
+    }
+
+    return {
       openCreateNetwork() {
-        setState({ kind: "network" })
+        open({ kind: "network" })
       },
       openEditNetwork(networkId) {
-        setState({ kind: "network", networkId })
+        open({ kind: "network", networkId })
       },
       openCreateOrganization(networkId) {
-        setState({ kind: "organization", networkId })
+        open({ kind: "organization", networkId })
       },
       openEditOrganization(organizationId) {
-        setState({ kind: "organization", organizationId })
+        open({ kind: "organization", organizationId })
       },
       openCreateOrganizationUser(scope) {
-        setState({ kind: "organizationUser", ...scope })
+        open({ kind: "organizationUser", ...scope })
       },
       openEditOrganizationUser(organizationUserId) {
-        setState({ kind: "organizationUser", organizationUserId })
+        open({ kind: "organizationUser", organizationUserId })
       },
       openCreateSchema(scope) {
-        setState({ kind: "schema", ...scope })
+        open({ kind: "schema", ...scope })
       },
       openEditSchema(schemaId) {
-        setState({ kind: "schema", schemaId })
+        open({ kind: "schema", schemaId })
       },
       openCreateWorkflow(networkId) {
-        setState({ kind: "workflow", networkId })
+        open({ kind: "workflow", networkId })
       },
       openEditWorkflow(workflowDefinitionId) {
-        setState({ kind: "workflow", workflowDefinitionId })
+        open({ kind: "workflow", workflowDefinitionId })
       },
       openCreatePipeline(networkId) {
-        setState({ kind: "pipeline", networkId })
+        open({ kind: "pipeline", networkId })
       },
       openEditPipeline(pipelineDefinitionId) {
-        setState({ kind: "pipeline", pipelineDefinitionId })
+        open({ kind: "pipeline", pipelineDefinitionId })
       },
       openCreateNode(networkId) {
-        setState({ kind: "node", networkId })
+        open({ kind: "node", networkId })
       },
       openEditNode(nodeDefinitionId) {
-        setState({ kind: "node", nodeDefinitionId })
+        open({ kind: "node", nodeDefinitionId })
       },
-    }),
-    []
-  )
+    }
+  }, [])
 
   function close() {
     setState(null)
@@ -118,6 +138,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
     <CreateEntityContext.Provider value={value}>
       {children}
       <CreateNetworkDialog
+        key={dialogKeys.network}
         open={state?.kind === "network"}
         onOpenChange={(open) => {
           if (!open) {
@@ -127,6 +148,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         networkId={state?.kind === "network" ? state.networkId : undefined}
       />
       <CreateOrganizationDialog
+        key={dialogKeys.organization}
         open={state?.kind === "organization"}
         onOpenChange={(open) => {
           if (!open) {
@@ -139,6 +161,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <CreateOrganizationUserDialog
+        key={dialogKeys.organizationUser}
         open={state?.kind === "organizationUser"}
         onOpenChange={(open) => {
           if (!open) {
@@ -158,6 +181,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <SchemaDefinitionDialog
+        key={dialogKeys.schema}
         open={state?.kind === "schema"}
         onOpenChange={(open) => {
           if (!open) {
@@ -171,6 +195,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         schemaId={state?.kind === "schema" ? state.schemaId : undefined}
       />
       <WorkflowDefinitionDialog
+        key={dialogKeys.workflow}
         open={state?.kind === "workflow"}
         onOpenChange={(open) => {
           if (!open) {
@@ -183,6 +208,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <PipelineDefinitionDialog
+        key={dialogKeys.pipeline}
         open={state?.kind === "pipeline"}
         onOpenChange={(open) => {
           if (!open) {
@@ -195,6 +221,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <NodeDefinitionDialog
+        key={dialogKeys.node}
         open={state?.kind === "node"}
         onOpenChange={(open) => {
           if (!open) {

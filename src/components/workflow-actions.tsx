@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react"
-import { ChevronDownIcon, SearchIcon } from "lucide-react"
+import { ChevronDownIcon } from "lucide-react"
 
 import { RunStatusPill } from "@/components/run-card"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -50,38 +49,19 @@ export function WorkflowActionsJournal({
     skip: !isAuthenticated || !workflowId,
   })
   const actions = query.data ?? []
-  const [search, setSearch] = useState("")
   const [expandedId, setExpandedId] = useState<string>()
-  const rows = useMemo(() => {
-    const needle = search.trim().toLowerCase()
-    const labeled = actions.map((action) => {
-      const step = steps.find((item) => item.order - 1 === action.actionIndex)
-      return {
-        action,
-        step,
-        name: step?.name ?? `Action ${action.actionIndex}`,
-        type: step?.type ?? action.actionType,
-      }
-    })
-
-    if (!needle) {
-      return labeled
-    }
-
-    return labeled.filter((row) =>
-      [
-        row.name,
-        row.type,
-        row.action.status,
-        row.action.error ?? "",
-        String(row.action.actionIndex),
-        String(row.action.attempt),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle)
-    )
-  }, [actions, search, steps])
+  const rows = useMemo(
+    () =>
+      actions.map((action) => {
+        const step = steps.find((item) => item.order - 1 === action.actionIndex)
+        return {
+          action,
+          name: step?.name ?? `Action ${action.actionIndex}`,
+          type: step?.type ?? action.actionType,
+        }
+      }),
+    [actions, steps]
+  )
 
   return (
     <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
@@ -95,9 +75,7 @@ export function WorkflowActionsJournal({
         <p className="text-sm text-muted-foreground tabular-nums">
           {query.isLoading
             ? "Loading..."
-            : rows.length === actions.length
-              ? `${actions.length} attempt${actions.length === 1 ? "" : "s"}`
-              : `${rows.length} of ${actions.length} attempts`}
+            : `${actions.length} attempt${actions.length === 1 ? "" : "s"}`}
         </p>
       </div>
 
@@ -110,67 +88,44 @@ export function WorkflowActionsJournal({
           Loading action attempts...
         </p>
       ) : actions.length > 0 ? (
-        <>
-          <div className="relative w-full max-w-md">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search actions..."
-              className="h-8 bg-background pl-8"
-            />
-          </div>
-          <div className="overflow-auto rounded-xl border bg-background">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-10">#</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Attempt</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Error</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.length > 0 ? (
-                  rows.map(({ action, name, type }) => {
-                    const durationMs =
-                      new Date(action.completedAt).getTime() -
-                      new Date(action.startedAt).getTime()
-                    const expanded = expandedId === action.id
+        <div className="overflow-auto rounded-xl border bg-background">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-10">#</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Attempt</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Started</TableHead>
+                <TableHead>Error</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map(({ action, name, type }) => {
+                const durationMs =
+                  new Date(action.completedAt).getTime() -
+                  new Date(action.startedAt).getTime()
+                const expanded = expandedId === action.id
 
-                    return (
-                      <ActionRows
-                        key={action.id}
-                        action={action}
-                        name={name}
-                        type={type}
-                        durationMs={durationMs}
-                        expanded={expanded}
-                        onToggle={() =>
-                          setExpandedId(expanded ? undefined : action.id)
-                        }
-                      />
-                    )
-                  })
-                ) : (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={8}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      No actions match this search.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </>
+                return (
+                  <ActionRows
+                    key={action.id}
+                    action={action}
+                    name={name}
+                    type={type}
+                    durationMs={durationMs}
+                    expanded={expanded}
+                    onToggle={() =>
+                      setExpandedId(expanded ? undefined : action.id)
+                    }
+                  />
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">
           No action attempts yet. Queued workflows wait until the first step

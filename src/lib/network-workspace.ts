@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react"
-import { useParams } from "react-router"
+import { useLocation, useParams } from "react-router"
 
 import type { StoredFile, StoredRecord } from "@/data/files"
 import {
@@ -564,7 +564,13 @@ export function useWorkspaceNetworksWithDefinitions(
 
 export function useNetworkWorkspace() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const { networkId, organizationId } = useParams()
+  const { pathname } = useLocation()
+  const params = useParams()
+  const parsed = parseNetworkPath(pathname)
+  const networkId = parsed?.networkId ?? params.networkId
+  const organizationId = parsed
+    ? parsed.organizationId || undefined
+    : params.organizationId
   const networkQuery = useGetNetworkQuery(networkId ?? "", {
     skip: !isAuthenticated || !networkId,
   })
@@ -577,7 +583,9 @@ export function useNetworkWorkspace() {
   const pipelinesQuery = useWorkspacePipelines()
   const nodesQuery = useWorkspaceNodes()
   const organization =
+    organizationId &&
     organizationQuery.data &&
+    organizationQuery.data.id === organizationId &&
     (!networkId || organizationQuery.data.networkId === networkId)
       ? workspaceOrganizationFromApi(organizationQuery.data)
       : undefined

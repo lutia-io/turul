@@ -157,8 +157,8 @@ export function WorkflowDefinitionDialog({
       : undefined
     const current =
       mockCurrent ??
-      (apiWorkflowQuery.data
-        ? workspaceWorkflowFromApi(apiWorkflowQuery.data)
+      (workflowDefinitionId && apiWorkflowQuery.currentData
+        ? workspaceWorkflowFromApi(apiWorkflowQuery.currentData)
         : undefined)
     const parsed = parseWorkflowDefinition(current?.definition)
 
@@ -171,7 +171,7 @@ export function WorkflowDefinitionDialog({
     setJsonError(null)
     setCriteria(criteriaFromApi(parsed?.criteria))
     setActions(actionsFromApi(parsed?.actions))
-  }, [apiWorkflowQuery.data, open, workflowDefinitionId])
+  }, [apiWorkflowQuery.currentData, open, workflowDefinitionId])
 
   useEffect(() => {
     if (!open) {
@@ -180,19 +180,20 @@ export function WorkflowDefinitionDialog({
     const mockCurrent = workflowDefinitionId
       ? getWorkflowDefinition(workflowDefinitionId)
       : undefined
+    const apiCurrent = workflowDefinitionId
+      ? apiWorkflowQuery.currentData
+      : undefined
     setSelectedNetworkId((current) => {
       if (networkId) {
         return networkId
       }
       return (
-        (mockCurrent?.network.id ??
-          apiWorkflowQuery.data?.networkId ??
-          current) ||
+        (mockCurrent?.network.id ?? apiCurrent?.networkId ?? current) ||
         firstNetworkId
       )
     })
   }, [
-    apiWorkflowQuery.data?.networkId,
+    apiWorkflowQuery.currentData,
     firstNetworkId,
     networkId,
     open,

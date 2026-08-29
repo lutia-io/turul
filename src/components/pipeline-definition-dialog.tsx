@@ -116,9 +116,10 @@ export function PipelineDefinitionDialog({
     if (!open) {
       return
     }
-    const current = existingQuery.data
-      ? workspacePipelineFromApi(existingQuery.data)
-      : undefined
+    const current =
+      pipelineDefinitionId && existingQuery.currentData
+        ? workspacePipelineFromApi(existingQuery.currentData)
+        : undefined
     const parsed = current
       ? parsePipelineDefinition(current.definition)
       : undefined
@@ -128,7 +129,13 @@ export function PipelineDefinitionDialog({
     setName(current?.name ?? "")
     setActive(current?.active ?? true)
     setLevels(draftsFromDefinition(parsed))
-  }, [existingQuery.data, firstNetworkId, networkId, open])
+  }, [
+    existingQuery.currentData,
+    firstNetworkId,
+    networkId,
+    open,
+    pipelineDefinitionId,
+  ])
 
   const networkNodes = useMemo(
     () => nodes.filter((node) => node.networkId === selectedNetworkId),

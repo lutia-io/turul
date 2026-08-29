@@ -86,15 +86,14 @@ export function CreateOrganizationUserDialog({
     }
     createState.reset()
     updateState.reset()
-    setFirstName(existingQuery.data?.firstName ?? "")
-    setLastName(existingQuery.data?.lastName ?? "")
-    setEmail(existingQuery.data?.email ?? "")
+    const current = organizationUserId ? existingQuery.currentData : undefined
+    setFirstName(current?.firstName ?? "")
+    setLastName(current?.lastName ?? "")
+    setEmail(current?.email ?? "")
     setPassword("")
   }, [
     createState.reset,
-    existingQuery.data?.email,
-    existingQuery.data?.firstName,
-    existingQuery.data?.lastName,
+    existingQuery.currentData,
     open,
     organizationUserId,
     updateState.reset,
@@ -105,23 +104,29 @@ export function CreateOrganizationUserDialog({
       return
     }
     setSelectedNetworkId((current) => {
-      if (existingQuery.data?.networkId) {
-        return existingQuery.data.networkId
+      if (organizationUserId && existingQuery.currentData?.networkId) {
+        return existingQuery.currentData.networkId
       }
       if (networkId) {
         return networkId
       }
       return current || firstNetworkId
     })
-  }, [existingQuery.data?.networkId, firstNetworkId, networkId, open])
+  }, [
+    existingQuery.currentData?.networkId,
+    firstNetworkId,
+    networkId,
+    open,
+    organizationUserId,
+  ])
 
   useEffect(() => {
     if (!open) {
       return
     }
     setSelectedOrganizationId((current) => {
-      if (existingQuery.data?.organizationId) {
-        return existingQuery.data.organizationId
+      if (organizationUserId && existingQuery.currentData?.organizationId) {
+        return existingQuery.currentData.organizationId
       }
       if (organizationId) {
         return organizationId
@@ -132,11 +137,12 @@ export function CreateOrganizationUserDialog({
       return firstOrganizationId
     })
   }, [
-    existingQuery.data?.organizationId,
+    existingQuery.currentData?.organizationId,
     firstOrganizationId,
     networkOrganizations,
     open,
     organizationId,
+    organizationUserId,
   ])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

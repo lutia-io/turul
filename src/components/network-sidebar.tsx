@@ -79,6 +79,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       plan: network
         ? `${network.organizations.length} in ${network.name}`
         : "Entire network",
+      color: "gray" as const,
     },
     ...(network?.organizations.map((organization) => ({
       id: organization.id,
@@ -271,8 +272,8 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain label="Definitions" items={definitionItems} />
         <NavMain label="Operations" items={navMain} />
+        <NavMain label="Definitions" items={definitionItems} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>

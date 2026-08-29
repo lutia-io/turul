@@ -2,7 +2,6 @@ import { useMemo, type ReactNode } from "react"
 import { Link } from "react-router"
 import {
   ArrowRightIcon,
-  BoxIcon,
   Building2Icon,
   FileIcon,
   FileJsonIcon,
@@ -14,7 +13,6 @@ import {
   PlayIcon,
   PlusIcon,
   TableIcon,
-  WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -29,10 +27,7 @@ import {
   summarizeActivity,
 } from "@/lib/activity"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
-import {
-  jsonSchemaPropertyCount,
-  publicationStatus,
-} from "@/lib/json-definition"
+import { publicationStatus } from "@/lib/json-definition"
 import {
   apiPipelineCurrentLevel,
   apiPipelineLevelSteps,
@@ -44,23 +39,15 @@ import {
   matchesPipelineScope,
   matchesWorkflowScope,
 } from "@/lib/runs"
-import {
-  parseWorkflowDefinition,
-  workflowSummary,
-} from "@/lib/workflow-definition"
-import { pipelineSummary } from "@/lib/pipeline-definition"
-import { nodeTypeLabel } from "@/lib/node-definition"
+import { parseWorkflowDefinition } from "@/lib/workflow-definition"
 import {
   networkWorkspacePath,
-  schemaScopeLabel,
   useNetworkWorkspace,
   useWorkspaceFiles,
   useWorkspaceOrganizations,
   useWorkspacePipelineRuns,
   useWorkspaceRecords,
-  useWorkspaceSchemas,
   useWorkspaceWorkflowRuns,
-  useWorkspaceWorkflows,
 } from "@/lib/network-workspace"
 import { cn } from "@/lib/utils"
 
@@ -192,101 +179,6 @@ function EntityCard({
   )
 }
 
-function AttentionCard({
-  to,
-  name,
-  kind,
-  status,
-  color,
-  icon: Icon,
-}: {
-  to: string
-  name: string
-  kind: string
-  status?: string
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
-
-  return (
-    <Link
-      to={to}
-      className="group flex min-h-[72px] items-center gap-3 rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
-    >
-      <div
-        className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-lg",
-          tone.bg,
-          tone.text
-        )}
-      >
-        <Icon className="size-4" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-medium">{name}</p>
-          {status ? <StatusBadge status={status} /> : null}
-        </div>
-        <p className="truncate text-xs text-muted-foreground">{kind}</p>
-      </div>
-      <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-    </Link>
-  )
-}
-
-function QuickActionCard({
-  to,
-  onClick,
-  label,
-  description,
-  color,
-  icon: Icon,
-}: {
-  to?: string
-  onClick?: () => void
-  label: string
-  description: string
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
-  const content = (
-    <>
-      <div
-        className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-lg",
-          tone.bg,
-          tone.text
-        )}
-      >
-        <Icon className="size-4" />
-      </div>
-      <div className="min-w-0 flex-1 text-left">
-        <p className="truncate text-sm font-medium">{label}</p>
-        <p className="truncate text-xs text-muted-foreground">{description}</p>
-      </div>
-      <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-    </>
-  )
-  const className =
-    "group flex min-h-[72px] w-full items-center gap-3 rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
-
-  if (to) {
-    return (
-      <Link to={to} className={className}>
-        {content}
-      </Link>
-    )
-  }
-
-  return (
-    <button type="button" onClick={onClick} className={className}>
-      {content}
-    </button>
-  )
-}
-
 function SectionHeader({
   title,
   description,
@@ -336,18 +228,9 @@ export default function NetworkDetail() {
     refetch: refetchFiles,
     isFetching: isFilesFetching,
   } = useWorkspaceFiles()
-  const { refetch: refetchOrganizations, isFetching: isOrganizationsFetching } =
-    useWorkspaceOrganizations()
-  const { refetch: refetchSchemas, isFetching: isSchemasFetching } =
-    useWorkspaceSchemas()
-  const { refetch: refetchWorkflows, isFetching: isWorkflowsFetching } =
-    useWorkspaceWorkflows()
+  const { isFetching: isOrganizationsFetching } = useWorkspaceOrganizations()
   const {
     openCreateOrganization,
-    openCreateSchema,
-    openCreateWorkflow,
-    openCreatePipeline,
-    openCreateNode,
     openEditNetwork,
     openEditOrganization,
   } = useCreateEntity()
@@ -358,11 +241,6 @@ export default function NetworkDetail() {
     void refetchFiles()
     void refetchRuns()
     void refetchPipelineRuns()
-  }
-
-  function refreshDefinitions() {
-    void refetchSchemas()
-    void refetchWorkflows()
   }
 
   const isRefreshing =
@@ -482,48 +360,6 @@ export default function NetworkDetail() {
   const schemaCounts = countByStatus(network.schemas, (schema) =>
     publicationStatus(schema.active)
   )
-  const attentionItems = [
-    ...network.schemas
-      .filter((schema) => !schema.active)
-      .map((schema) => ({
-        id: schema.id,
-        name: schema.name,
-        kind: "Schema",
-        to: href(`schemas/${schema.id}`),
-        color: accentColor,
-        icon: FileJsonIcon,
-      })),
-    ...network.workflowDefinitions
-      .filter((workflowDefinition) => !workflowDefinition.active)
-      .map((workflowDefinition) => ({
-        id: workflowDefinition.id,
-        name: workflowDefinition.name,
-        kind: "Workflow definition",
-        to: href(`workflow-definitions/${workflowDefinition.id}`),
-        color: accentColor,
-        icon: WorkflowIcon,
-      })),
-    ...network.pipelineDefinitions
-      .filter((pipelineDefinition) => !pipelineDefinition.active)
-      .map((pipelineDefinition) => ({
-        id: pipelineDefinition.id,
-        name: pipelineDefinition.name,
-        kind: "Pipeline definition",
-        to: href(`pipeline-definitions/${pipelineDefinition.id}`),
-        color: accentColor,
-        icon: LayersIcon,
-      })),
-    ...(network.nodeDefinitions ?? [])
-      .filter((nodeDefinition) => !nodeDefinition.active)
-      .map((nodeDefinition) => ({
-        id: nodeDefinition.id,
-        name: nodeDefinition.name,
-        kind: "Node definition",
-        to: href(`node-definitions/${nodeDefinition.id}`),
-        color: accentColor,
-        icon: BoxIcon,
-      })),
-  ]
   const activeRuns = [
     ...scopedWorkflows
       .filter((run) => run.status === "pending" || run.status === "running")
@@ -744,361 +580,93 @@ export default function NetworkDetail() {
         </div>
       </LoadingFrame>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <section id="organizations" className="flex flex-col gap-3">
-            <SectionHeader
-              title="Organizations"
-              description={`Members of the ${network.name} network.`}
-              action={
-                <div className="flex items-center gap-2">
-                  <RefreshButton
-                    onRefresh={refetchOrganizations}
-                    isRefreshing={isOrganizationsFetching}
-                  />
-                  <Link
-                    to={href("organizations")}
-                    className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-                  >
-                    <ArrowRightIcon />
-                    <span className="sr-only">View all organizations</span>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openCreateOrganization(network.id)}
-                  >
-                    <PlusIcon />
-                    Add
-                  </Button>
-                </div>
-              }
-            />
-            <LoadingFrame
-              isLoading={isOrganizationsFetching}
-              className="min-h-24 rounded-xl"
-            >
-              {network.organizations.length > 0 ? (
-                <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                  {network.organizations.map((item) => (
-                    <EntityCard
-                      key={item.id}
-                      to={networkWorkspacePath({
-                        networkId: network.id,
-                        organizationId: item.id,
-                      })}
-                      name={item.name}
-                      status={item.status}
-                      color={item.color}
-                      icon={Building2Icon}
-                      subtitle={
-                        [item.type, item.location]
-                          .filter(Boolean)
-                          .join(" · ") || "Organization"
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No organizations yet. Add one to start collaborating in this
-                  network.
-                </p>
-              )}
-            </LoadingFrame>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <SectionHeader
-              title="Definitions"
-              description={`Schemas and automation used by ${network.name}.`}
-              action={
-                <RefreshButton
-                  onRefresh={refreshDefinitions}
-                  isRefreshing={isSchemasFetching || isWorkflowsFetching}
-                />
-              }
-            />
-            <LoadingFrame
-              isLoading={isSchemasFetching || isWorkflowsFetching}
-              className="rounded-xl"
-            >
-              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-                <DefinitionColumn
-                  title="Schemas"
-                  viewAll={href("schemas")}
-                  onAdd={() =>
-                    openCreateSchema({
-                      networkId: network.id,
-                      organizationId,
-                    })
-                  }
-                  empty="No schemas yet."
-                  items={network.schemas.map((schema) => ({
-                    id: schema.id,
-                    name: schema.name,
-                    subtitle: `${schemaScopeLabel(schema, network.organizations)} · ${jsonSchemaPropertyCount(schema.definition)} properties`,
-                    status: publicationStatus(schema.active),
-                    color: accentColor,
-                    icon: FileJsonIcon,
-                    to: href(`schemas/${schema.id}`),
-                  }))}
-                />
-                <DefinitionColumn
-                  title="Workflows"
-                  viewAll={href("workflow-definitions")}
-                  onAdd={() => openCreateWorkflow(network.id)}
-                  empty="No workflow definitions yet."
-                  items={network.workflowDefinitions.map(
-                    (workflowDefinition) => ({
-                      id: workflowDefinition.id,
-                      name: workflowDefinition.name,
-                      subtitle: workflowSummary(workflowDefinition.definition),
-                      status: publicationStatus(workflowDefinition.active),
-                      color: accentColor,
-                      icon: WorkflowIcon,
-                      to: href(`workflow-definitions/${workflowDefinition.id}`),
-                    })
-                  )}
-                />
-                <DefinitionColumn
-                  title="Pipelines"
-                  viewAll={href("pipeline-definitions")}
-                  onAdd={() => openCreatePipeline(network.id)}
-                  empty="No pipeline definitions yet."
-                  items={network.pipelineDefinitions.map(
-                    (pipelineDefinition) => ({
-                      id: pipelineDefinition.id,
-                      name: pipelineDefinition.name,
-                      subtitle: pipelineSummary(pipelineDefinition.definition),
-                      status: publicationStatus(pipelineDefinition.active),
-                      color: accentColor,
-                      icon: LayersIcon,
-                      to: href(`pipeline-definitions/${pipelineDefinition.id}`),
-                    })
-                  )}
-                />
-                <DefinitionColumn
-                  title="Nodes"
-                  viewAll={href("node-definitions")}
-                  onAdd={() => openCreateNode(network.id)}
-                  empty="No node definitions yet."
-                  items={(network.nodeDefinitions ?? []).map(
-                    (nodeDefinition) => ({
-                      id: nodeDefinition.id,
-                      name: nodeDefinition.name,
-                      subtitle: nodeTypeLabel(nodeDefinition.type),
-                      status: publicationStatus(nodeDefinition.active),
-                      color: accentColor,
-                      icon: BoxIcon,
-                      to: href(`node-definitions/${nodeDefinition.id}`),
-                    })
-                  )}
-                />
-              </div>
-            </LoadingFrame>
-          </section>
-        </div>
-
-        <aside className="flex flex-col gap-6">
-          <section className="flex flex-col gap-3">
-            <SectionHeader
-              title="Active now"
-              description={`Live executions${scopeLabel}.`}
-              action={
-                <RefreshButton
-                  onRefresh={refetchRuns}
-                  isRefreshing={isRunsFetching}
-                />
-              }
-            />
-            <LoadingFrame
-              isLoading={isRunsFetching}
-              className="min-h-24 rounded-xl"
-            >
-              {activeRuns.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {activeRuns.slice(0, 6).map((run) => {
-                    const runTone = getBadgeColor(run.color)
-                    return (
-                      <Link
-                        key={run.id}
-                        to={run.href}
-                        className="group flex min-h-[72px] items-center gap-3 rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
-                      >
-                        <div
-                          className={cn(
-                            "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                            runTone.bg,
-                            runTone.text
-                          )}
-                        >
-                          <run.icon className="size-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <p className="truncate text-sm font-medium">
-                              {run.name}
-                            </p>
-                            <StatusBadge status={run.status} />
-                          </div>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {run.kind}
-                            {run.current ? ` · ${run.current}` : ""} ·{" "}
-                            {formatRelativeTime(run.updatedAt)}
-                          </p>
-                        </div>
-                        <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                      </Link>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No workflows or pipelines are running right now.
-                </p>
-              )}
-            </LoadingFrame>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <SectionHeader
-              title="Needs attention"
-              description="Draft definitions that are not yet published."
-              action={
-                <RefreshButton
-                  onRefresh={refreshDefinitions}
-                  isRefreshing={isSchemasFetching || isWorkflowsFetching}
-                />
-              }
-            />
-            <LoadingFrame
-              isLoading={isSchemasFetching || isWorkflowsFetching}
-              className="min-h-24 rounded-xl"
-            >
-              {attentionItems.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {attentionItems.map((item) => (
-                    <AttentionCard
-                      key={item.id}
-                      to={item.to}
-                      name={item.name}
-                      kind={item.kind}
-                      status="Draft"
-                      color={item.color}
-                      icon={item.icon}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nothing waiting on review.
-                </p>
-              )}
-            </LoadingFrame>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <SectionHeader
-              title="Quick actions"
-              description="Jump into a common setup task."
-            />
-            <div className="flex flex-col gap-2">
-              <QuickActionCard
-                onClick={() =>
-                  openCreateSchema({
-                    networkId: network.id,
-                    organizationId,
-                  })
-                }
-                label="Create schema"
-                description="Define a JSONB record shape"
-                color={accentColor}
-                icon={FileJsonIcon}
-              />
-              <QuickActionCard
-                to={href("workflows")}
-                label="Open workflows"
-                description="Live executions in flight"
-                color={accentColor}
-                icon={PlayIcon}
-              />
+      <section id="organizations" className="flex flex-col gap-3">
+        <SectionHeader
+          title="Organizations"
+          description={`Members of the ${network.name} network.`}
+          action={
+            <div className="flex items-center gap-2">
+              <Link
+                to={href("organizations")}
+                className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+              >
+                <ArrowRightIcon />
+                <span className="sr-only">View all organizations</span>
+              </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openCreateOrganization(network.id)}
+              >
+                <PlusIcon />
+                Add
+              </Button>
             </div>
-          </section>
-        </aside>
-      </div>
-    </div>
-  )
-}
+          }
+        />
+        <LoadingFrame
+          isLoading={isOrganizationsFetching}
+          className="min-h-24 rounded-xl"
+        >
+          {network.organizations.length > 0 ? (
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {network.organizations.map((item) => (
+                <EntityCard
+                  key={item.id}
+                  to={networkWorkspacePath({
+                    networkId: network.id,
+                    organizationId: item.id,
+                  })}
+                  name={item.name}
+                  status={item.status}
+                  color={item.color}
+                  icon={Building2Icon}
+                  subtitle={
+                    [item.type, item.location].filter(Boolean).join(" · ") ||
+                    "Organization"
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No organizations yet. Add one to start collaborating in this
+              network.
+            </p>
+          )}
+        </LoadingFrame>
+      </section>
 
-function DefinitionColumn({
-  title,
-  viewAll,
-  onAdd,
-  empty,
-  items,
-}: {
-  title: string
-  viewAll: string
-  onAdd: () => void
-  empty: string
-  items: {
-    id: string
-    name: string
-    subtitle: string
-    status: string
-    color: BadgeColor
-    icon: LucideIcon
-    to: string
-  }[]
-}) {
-  const preview = items.slice(0, 4)
-  const remaining = items.length - preview.length
-
-  return (
-    <div className="flex min-w-0 flex-col gap-2 overflow-hidden rounded-2xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">{title}</h3>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={onAdd}>
-            <PlusIcon />
-            <span className="sr-only">Add {title.toLowerCase()}</span>
-          </Button>
-          <Link
-            to={viewAll}
-            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-          >
-            <ArrowRightIcon />
-            <span className="sr-only">View all {title.toLowerCase()}</span>
-          </Link>
-        </div>
-      </div>
-      {preview.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          {preview.map((item) => (
-            <AttentionCard
-              key={item.id}
-              to={item.to}
-              name={item.name}
-              kind={item.subtitle}
-              status={item.status}
-              color={item.color}
-              icon={item.icon}
-            />
-          ))}
-          {remaining > 0 ? (
-            <Link
-              to={viewAll}
-              className="inline-flex w-fit items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              +{remaining} more
-              <ArrowRightIcon className="size-3.5" />
-            </Link>
-          ) : null}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">{empty}</p>
-      )}
+      <section className="flex flex-col gap-3">
+        <SectionHeader
+          title="Active now"
+          description={`Live executions${scopeLabel}.`}
+        />
+        <LoadingFrame
+          isLoading={isRunsFetching}
+          className="min-h-24 rounded-xl"
+        >
+          {activeRuns.length > 0 ? (
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {activeRuns.slice(0, 6).map((run) => (
+                <EntityCard
+                  key={run.id}
+                  to={run.href}
+                  name={run.name}
+                  status={run.status}
+                  color={run.color}
+                  icon={run.icon}
+                  subtitle={`${run.kind}${run.current ? ` · ${run.current}` : ""} · ${formatRelativeTime(run.updatedAt)}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No workflows or pipelines are running right now.
+            </p>
+          )}
+        </LoadingFrame>
+      </section>
     </div>
   )
 }

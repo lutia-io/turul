@@ -346,7 +346,7 @@ export default function PipelineList() {
               row.original.total,
               row.original.status
             )
-            const tone = getBadgeColor("pink")
+            const tone = getBadgeColor("teal")
             return (
               <DataTableCellLink
                 to={hrefFor(row.original)}

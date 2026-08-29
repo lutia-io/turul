@@ -65,10 +65,12 @@ export function CreateOrganizationDialog({
     }
     createState.reset()
     updateState.reset()
-    setName(organizationId ? (existingQuery.data?.name ?? "") : "")
+    setName(
+      organizationId ? (existingQuery.currentData?.name ?? "") : ""
+    )
   }, [
     createState.reset,
-    existingQuery.data?.name,
+    existingQuery.currentData?.name,
     open,
     organizationId,
     updateState.reset,
@@ -79,15 +81,21 @@ export function CreateOrganizationDialog({
       return
     }
     setSelectedNetworkId((current) => {
-      if (existingQuery.data?.networkId) {
-        return existingQuery.data.networkId
+      if (organizationId && existingQuery.currentData?.networkId) {
+        return existingQuery.currentData.networkId
       }
       if (networkId) {
         return networkId
       }
       return current || firstNetworkId
     })
-  }, [existingQuery.data?.networkId, firstNetworkId, networkId, open])
+  }, [
+    existingQuery.currentData?.networkId,
+    firstNetworkId,
+    networkId,
+    open,
+    organizationId,
+  ])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

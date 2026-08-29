@@ -365,8 +365,8 @@ export function SchemaDefinitionDialog({
     const mockCurrent = schemaId ? getSchema(schemaId) : undefined
     const current =
       mockCurrent?.schema ??
-      (apiSchemaQuery.data
-        ? workspaceSchemaFromApi(apiSchemaQuery.data)
+      (schemaId && apiSchemaQuery.currentData
+        ? workspaceSchemaFromApi(apiSchemaQuery.currentData)
         : undefined)
     setName(current?.name ?? "")
     setSlug(current?.slug ?? "")
@@ -387,21 +387,20 @@ export function SchemaDefinitionDialog({
         ? draftsFromProperties(getJsonSchemaProperties(current.definition))
         : [emptyProperty("property-1", { name: "id", required: true })]
     )
-  }, [apiSchemaQuery.data, open, schemaId])
+  }, [apiSchemaQuery.currentData, open, schemaId])
 
   useEffect(() => {
     if (!open) {
       return
     }
     const mockCurrent = schemaId ? getSchema(schemaId) : undefined
+    const apiCurrent = schemaId ? apiSchemaQuery.currentData : undefined
     setSelectedNetworkId((current) => {
       if (networkId) {
         return networkId
       }
       return (
-        (mockCurrent?.network.id ??
-          apiSchemaQuery.data?.networkId ??
-          current) ||
+        (mockCurrent?.network.id ?? apiCurrent?.networkId ?? current) ||
         firstNetworkId
       )
     })
@@ -411,13 +410,12 @@ export function SchemaDefinitionDialog({
       }
       return (
         mockCurrent?.schema.organizationId ??
-        apiSchemaQuery.data?.organizationId ??
+        apiCurrent?.organizationId ??
         current
       )
     })
   }, [
-    apiSchemaQuery.data?.networkId,
-    apiSchemaQuery.data?.organizationId,
+    apiSchemaQuery.currentData,
     firstNetworkId,
     networkId,
     open,

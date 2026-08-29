@@ -121,7 +121,7 @@ export function NodeDefinitionDialog({
     if (!open) {
       return
     }
-    const current = existingQuery.data
+    const current = nodeDefinitionId ? existingQuery.currentData : undefined
     const nextType =
       current && isNodeType(current.type) ? current.type : "HTTP"
     const nextDefinition = current?.definition ?? defaultDefinition(nextType)
@@ -136,7 +136,13 @@ export function NodeDefinitionDialog({
     )
     setHttp(httpDraftFromDefinition(nextDefinition))
     setJsonText(stringifyDefinition(nextDefinition))
-  }, [existingQuery.data, firstNetworkId, networkId, open])
+  }, [
+    existingQuery.currentData,
+    firstNetworkId,
+    networkId,
+    nodeDefinitionId,
+    open,
+  ])
 
   const composed = definitionFromFields(type, http, message, jsonText)
   const preview = stringifyDefinition(

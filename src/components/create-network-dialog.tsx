@@ -52,10 +52,10 @@ export function CreateNetworkDialog({
     }
     createState.reset()
     updateState.reset()
-    setName(networkId ? (existingQuery.data?.name ?? "") : "")
+    setName(networkId ? (existingQuery.currentData?.name ?? "") : "")
   }, [
     createState.reset,
-    existingQuery.data?.name,
+    existingQuery.currentData?.name,
     networkId,
     open,
     updateState.reset,
