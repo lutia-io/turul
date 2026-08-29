@@ -9,6 +9,7 @@ export type JsonSchemaProperty = {
   required: boolean
   description?: string
   format?: string
+  schemaId?: string
   enumValues?: string[]
   itemsType?: string
 }
@@ -83,6 +84,7 @@ export function getJsonSchemaProperties(
       required: required.has(name),
       description: asString(property?.description),
       format: asString(property?.format),
+      schemaId: asString(property?.schemaId),
       enumValues,
       itemsType: asString(items?.type),
     }
@@ -209,6 +211,10 @@ export function pipelineSourceLabel(definition: JsonObject) {
 
 export function isFileProperty(property: JsonSchemaProperty) {
   return property.format === "file"
+}
+
+export function isForeignProperty(property: JsonSchemaProperty) {
+  return property.format === "foreign"
 }
 
 export function getRecordFileIds(

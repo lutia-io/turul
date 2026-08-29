@@ -2,6 +2,12 @@ import type { JsonObject } from "@/lib/json-definition"
 import { setStringFilterParam } from "@/lib/list-query"
 import { api } from "@/store/api"
 
+export type RelatedRecord = {
+  id: string
+  schemaId: string
+  title: string
+}
+
 export type ApiRecord = {
   id: string
   data: JsonObject
@@ -12,6 +18,7 @@ export type ApiRecord = {
   createdAt: string
   updatedAt: string
   deletedAt?: string | null
+  related?: Record<string, RelatedRecord>
 }
 
 export type CreateRecordRequest = {
@@ -58,6 +65,7 @@ export type ListRecordsParams = {
 
 export type ApiRecordList = {
   items: ApiRecord[]
+  related?: Record<string, RelatedRecord>
   total: number
   page: number
   pageSize: number
@@ -133,7 +141,18 @@ const recordApi = api.injectEndpoints({
         try {
           const { data } = await queryFulfilled
           for (const record of data.items) {
-            dispatch(api.util.upsertQueryData("getRecord", record.id, record))
+            const related: Record<string, RelatedRecord> = {}
+            for (const value of Object.values(record.data)) {
+              if (typeof value === "string" && data.related?.[value]) {
+                related[value] = data.related[value]
+              }
+            }
+            dispatch(
+              api.util.upsertQueryData("getRecord", record.id, {
+                ...record,
+                related,
+              })
+            )
           }
         } catch {
           // List failed; getRecord cache stays unchanged.

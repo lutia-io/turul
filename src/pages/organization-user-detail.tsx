@@ -18,6 +18,7 @@ import { fileKindLabel } from "@/lib/file-preview"
 import {
   getJsonSchemaProperties,
   isFileProperty,
+  isForeignProperty,
   type JsonObject,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
@@ -399,7 +400,7 @@ function recordDisplayTitle(
   fallback: string
 ) {
   for (const property of properties) {
-    if (property.type !== "string" || isFileProperty(property)) {
+    if (property.type !== "string" || isFileProperty(property) || isForeignProperty(property)) {
       continue
     }
     if (property.enumValues?.length) {

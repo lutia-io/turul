@@ -5,6 +5,7 @@ export type JsonSchemaPropertySpec = {
   type: "string" | "number" | "integer" | "boolean" | "array" | "object"
   description: string
   format?: string
+  schemaId?: string
   enum?: string[]
   items?: { type: string }
 }

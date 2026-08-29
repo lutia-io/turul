@@ -38,6 +38,7 @@ import {
   newDraftKey,
   nowTemplate,
   recordFieldTemplate,
+  recordIDTemplate,
   workflowActionTypes,
   type ActionDraft,
   type DataEntryDraft,
@@ -119,39 +120,47 @@ function TemplateValueInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
       />
-      {fields.length > 0 ? (
-        <Select
-          value={INSERT_VALUE}
-          modal={false}
-          items={[
-            { value: INSERT_VALUE, label: "Insert a value…" },
-            { value: "__now", label: "Current time" },
-            ...fields.map((field) => ({
-              value: field.name,
-              label: `From the record: ${field.name}`,
-            })),
-          ]}
-          onValueChange={(next) => {
-            if (!next || next === INSERT_VALUE) {
-              return
-            }
-            onChange(next === "__now" ? nowTemplate : recordFieldTemplate(next))
-          }}
-        >
-          <SelectTrigger size="sm" aria-label="Insert a value from the record">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={INSERT_VALUE}>Insert a value…</SelectItem>
-            <SelectItem value="__now">Current time</SelectItem>
-            {fields.map((field) => (
-              <SelectItem key={field.name} value={field.name}>
-                From the record: {field.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : null}
+      <Select
+        value={INSERT_VALUE}
+        modal={false}
+        items={[
+          { value: INSERT_VALUE, label: "Insert a value…" },
+          { value: "__record_id", label: "Record ID" },
+          { value: "__now", label: "Current time" },
+          ...fields.map((field) => ({
+            value: field.name,
+            label: `From the record: ${field.name}`,
+          })),
+        ]}
+        onValueChange={(next) => {
+          if (!next || next === INSERT_VALUE) {
+            return
+          }
+          if (next === "__now") {
+            onChange(nowTemplate)
+            return
+          }
+          if (next === "__record_id") {
+            onChange(recordIDTemplate)
+            return
+          }
+          onChange(recordFieldTemplate(next))
+        }}
+      >
+        <SelectTrigger size="sm" aria-label="Insert a value from the record">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={INSERT_VALUE}>Insert a value…</SelectItem>
+          <SelectItem value="__record_id">Record ID</SelectItem>
+          <SelectItem value="__now">Current time</SelectItem>
+          {fields.map((field) => (
+            <SelectItem key={field.name} value={field.name}>
+              From the record: {field.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }

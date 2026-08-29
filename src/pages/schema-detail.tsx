@@ -29,6 +29,7 @@ import {
   definitionDescription,
   getJsonSchemaProperties,
   isFileProperty,
+  isForeignProperty,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
 import {
@@ -371,6 +372,9 @@ function PropertyItem({ property }: { property: JsonSchemaProperty }) {
 function propertyTypeLabel(property: JsonSchemaProperty) {
   if (isFileProperty(property)) {
     return "file"
+  }
+  if (isForeignProperty(property)) {
+    return "related record"
   }
   if (property.type === "array" && property.itemsType) {
     return `array of ${property.itemsType}`

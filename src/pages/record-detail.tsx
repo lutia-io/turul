@@ -21,6 +21,7 @@ import {
   getJsonSchemaProperties,
   getRecordFileIds,
   isFileProperty,
+  isForeignProperty,
   type JsonObject,
   type JsonSchemaProperty,
   type JsonValue,
@@ -175,6 +176,9 @@ export default function RecordDetail() {
                   key={property.name}
                   property={property}
                   value={record.data[property.name]}
+                  related={recordQuery.data?.related}
+                  schemas={schemas}
+                  recordHref={(recordId) => href(`records/${recordId}`)}
                 />
               ))}
             </dl>
@@ -344,9 +348,15 @@ function RecordStatusPage({
 function FieldItem({
   property,
   value,
+  related,
+  schemas,
+  recordHref,
 }: {
   property: JsonSchemaProperty
   value: JsonValue | undefined
+  related?: Record<string, { id: string; schemaId: string; title: string }>
+  schemas: { id: string; name: string }[]
+  recordHref: (recordId: string) => string
 }) {
   return (
     <div
@@ -356,7 +366,13 @@ function FieldItem({
         {propertyLabel(property.name)}
       </dt>
       <dd className="mt-1.5 text-sm">
-        <FieldValue property={property} value={value} />
+        <FieldValue
+          property={property}
+          value={value}
+          related={related}
+          schemas={schemas}
+          recordHref={recordHref}
+        />
       </dd>
     </div>
   )
@@ -365,12 +381,43 @@ function FieldItem({
 function FieldValue({
   property,
   value,
+  related,
+  schemas,
+  recordHref,
 }: {
   property: JsonSchemaProperty
   value: JsonValue | undefined
+  related?: Record<string, { id: string; schemaId: string; title: string }>
+  schemas: { id: string; name: string }[]
+  recordHref: (recordId: string) => string
 }) {
   if (value == null || value === "") {
     return <span className="text-muted-foreground">—</span>
+  }
+
+  if (
+    isForeignProperty(property) &&
+    typeof value === "string" &&
+    value
+  ) {
+    const relatedRecord = related?.[value]
+    const schemaName = schemas.find(
+      (schema) => schema.id === (relatedRecord?.schemaId ?? property.schemaId)
+    )?.name
+
+    return (
+      <Link
+        to={recordHref(value)}
+        className="inline-flex max-w-full flex-col gap-0.5 font-medium underline-offset-4 hover:underline"
+      >
+        <span className="truncate">{relatedRecord?.title || value}</span>
+        {schemaName ? (
+          <span className="text-xs font-normal text-muted-foreground">
+            {schemaName}
+          </span>
+        ) : null}
+      </Link>
+    )
   }
 
   if (typeof value === "boolean") {
@@ -504,7 +551,7 @@ function recordDisplayTitle(
   fallback: string
 ) {
   for (const property of properties) {
-    if (property.type !== "string" || isFileProperty(property)) {
+    if (property.type !== "string" || isFileProperty(property) || isForeignProperty(property)) {
       continue
     }
     if (property.enumValues?.length) {

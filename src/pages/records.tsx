@@ -407,6 +407,22 @@ function SchemaRecordsDataTable({
     [organizationId]
   )
 
+  const hrefForRelated = useCallback(
+    (recordId: string) => {
+      return networkWorkspacePath({
+        networkId: network.id,
+        organizationId,
+        rest: `records/${recordId}`,
+      })
+    },
+    [network.id, organizationId]
+  )
+
+  const relatedById = useMemo(() => {
+    const related = list?.related ?? {}
+    return new Map(Object.entries(related))
+  }, [list])
+
   const fileHref = useCallback(
     (fileId: string) => {
       return networkWorkspacePath({
@@ -496,7 +512,9 @@ function SchemaRecordsDataTable({
                 record={row.original}
                 property={property}
                 filesById={filesById}
+                relatedById={relatedById}
                 href={hrefFor(row.original)}
+                relatedHref={hrefForRelated}
                 onPreviewFile={setPreviewFileId}
               />
             ),
@@ -547,9 +565,11 @@ function SchemaRecordsDataTable({
       columnFilters.organization,
       filesById,
       hrefFor,
+      hrefForRelated,
       organizationId,
       organizationsById,
       properties,
+      relatedById,
       setFieldFilter,
     ]
   )

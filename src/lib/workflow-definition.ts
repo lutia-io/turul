@@ -511,8 +511,10 @@ export function actionSummary(action: WorkflowAction): string {
 }
 
 export function recordFieldTemplate(field: string) {
-  return `{{ .Record.${field} }}`
+  return `{{ .Record.data.${field} }}`
 }
+
+export const recordIDTemplate = "{{ .Record.id }}"
 
 export const nowTemplate = "{{ now }}"
 

@@ -6,22 +6,28 @@ import type { Schema } from "@/data/networks"
 import { getBadgeColor } from "@/lib/badge"
 import {
   isFileProperty,
+  isForeignProperty,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
 import { formatCellValue } from "@/lib/records"
 import { cn } from "@/lib/utils"
+import type { RelatedRecord } from "@/store/record-slice"
 
 export function RecordCell({
   record,
   property,
   filesById,
+  relatedById,
   href,
+  relatedHref,
   onPreviewFile,
 }: {
   record: StoredRecord
   property: JsonSchemaProperty
   filesById: Map<string, StoredFile>
+  relatedById?: Map<string, RelatedRecord>
   href: string
+  relatedHref?: (recordId: string) => string
   onPreviewFile: (fileId: string) => void
 }) {
   const value = record.data[property.name]
@@ -38,6 +44,20 @@ export function RecordCell({
         {file ? <FileThumbnail file={file} className="size-6" /> : null}
         <span className="truncate">{file?.filename ?? value}</span>
       </button>
+    )
+  }
+
+  if (isForeignProperty(property) && typeof value === "string" && value) {
+    const related = relatedById?.get(value)
+    const to = relatedHref?.(value) ?? href
+
+    return (
+      <Link
+        to={to}
+        className="block max-w-[18rem] min-w-[6rem] truncate font-medium underline-offset-4 hover:underline"
+      >
+        {related?.title || value}
+      </Link>
     )
   }
 

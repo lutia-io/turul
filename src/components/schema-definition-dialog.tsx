@@ -70,6 +70,7 @@ import {
   networkWorkspacePath,
   useWorkspaceNetworkList,
   useWorkspaceOrganizations,
+  useWorkspaceSchemas,
   workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
 import { slugifyId, toFieldName } from "@/lib/slug"
@@ -99,7 +100,15 @@ const propertyTypeLabels: Record<(typeof propertyTypes)[number], string> = {
   object: "Object",
 }
 
-const formatOptions = ["", "date", "date-time", "email", "uri", "file"] as const
+const formatOptions = [
+  "",
+  "date",
+  "date-time",
+  "email",
+  "uri",
+  "file",
+  "foreign",
+] as const
 
 const formatLabels: Record<
   Exclude<(typeof formatOptions)[number], "">,
@@ -110,6 +119,7 @@ const formatLabels: Record<
   email: "Email",
   uri: "URL",
   file: "File",
+  foreign: "Related record",
 }
 
 const itemTypes = ["string", "number", "integer", "boolean"] as const
@@ -127,6 +137,7 @@ type PropertyDraft = {
   required: boolean
   description: string
   format: PropertyFormat
+  schemaId: string
   enumValues: string[]
   itemsType: (typeof itemTypes)[number]
 }
@@ -142,6 +153,7 @@ function emptyProperty(
     required: false,
     description: "",
     format: "",
+    schemaId: "",
     enumValues: [],
     itemsType: "string",
     ...defaults,
@@ -170,6 +182,7 @@ function draftsFromProperties(
     required: property.required,
     description: property.description ?? "",
     format: asFormat(property.format),
+    schemaId: property.schemaId ?? "",
     enumValues: property.enumValues ?? [],
     itemsType: asItemsType(property.itemsType),
   }))
@@ -205,7 +218,13 @@ function definitionFromDrafts({
 
   for (const [key, spec] of Object.entries(input.properties)) {
     const previous = asJsonObject(previousProperties?.[key])
-    mergedProperties[key] = previous ? { ...previous, ...spec } : spec
+    const merged: JsonObject = previous ? { ...previous, ...spec } : spec
+    if (spec.format !== "foreign") {
+      delete merged.schemaId
+    } else {
+      delete merged.enum
+    }
+    mergedProperties[key] = merged
   }
 
   const next: JsonObject = {
@@ -268,6 +287,10 @@ function toSchemaInput(properties: PropertyDraft[]) {
       spec.format = property.format
     }
 
+    if (property.format === "foreign" && property.schemaId) {
+      spec.schemaId = property.schemaId
+    }
+
     if (property.type === "array") {
       spec.items = { type: property.itemsType }
     }
@@ -276,7 +299,11 @@ function toSchemaInput(properties: PropertyDraft[]) {
       .map((value) => value.trim())
       .filter(Boolean)
 
-    if (enumValues.length > 0 && property.type === "string") {
+    if (
+      enumValues.length > 0 &&
+      property.type === "string" &&
+      property.format !== "foreign"
+    ) {
       spec.enum = enumValues
     }
 
@@ -306,6 +333,7 @@ export function SchemaDefinitionDialog({
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
   const { organizations } = useWorkspaceOrganizations({ skip: !open })
+  const { schemas: workspaceSchemas } = useWorkspaceSchemas({ skip: !open })
   const [createSchema, createState] = useCreateSchemaMutation()
   const [updateSchema, updateState] = useUpdateSchemaMutation()
   const isLoading = createState.isLoading || updateState.isLoading
@@ -426,6 +454,30 @@ export function SchemaDefinitionDialog({
   const networkOrganizations = organizations.filter(
     (organization) => organization.networkId === selectedNetworkId
   )
+  const relatedSchemas = useMemo(
+    () =>
+      workspaceSchemas.filter((schema) => {
+        if (schema.networkId !== selectedNetworkId) {
+          return false
+        }
+        if (schemaId && schema.id === schemaId) {
+          return false
+        }
+        if (!schema.organizationId) {
+          return true
+        }
+        return (
+          Boolean(selectedOrganizationId) &&
+          schema.organizationId === selectedOrganizationId
+        )
+      }),
+    [
+      schemaId,
+      selectedNetworkId,
+      selectedOrganizationId,
+      workspaceSchemas,
+    ]
+  )
   const requiredCount = properties.filter(
     (property) => property.required
   ).length
@@ -510,10 +562,18 @@ export function SchemaDefinitionDialog({
 
   function updateProperty(key: string, patch: Partial<PropertyDraft>) {
     markBuilderSource()
-    const nextPatch =
-      patch.type && patch.type !== "string"
-        ? { ...patch, format: "" as const, enumValues: [] }
-        : patch
+    const nextPatch: Partial<PropertyDraft> = { ...patch }
+    if (patch.type && patch.type !== "string") {
+      nextPatch.format = ""
+      nextPatch.enumValues = []
+      nextPatch.schemaId = ""
+    }
+    if (patch.format !== undefined && patch.format !== "foreign") {
+      nextPatch.schemaId = ""
+    }
+    if (patch.format === "foreign") {
+      nextPatch.enumValues = []
+    }
     setProperties((current) =>
       current.map((property) =>
         property.key === key ? { ...property, ...nextPatch } : property
@@ -856,6 +916,7 @@ export function SchemaDefinitionDialog({
                         jsonKey={propertyKeys[index]!}
                         isDuplicate={duplicateKeys.has(propertyKeys[index]!)}
                         focus={property.key === focusKey}
+                        relatedSchemas={relatedSchemas}
                         onUpdate={(patch) =>
                           updateProperty(property.key, patch)
                         }
@@ -1065,6 +1126,7 @@ function PropertyRow({
   jsonKey,
   isDuplicate,
   focus,
+  relatedSchemas,
   onUpdate,
   onMove,
   onDuplicate,
@@ -1077,6 +1139,7 @@ function PropertyRow({
   jsonKey: string
   isDuplicate: boolean
   focus: boolean
+  relatedSchemas: { id: string; name: string }[]
   onUpdate: (patch: Partial<PropertyDraft>) => void
   onMove: (offset: number) => void
   onDuplicate: () => void
@@ -1088,8 +1151,17 @@ function PropertyRow({
   const requiredId = `${property.key}-required`
   const descriptionId = `${property.key}-description`
   const formatId = `${property.key}-format`
+  const relatedSchemaId = `${property.key}-schema`
   const itemsId = `${property.key}-items`
   const enumId = `${property.key}-enum`
+  const stringFormats = [
+    "date",
+    "date-time",
+    "email",
+    "uri",
+    "file",
+    "foreign",
+  ] as const
 
   function handleNameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") {
@@ -1228,12 +1300,10 @@ function PropertyRow({
                 modal={false}
                 items={[
                   { value: anyFormatValue, label: "Any text" },
-                  ...(["date", "date-time", "email", "uri", "file"] as const).map(
-                    (format) => ({
-                      value: format,
-                      label: formatLabels[format],
-                    })
-                  ),
+                  ...stringFormats.map((format) => ({
+                    value: format,
+                    label: formatLabels[format],
+                  })),
                 ]}
                 onValueChange={(value) => {
                   if (!value || value === anyFormatValue) {
@@ -1248,28 +1318,59 @@ function PropertyRow({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={anyFormatValue}>Any text</SelectItem>
-                  {(["date", "date-time", "email", "uri", "file"] as const).map(
-                    (format) => (
-                      <SelectItem key={format} value={format}>
-                        {formatLabels[format]}
-                      </SelectItem>
-                    )
-                  )}
+                  {stringFormats.map((format) => (
+                    <SelectItem key={format} value={format}>
+                      {formatLabels[format]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field className="gap-1">
-              <FieldLabel htmlFor={enumId}>Allowed values</FieldLabel>
-              <TagInput
-                id={enumId}
-                values={property.enumValues}
-                onChange={(enumValues) => onUpdate({ enumValues })}
-                placeholder="Type a value and press Enter"
-              />
-              <FieldDescription className="text-xs">
-                Optional. Leave empty to allow any text.
-              </FieldDescription>
-            </Field>
+            {property.format === "foreign" ? (
+              <Field className="gap-1">
+                <FieldLabel htmlFor={relatedSchemaId}>Related schema</FieldLabel>
+                <Select
+                  value={property.schemaId || undefined}
+                  modal={false}
+                  items={relatedSchemas.map((schema) => ({
+                    value: schema.id,
+                    label: schema.name,
+                  }))}
+                  onValueChange={(value) => {
+                    if (value) {
+                      onUpdate({ schemaId: value })
+                    }
+                  }}
+                >
+                  <SelectTrigger id={relatedSchemaId}>
+                    <SelectValue placeholder="Select a schema" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {relatedSchemas.map((schema) => (
+                      <SelectItem key={schema.id} value={schema.id}>
+                        {schema.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription className="text-xs">
+                  The record ID stored in this field must belong to that schema.
+                </FieldDescription>
+              </Field>
+            ) : (
+              <Field className="gap-1">
+                <FieldLabel htmlFor={enumId}>Allowed values</FieldLabel>
+                <TagInput
+                  id={enumId}
+                  values={property.enumValues}
+                  onChange={(enumValues) => onUpdate({ enumValues })}
+                  placeholder="Type a value and press Enter"
+                />
+                <FieldDescription className="text-xs">
+                  Optional. Leave empty to allow any text.
+                </FieldDescription>
+              </Field>
+            )}
           </>
         ) : null}
         {property.type === "array" ? (
