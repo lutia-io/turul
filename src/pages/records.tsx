@@ -42,6 +42,10 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor } from "@/lib/badge"
 import {
   getJsonSchemaProperties,
+  isEmailProperty,
+  isFileProperty,
+  isForeignProperty,
+  isUriProperty,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
 import {
@@ -255,7 +259,7 @@ export default function RecordsPage() {
   return (
     <DataTablePage
       title="Records"
-      description="Each schema is a table. Open a row for the record, or click a file to preview it."
+      description="Each schema is a table. Hover a related record, URL, or file for a preview, then click to open it."
     >
       {!network ? (
         <div className="flex min-w-0 shrink-0 gap-1 overflow-x-auto">
@@ -434,20 +438,17 @@ function SchemaRecordsDataTable({
     [network.id, organizationId]
   )
 
-  const setFieldFilter = useCallback(
-    (name: string, value?: FieldFilter) => {
-      setColumnFilters((current) => {
-        const fields = { ...current.fields }
-        if (value) {
-          fields[name] = value
-        } else {
-          delete fields[name]
-        }
-        return { ...current, fields }
-      })
-    },
-    []
-  )
+  const setFieldFilter = useCallback((name: string, value?: FieldFilter) => {
+    setColumnFilters((current) => {
+      const fields = { ...current.fields }
+      if (value) {
+        fields[name] = value
+      } else {
+        delete fields[name]
+      }
+      return { ...current, fields }
+    })
+  }, [])
 
   const columns = useMemo(
     () =>
@@ -513,12 +514,19 @@ function SchemaRecordsDataTable({
                 property={property}
                 filesById={filesById}
                 relatedById={relatedById}
+                schemas={network.schemas}
                 href={hrefFor(row.original)}
                 relatedHref={hrefForRelated}
                 onPreviewFile={setPreviewFileId}
               />
             ),
-            size: 160,
+            size:
+              isForeignProperty(property) ||
+              isFileProperty(property) ||
+              isUriProperty(property) ||
+              isEmailProperty(property)
+                ? 200
+                : 160,
           })
         ),
         helper.accessor("createdAt", {
@@ -566,6 +574,7 @@ function SchemaRecordsDataTable({
       filesById,
       hrefFor,
       hrefForRelated,
+      network.schemas,
       organizationId,
       organizationsById,
       properties,
@@ -616,7 +625,10 @@ function SchemaRecordsDataTable({
       chips.push({
         id: "organization",
         label: "Organization",
-        value: stringFilterChipValue(columnFilters.organization.op, columnFilters.organization.value),
+        value: stringFilterChipValue(
+          columnFilters.organization.op,
+          columnFilters.organization.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -725,4 +737,3 @@ function NetworkPill({
     </button>
   )
 }
-

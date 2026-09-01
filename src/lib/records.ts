@@ -3,6 +3,9 @@ import type { Schema } from "@/data/networks"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
+  isFileProperty,
+  isForeignProperty,
+  type JsonObject,
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
@@ -69,6 +72,31 @@ export function formatCellValue(
   }
 
   return value
+}
+
+export function recordDisplayTitle(
+  data: JsonObject,
+  properties: JsonSchemaProperty[],
+  fallback: string
+) {
+  for (const property of properties) {
+    if (
+      property.type !== "string" ||
+      isFileProperty(property) ||
+      isForeignProperty(property)
+    ) {
+      continue
+    }
+    if (property.enumValues?.length) {
+      continue
+    }
+    const value = data[property.name]
+    if (typeof value === "string" && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  return fallback
 }
 
 export function recordsReferencingFile(

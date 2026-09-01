@@ -12,17 +12,28 @@ import {
 
 import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
-import { propertyLabel } from "@/components/schema-records-table"
+import {
+  propertyLabel,
+  EmailRecordLink,
+  RelatedRecordLink,
+  UriRecordLink,
+} from "@/components/schema-records-table"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import type { Schema } from "@/data/networks"
 import { getBadgeColor } from "@/lib/badge"
-import { formatCellValue, formatFileSize } from "@/lib/records"
+import {
+  formatCellValue,
+  formatFileSize,
+  recordDisplayTitle,
+} from "@/lib/records"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
+  isEmailProperty,
   isFileProperty,
   isForeignProperty,
-  type JsonObject,
+  isUriProperty,
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
@@ -354,7 +365,7 @@ function FieldItem({
   property: JsonSchemaProperty
   value: JsonValue | undefined
   related?: Record<string, { id: string; schemaId: string; title: string }>
-  schemas: { id: string; name: string }[]
+  schemas: Schema[]
   recordHref: (recordId: string) => string
 }) {
   return (
@@ -387,7 +398,7 @@ function FieldValue({
   property: JsonSchemaProperty
   value: JsonValue | undefined
   related?: Record<string, { id: string; schemaId: string; title: string }>
-  schemas: { id: string; name: string }[]
+  schemas: Schema[]
   recordHref: (recordId: string) => string
 }) {
   if (value == null || value === "") {
@@ -396,23 +407,26 @@ function FieldValue({
 
   if (isForeignProperty(property) && typeof value === "string" && value) {
     const relatedRecord = related?.[value]
-    const schemaName = schemas.find(
-      (schema) => schema.id === (relatedRecord?.schemaId ?? property.schemaId)
-    )?.name
+    const schema = schemas.find(
+      (item) => item.id === (relatedRecord?.schemaId ?? property.schemaId)
+    )
 
     return (
-      <Link
-        to={recordHref(value)}
-        className="inline-flex max-w-full flex-col gap-0.5 font-medium underline-offset-4 hover:underline"
-      >
-        <span className="truncate">{relatedRecord?.title || value}</span>
-        {schemaName ? (
-          <span className="text-xs font-normal text-muted-foreground">
-            {schemaName}
-          </span>
-        ) : null}
-      </Link>
+      <RelatedRecordLink
+        recordId={value}
+        title={relatedRecord?.title}
+        schema={schema}
+        href={recordHref(value)}
+      />
     )
+  }
+
+  if (isUriProperty(property) && typeof value === "string" && value) {
+    return <UriRecordLink value={value} />
+  }
+
+  if (isEmailProperty(property) && typeof value === "string" && value) {
+    return <EmailRecordLink value={value} />
   }
 
   if (typeof value === "boolean") {
@@ -538,31 +552,6 @@ function RecordFileRow({
       </span>
     </button>
   )
-}
-
-function recordDisplayTitle(
-  data: JsonObject,
-  properties: JsonSchemaProperty[],
-  fallback: string
-) {
-  for (const property of properties) {
-    if (
-      property.type !== "string" ||
-      isFileProperty(property) ||
-      isForeignProperty(property)
-    ) {
-      continue
-    }
-    if (property.enumValues?.length) {
-      continue
-    }
-    const value = data[property.name]
-    if (typeof value === "string" && value.trim()) {
-      return value.trim()
-    }
-  }
-
-  return fallback
 }
 
 function isWideField(

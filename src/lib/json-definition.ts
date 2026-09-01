@@ -125,7 +125,9 @@ export type PipelineLevelNode = {
   id: string
 }
 
-export function getPipelineLevels(definition: JsonObject): PipelineLevelNode[][] {
+export function getPipelineLevels(
+  definition: JsonObject
+): PipelineLevelNode[][] {
   if (!Array.isArray(definition.nodes)) {
     return []
   }
@@ -215,6 +217,14 @@ export function isFileProperty(property: JsonSchemaProperty) {
 
 export function isForeignProperty(property: JsonSchemaProperty) {
   return property.format === "foreign"
+}
+
+export function isUriProperty(property: JsonSchemaProperty) {
+  return property.format === "uri"
+}
+
+export function isEmailProperty(property: JsonSchemaProperty) {
+  return property.format === "email"
 }
 
 export function getRecordFileIds(
