@@ -141,11 +141,12 @@ export function WorkflowDefinitionDialog({
   const triggerFields = schemaFieldOptions(triggerSchema?.definition)
 
   useEffect(() => {
-    if (open) {
-      createState.reset()
-      updateState.reset()
-    }
-  }, [createState.reset, open, updateState.reset])
+    createState.reset()
+    updateState.reset()
+    // Reset only when the dialog opens or closes. `reset` changes after each
+    // mutation (it closes over requestId) and would clear a 409 before render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open only
+  }, [open])
 
   useEffect(() => {
     if (!open) {

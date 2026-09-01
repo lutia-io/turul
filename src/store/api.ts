@@ -72,7 +72,20 @@ export type UpdatePasswordRequest = {
   newPassword: string
 }
 
+export const HUMA_ERROR_CODES = {
+  badRequest: "bad_request",
+  unauthorized: "unauthorized",
+  forbidden: "forbidden",
+  conflict: "conflict",
+  notFound: "not_found",
+  internal: "internal",
+} as const
+
+export type HumaErrorCode =
+  (typeof HUMA_ERROR_CODES)[keyof typeof HUMA_ERROR_CODES]
+
 export type HumaError = {
+  code: string
   message: string
 }
 
@@ -258,7 +271,7 @@ export const api = createApi({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: ["Me"],
+      invalidatesTags: (_result, error) => (error ? [] : ["Me"]),
     }),
     updatePassword: build.mutation<void, UpdatePasswordRequest>({
       query: ({ id, principalType, currentPassword, newPassword }) => ({
@@ -289,19 +302,71 @@ function isHumaError(data: unknown): data is HumaError {
   return (
     typeof data === "object" &&
     data !== null &&
+    "code" in data &&
+    typeof data.code === "string" &&
+    data.code.length > 0 &&
     "message" in data &&
     typeof data.message === "string" &&
     data.message.length > 0
   )
 }
 
+export function getHumaError(error: unknown): HumaError | undefined {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return undefined
+  }
+
+  return isHumaError(error.data) ? error.data : undefined
+}
+
+export function isHumaErrorCode(error: unknown, code: HumaErrorCode) {
+  return getHumaError(error)?.code === code
+}
+
 export function getHumaErrorMessage(
   error: unknown,
   fallback = "Something went wrong"
 ) {
-  if (typeof error !== "object" || error === null || !("data" in error)) {
-    return fallback
-  }
+  return getHumaError(error)?.message ?? fallback
+}
 
-  return isHumaError(error.data) ? error.data.message : fallback
+export function getHumaLoadErrorCopy(
+  error: unknown,
+  {
+    resource,
+    notFoundMessage,
+  }: {
+    resource: string
+    notFoundMessage: string
+  }
+) {
+  const huma = getHumaError(error)
+  switch (huma?.code) {
+    case HUMA_ERROR_CODES.notFound:
+      return {
+        title: `${resource} not found`,
+        message: notFoundMessage,
+        destructive: true,
+      }
+    case HUMA_ERROR_CODES.forbidden:
+      return {
+        title: "Access denied",
+        message:
+          huma.message ||
+          `You don't have permission to view this ${resource.toLowerCase()}.`,
+        destructive: true,
+      }
+    case HUMA_ERROR_CODES.unauthorized:
+      return {
+        title: "Sign in required",
+        message: huma.message || "Sign in to continue.",
+        destructive: true,
+      }
+    default:
+      return {
+        title: `Couldn't load ${resource.toLowerCase()}`,
+        message: huma?.message ?? "Something went wrong",
+        destructive: true,
+      }
+  }
 }

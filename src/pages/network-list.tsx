@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
+import { DeleteOrganizationDialog } from "@/components/delete-organization-dialog"
 import { RefreshButton } from "@/components/refresh-button"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -46,7 +47,6 @@ import {
 import { formatRelativeTime } from "@/lib/runs"
 import { getHumaErrorMessage } from "@/store/api"
 import { useDeleteNetworkMutation } from "@/store/network-slice"
-import { useDeleteOrganizationMutation } from "@/store/organization-slice"
 import type { Network, Organization } from "@/data/networks"
 
 type NetworkDetails = Network & {
@@ -177,73 +177,6 @@ function AddOrganizationCard({ onClick }: { onClick: () => void }) {
         </p>
       </div>
     </button>
-  )
-}
-
-function DeleteOrganizationDialog({
-  organization,
-  open,
-  onOpenChange,
-}: {
-  organization: Organization
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}) {
-  const [deleteOrganization, deleteState] = useDeleteOrganizationMutation()
-
-  async function handleDelete() {
-    try {
-      await deleteOrganization(organization.id).unwrap()
-      onOpenChange(false)
-    } catch {
-      // Error is rendered from the mutation state.
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          deleteState.reset()
-        }
-        onOpenChange(nextOpen)
-      }}
-    >
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Delete {organization.name}?</DialogTitle>
-          <DialogDescription>
-            This will permanently delete the organization. This cannot be
-            undone.
-          </DialogDescription>
-        </DialogHeader>
-        {deleteState.error ? (
-          <p className="text-sm text-destructive">
-            {getHumaErrorMessage(
-              deleteState.error,
-              "Failed to delete organization"
-            )}
-          </p>
-        ) : null}
-        <DialogFooter>
-          <DialogClose
-            render={
-              <Button variant="outline" disabled={deleteState.isLoading} />
-            }
-          >
-            Cancel
-          </DialogClose>
-          <Button
-            variant="destructive"
-            onClick={() => void handleDelete()}
-            disabled={deleteState.isLoading}
-          >
-            {deleteState.isLoading ? "Deleting..." : "Delete organization"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 

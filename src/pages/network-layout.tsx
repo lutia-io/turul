@@ -7,6 +7,7 @@ import {
   parseNetworkPath,
   useNetworkWorkspace,
 } from "@/lib/network-workspace"
+import { getHumaLoadErrorCopy } from "@/store/api"
 
 export default function NetworkLayout() {
   const { pathname } = useLocation()
@@ -15,6 +16,8 @@ export default function NetworkLayout() {
     requestedOrganizationId,
     organization,
     isNetworkLoading,
+    isNetworkError,
+    networkError,
     isOrganizationLoading,
   } = useNetworkWorkspace()
   const parsed = parseNetworkPath(pathname)
@@ -57,13 +60,30 @@ export default function NetworkLayout() {
     )
   }
 
-  if (!network) {
+  if (isNetworkError || !network) {
+    const copy = isNetworkError
+      ? getHumaLoadErrorCopy(networkError, {
+          resource: "Network",
+          notFoundMessage:
+            "This network does not exist or is no longer available.",
+        })
+      : {
+          title: "Network not found",
+          message: "This network does not exist or is no longer available.",
+          destructive: false,
+        }
     return (
       <AppShell sidebar={<NetworkSidebar style={appSidebarStyle} />}>
         <div className="flex flex-1 flex-col gap-2 p-4">
-          <h1 className="text-lg font-semibold">Network not found</h1>
-          <p className="text-sm text-muted-foreground">
-            This network does not exist or is no longer available.
+          <h1 className="text-lg font-semibold">{copy.title}</h1>
+          <p
+            className={
+              copy.destructive
+                ? "text-sm text-destructive"
+                : "text-sm text-muted-foreground"
+            }
+          >
+            {copy.message}
           </p>
           <Link
             to="/app/networks"

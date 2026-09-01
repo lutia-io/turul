@@ -38,7 +38,7 @@ import {
 } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetFileQuery } from "@/store/file-slice"
@@ -110,12 +110,11 @@ export default function RecordDetail() {
   if (recordQuery.isError) {
     return (
       <RecordStatusPage
-        title="Record not found"
-        message={getHumaErrorMessage(
-          recordQuery.error,
-          "This record does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(recordQuery.error, {
+          resource: "Record",
+          notFoundMessage:
+            "This record does not exist or is no longer available.",
+        })}
       />
     )
   }
@@ -395,11 +394,7 @@ function FieldValue({
     return <span className="text-muted-foreground">—</span>
   }
 
-  if (
-    isForeignProperty(property) &&
-    typeof value === "string" &&
-    value
-  ) {
+  if (isForeignProperty(property) && typeof value === "string" && value) {
     const relatedRecord = related?.[value]
     const schemaName = schemas.find(
       (schema) => schema.id === (relatedRecord?.schemaId ?? property.schemaId)
@@ -551,7 +546,11 @@ function recordDisplayTitle(
   fallback: string
 ) {
   for (const property of properties) {
-    if (property.type !== "string" || isFileProperty(property) || isForeignProperty(property)) {
+    if (
+      property.type !== "string" ||
+      isFileProperty(property) ||
+      isForeignProperty(property)
+    ) {
       continue
     }
     if (property.enumValues?.length) {

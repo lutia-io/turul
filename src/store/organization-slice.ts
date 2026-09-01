@@ -145,7 +145,8 @@ const organizationApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Organization", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "Organization", id: "LIST" }],
     }),
     updateOrganization: build.mutation<
       UpdateOrganizationResponse,
@@ -156,10 +157,13 @@ const organizationApi = api.injectEndpoints({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "Organization", id },
-        { type: "Organization", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "Organization", id },
+              { type: "Organization", id: "LIST" },
+            ],
     }),
     deleteOrganization: build.mutation<void, string>({
       query: (id) => ({
@@ -167,11 +171,14 @@ const organizationApi = api.injectEndpoints({
         method: "DELETE",
         responseHandler: (response) => response.text(),
       }),
-      invalidatesTags: (_result, _error, id) => [
-        { type: "Organization", id },
-        { type: "Organization", id: "LIST" },
-        { type: "OrganizationUser", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, id) =>
+        error
+          ? []
+          : [
+              { type: "Organization", id },
+              { type: "Organization", id: "LIST" },
+              { type: "OrganizationUser", id: "LIST" },
+            ],
     }),
   }),
 })

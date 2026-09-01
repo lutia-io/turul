@@ -31,7 +31,7 @@ import {
   runProgress,
 } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetPipelineQuery } from "@/store/pipeline-slice"
@@ -76,12 +76,11 @@ export default function PipelineRunDetail() {
   if (pipelineQuery.isError) {
     return (
       <PipelineRunStatusPage
-        title="Pipeline run not found"
-        message={getHumaErrorMessage(
-          pipelineQuery.error,
-          "This pipeline execution does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(pipelineQuery.error, {
+          resource: "Pipeline run",
+          notFoundMessage:
+            "This pipeline execution does not exist or is no longer available.",
+        })}
       />
     )
   }

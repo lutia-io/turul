@@ -150,7 +150,8 @@ const nodeApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "NodeDefinition", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "NodeDefinition", id: "LIST" }],
     }),
     updateNodeDefinition: build.mutation<
       { id: string },
@@ -161,10 +162,13 @@ const nodeApi = api.injectEndpoints({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "NodeDefinition", id },
-        { type: "NodeDefinition", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "NodeDefinition", id },
+              { type: "NodeDefinition", id: "LIST" },
+            ],
     }),
   }),
 })

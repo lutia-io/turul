@@ -42,7 +42,7 @@ import {
 } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetSchemaQuery } from "@/store/schema-slice"
@@ -106,12 +106,11 @@ export default function SchemaDetail() {
   if (schemaQuery.isError) {
     return (
       <DefinitionStatusPage
-        title="Schema not found"
-        message={getHumaErrorMessage(
-          schemaQuery.error,
-          "This schema does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(schemaQuery.error, {
+          resource: "Schema",
+          notFoundMessage:
+            "This schema does not exist or is no longer available.",
+        })}
       />
     )
   }

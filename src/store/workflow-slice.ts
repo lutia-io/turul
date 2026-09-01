@@ -282,7 +282,8 @@ const workflowApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "WorkflowDefinition", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "WorkflowDefinition", id: "LIST" }],
     }),
     updateWorkflowDefinition: build.mutation<
       UpdateWorkflowDefinitionResponse,
@@ -293,10 +294,13 @@ const workflowApi = api.injectEndpoints({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "WorkflowDefinition", id },
-        { type: "WorkflowDefinition", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "WorkflowDefinition", id },
+              { type: "WorkflowDefinition", id: "LIST" },
+            ],
     }),
     listWorkflows: build.query<ApiWorkflowList, ListWorkflowsParams | void>({
       query: (params) => ({

@@ -81,23 +81,23 @@ export function CreateOrganizationUserDialog({
   const firstOrganizationId = networkOrganizations[0]?.id ?? ""
 
   useEffect(() => {
+    createState.reset()
+    updateState.reset()
+    // Reset only when the dialog opens or closes. `reset` changes after each
+    // mutation (it closes over requestId) and would clear a 409 before render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open only
+  }, [open])
+
+  useEffect(() => {
     if (!open) {
       return
     }
-    createState.reset()
-    updateState.reset()
     const current = organizationUserId ? existingQuery.currentData : undefined
     setFirstName(current?.firstName ?? "")
     setLastName(current?.lastName ?? "")
     setEmail(current?.email ?? "")
     setPassword("")
-  }, [
-    createState.reset,
-    existingQuery.currentData,
-    open,
-    organizationUserId,
-    updateState.reset,
-  ])
+  }, [existingQuery.currentData, open, organizationUserId])
 
   useEffect(() => {
     if (!open) {

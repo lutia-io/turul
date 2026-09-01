@@ -27,7 +27,7 @@ import {
 } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetFileContentQuery, useGetFileQuery } from "@/store/file-slice"
@@ -75,12 +75,11 @@ export default function FileDetail() {
   if (fileQuery.isError) {
     return (
       <FileStatusPage
-        title="File not found"
-        message={getHumaErrorMessage(
-          fileQuery.error,
-          "This file does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(fileQuery.error, {
+          resource: "File",
+          notFoundMessage:
+            "This file does not exist or is no longer available.",
+        })}
       />
     )
   }

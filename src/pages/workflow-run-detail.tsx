@@ -32,7 +32,7 @@ import {
 } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { parseWorkflowDefinition } from "@/lib/workflow-definition"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetWorkflowQuery } from "@/store/workflow-slice"
@@ -80,12 +80,11 @@ export default function WorkflowRunDetail() {
   if (workflowQuery.isError) {
     return (
       <WorkflowRunStatusPage
-        title="Workflow run not found"
-        message={getHumaErrorMessage(
-          workflowQuery.error,
-          "This workflow execution does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(workflowQuery.error, {
+          resource: "Workflow run",
+          notFoundMessage:
+            "This workflow execution does not exist or is no longer available.",
+        })}
       />
     )
   }

@@ -638,9 +638,11 @@ export function useNetworkWorkspace() {
     organization,
     isNetworkLoading: networkQuery.isLoading,
     isNetworkError: networkQuery.isError,
+    networkError: networkQuery.error,
     isOrganizationLoading:
       Boolean(organizationId) && organizationQuery.isLoading,
     isOrganizationError: organizationQuery.isError,
+    organizationError: organizationQuery.error,
     isFetching:
       networkQuery.isFetching ||
       organizationQuery.isFetching ||

@@ -60,21 +60,19 @@ export function CreateOrganizationDialog({
   const firstNetworkId = networks[0]?.id ?? ""
 
   useEffect(() => {
+    createState.reset()
+    updateState.reset()
+    // Reset only when the dialog opens or closes. `reset` changes after each
+    // mutation (it closes over requestId) and would clear a 409 before render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open only
+  }, [open])
+
+  useEffect(() => {
     if (!open) {
       return
     }
-    createState.reset()
-    updateState.reset()
-    setName(
-      organizationId ? (existingQuery.currentData?.name ?? "") : ""
-    )
-  }, [
-    createState.reset,
-    existingQuery.currentData?.name,
-    open,
-    organizationId,
-    updateState.reset,
-  ])
+    setName(organizationId ? (existingQuery.currentData?.name ?? "") : "")
+  }, [existingQuery.currentData?.name, open, organizationId])
 
   useEffect(() => {
     if (!open) {

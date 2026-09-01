@@ -47,7 +47,7 @@ import {
   type WorkflowAction,
   type WorkflowCriteria,
 } from "@/lib/workflow-definition"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetWorkflowDefinitionQuery } from "@/store/workflow-slice"
@@ -135,12 +135,11 @@ export default function WorkflowDefinitionDetail() {
   if (workflowQuery.isError) {
     return (
       <DefinitionStatusPage
-        title="Workflow definition not found"
-        message={getHumaErrorMessage(
-          workflowQuery.error,
-          "This workflow definition does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(workflowQuery.error, {
+          resource: "Workflow definition",
+          notFoundMessage:
+            "This workflow definition does not exist or is no longer available.",
+        })}
       />
     )
   }

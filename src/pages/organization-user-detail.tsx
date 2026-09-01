@@ -35,7 +35,7 @@ import {
 import { formatFileSize } from "@/lib/records"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetOrganizationUserQuery } from "@/store/organization-user-slice"
@@ -83,12 +83,11 @@ export default function OrganizationUserDetail() {
   if (organizationUserQuery.isError) {
     return (
       <OrganizationUserStatusPage
-        title="Organization user not found"
-        message={getHumaErrorMessage(
-          organizationUserQuery.error,
-          "This organization user does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(organizationUserQuery.error, {
+          resource: "Organization user",
+          notFoundMessage:
+            "This organization user does not exist or is no longer available.",
+        })}
       />
     )
   }
@@ -400,7 +399,11 @@ function recordDisplayTitle(
   fallback: string
 ) {
   for (const property of properties) {
-    if (property.type !== "string" || isFileProperty(property) || isForeignProperty(property)) {
+    if (
+      property.type !== "string" ||
+      isFileProperty(property) ||
+      isForeignProperty(property)
+    ) {
       continue
     }
     if (property.enumValues?.length) {

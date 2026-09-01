@@ -292,7 +292,8 @@ const pipelineApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "PipelineDefinition", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "PipelineDefinition", id: "LIST" }],
     }),
     updatePipelineDefinition: build.mutation<
       { id: string },
@@ -303,10 +304,13 @@ const pipelineApi = api.injectEndpoints({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "PipelineDefinition", id },
-        { type: "PipelineDefinition", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "PipelineDefinition", id },
+              { type: "PipelineDefinition", id: "LIST" },
+            ],
     }),
     listPipelines: build.query<ApiPipelineList, ListPipelinesParams | void>({
       query: (params) => ({
@@ -346,7 +350,8 @@ const pipelineApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Pipeline", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "Pipeline", id: "LIST" }],
     }),
     listPipelineNodes: build.query<ApiPipelineNode[], string>({
       query: (pipelineId) => `/pipeline/${pipelineId}/node`,

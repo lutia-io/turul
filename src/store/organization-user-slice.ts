@@ -153,7 +153,8 @@ const organizationUserApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "OrganizationUser", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "OrganizationUser", id: "LIST" }],
     }),
     updateOrganizationUser: build.mutation<
       UpdateOrganizationUserResponse,
@@ -164,11 +165,14 @@ const organizationUserApi = api.injectEndpoints({
         method: "PATCH",
         body: password ? { ...body, password } : body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "OrganizationUser", id },
-        { type: "OrganizationUser", id: "LIST" },
-        "Me",
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "OrganizationUser", id },
+              { type: "OrganizationUser", id: "LIST" },
+              "Me",
+            ],
     }),
   }),
 })

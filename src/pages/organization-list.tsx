@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { PencilIcon, PlusIcon, ViewIcon } from "lucide-react"
+import { PencilIcon, PlusIcon, Trash2Icon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import {
@@ -26,6 +26,7 @@ import {
   type StringFilterOp,
 } from "@/components/data-table-view"
 import { useCreateEntity } from "@/components/create-entity"
+import { DeleteOrganizationDialog } from "@/components/delete-organization-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -105,6 +106,8 @@ export default function OrganizationList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateOrganization, openEditOrganization } = useCreateEntity()
+  const [deleteTarget, setDeleteTarget] = useState<OrganizationRow | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
   const [columnFilters, setColumnFilters] = useState<OrganizationColumnFilters>(
@@ -272,6 +275,16 @@ export default function OrganizationList() {
                     <PencilIcon />
                     Edit
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => {
+                      setDeleteTarget(row.original)
+                      setDeleteOpen(true)
+                    }}
+                  >
+                    <Trash2Icon />
+                    Delete
+                  </DropdownMenuItem>
                 </>
               }
             />
@@ -395,6 +408,11 @@ export default function OrganizationList() {
           <DataTablePagination table={table} />
         </>
       )}
+      <DeleteOrganizationDialog
+        organization={deleteTarget}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+      />
     </DataTablePage>
   )
 }

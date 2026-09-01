@@ -47,7 +47,7 @@ import {
 } from "@/lib/pipeline-definition"
 import { apiPipelineStatus, formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaErrorMessage } from "@/store/api"
+import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
@@ -123,12 +123,11 @@ export default function PipelineDefinitionDetail() {
   if (pipelineQuery.isError) {
     return (
       <DefinitionStatusPage
-        title="Pipeline definition not found"
-        message={getHumaErrorMessage(
-          pipelineQuery.error,
-          "This pipeline definition does not exist or is no longer available."
-        )}
-        destructive
+        {...getHumaLoadErrorCopy(pipelineQuery.error, {
+          resource: "Pipeline definition",
+          notFoundMessage:
+            "This pipeline definition does not exist or is no longer available.",
+        })}
       />
     )
   }

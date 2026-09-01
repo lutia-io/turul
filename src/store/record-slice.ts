@@ -169,7 +169,8 @@ const recordApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Record", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "Record", id: "LIST" }],
     }),
     updateRecord: build.mutation<UpdateRecordResponse, UpdateRecordRequest>({
       query: ({ id, ...body }) => ({
@@ -177,10 +178,13 @@ const recordApi = api.injectEndpoints({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "Record", id },
-        { type: "Record", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "Record", id },
+              { type: "Record", id: "LIST" },
+            ],
     }),
   }),
 })

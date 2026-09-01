@@ -154,7 +154,8 @@ const schemaApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Schema", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "Schema", id: "LIST" }],
     }),
     updateSchema: build.mutation<UpdateSchemaResponse, UpdateSchemaRequest>({
       query: ({ id, ...body }) => ({
@@ -162,10 +163,13 @@ const schemaApi = api.injectEndpoints({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "Schema", id },
-        { type: "Schema", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "Schema", id },
+              { type: "Schema", id: "LIST" },
+            ],
     }),
   }),
 })

@@ -378,12 +378,17 @@ export function SchemaDefinitionDialog({
   }
 
   useEffect(() => {
-    if (open) {
-      createState.reset()
-      updateState.reset()
-      setSelectedOrganizationId(organizationId ?? "")
+    if (!open) {
+      return
     }
-  }, [createState.reset, open, organizationId, updateState.reset])
+    createState.reset()
+    updateState.reset()
+    setSelectedOrganizationId(organizationId ?? "")
+    // Reset only when the dialog opens or its org scope changes. `reset`
+    // changes after each mutation (it closes over requestId) and would clear
+    // a 409 before render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open/org only
+  }, [open, organizationId])
 
   useEffect(() => {
     if (!open) {
@@ -471,12 +476,7 @@ export function SchemaDefinitionDialog({
           schema.organizationId === selectedOrganizationId
         )
       }),
-    [
-      schemaId,
-      selectedNetworkId,
-      selectedOrganizationId,
-      workspaceSchemas,
-    ]
+    [schemaId, selectedNetworkId, selectedOrganizationId, workspaceSchemas]
   )
   const requiredCount = properties.filter(
     (property) => property.required
@@ -1328,7 +1328,9 @@ function PropertyRow({
             </Field>
             {property.format === "foreign" ? (
               <Field className="gap-1">
-                <FieldLabel htmlFor={relatedSchemaId}>Related schema</FieldLabel>
+                <FieldLabel htmlFor={relatedSchemaId}>
+                  Related schema
+                </FieldLabel>
                 <Select
                   value={property.schemaId || undefined}
                   modal={false}

@@ -61,7 +61,8 @@ const networkApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Network", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "Network", id: "LIST" }],
     }),
     updateNetwork: build.mutation<UpdateNetworkResponse, UpdateNetworkRequest>({
       query: ({ id, ...body }) => ({
@@ -69,10 +70,13 @@ const networkApi = api.injectEndpoints({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, { id }) => [
-        { type: "Network", id },
-        { type: "Network", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, { id }) =>
+        error
+          ? []
+          : [
+              { type: "Network", id },
+              { type: "Network", id: "LIST" },
+            ],
     }),
     deleteNetwork: build.mutation<void, string>({
       query: (id) => ({
@@ -80,11 +84,14 @@ const networkApi = api.injectEndpoints({
         method: "DELETE",
         responseHandler: (response) => response.text(),
       }),
-      invalidatesTags: (_result, _error, id) => [
-        { type: "Network", id },
-        { type: "Network", id: "LIST" },
-        { type: "Organization", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, id) =>
+        error
+          ? []
+          : [
+              { type: "Network", id },
+              { type: "Network", id: "LIST" },
+              { type: "Organization", id: "LIST" },
+            ],
     }),
   }),
 })

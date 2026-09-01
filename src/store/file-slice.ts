@@ -174,7 +174,8 @@ const fileApi = api.injectEndpoints({
           body,
         }
       },
-      invalidatesTags: [{ type: "File", id: "LIST" }],
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "File", id: "LIST" }],
     }),
     deleteFile: build.mutation<void, string>({
       query: (id) => ({
@@ -182,10 +183,13 @@ const fileApi = api.injectEndpoints({
         method: "DELETE",
         responseHandler: (response) => response.text(),
       }),
-      invalidatesTags: (_result, _error, id) => [
-        { type: "File", id },
-        { type: "File", id: "LIST" },
-      ],
+      invalidatesTags: (_result, error, id) =>
+        error
+          ? []
+          : [
+              { type: "File", id },
+              { type: "File", id: "LIST" },
+            ],
     }),
   }),
 })
