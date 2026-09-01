@@ -545,7 +545,7 @@ export default function WorkflowDefinitionList() {
       action={
         <Button onClick={() => openCreateWorkflow(network?.id)}>
           <PlusIcon />
-          Create workflow
+          Create workflow definition
         </Button>
       }
     >

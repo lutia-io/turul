@@ -7,6 +7,7 @@ import {
   type FormEvent,
 } from "react"
 import { useNavigate, useParams } from "react-router"
+import { Loader } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
 import { Button } from "@/components/ui/button"
@@ -391,7 +392,7 @@ export function WorkflowDefinitionDialog({
       <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
-            {editing ? "Edit workflow" : "Create a workflow"}
+            {editing ? "Edit workflow definition" : "Create a workflow definition"}
           </DialogTitle>
           <DialogDescription>
             {triggerSchema
@@ -543,14 +544,21 @@ export function WorkflowDefinitionDialog({
             <Button
               type="submit"
               disabled={isLoading || !canSubmit || Boolean(jsonError)}
+              aria-busy={isLoading}
+              className={isLoading ? "disabled:opacity-100" : undefined}
             >
-              {isLoading
-                ? editing
-                  ? "Saving..."
-                  : "Creating..."
-                : editing
-                  ? "Save workflow"
-                  : "Create workflow"}
+              {isLoading ? (
+                <>
+                  <Loader className="animate-spin" />
+                  <span className="sr-only">
+                    {editing ? "Saving" : "Creating"}
+                  </span>
+                </>
+              ) : editing ? (
+                "Save workflow definition"
+              ) : (
+                "Create workflow definition"
+              )}
             </Button>
           </DialogFooter>
         </form>

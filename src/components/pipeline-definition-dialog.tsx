@@ -7,6 +7,7 @@ import {
   type FormEvent,
 } from "react"
 import { useNavigate } from "react-router"
+import { Loader } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
 import {
@@ -340,14 +341,21 @@ export function PipelineDefinitionDialog({
               disabled={
                 isLoading || !name.trim() || !selectedNetworkId || !definition
               }
+              aria-busy={isLoading}
+              className={isLoading ? "disabled:opacity-100" : undefined}
             >
-              {isLoading
-                ? editing
-                  ? "Saving..."
-                  : "Creating..."
-                : editing
-                  ? "Save pipeline"
-                  : "Create pipeline"}
+              {isLoading ? (
+                <>
+                  <Loader className="animate-spin" />
+                  <span className="sr-only">
+                    {editing ? "Saving" : "Creating"}
+                  </span>
+                </>
+              ) : editing ? (
+                "Save pipeline definition"
+              ) : (
+                "Create pipeline definition"
+              )}
             </Button>
           </DialogFooter>
         </form>

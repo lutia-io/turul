@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { PlayIcon, ViewIcon } from "lucide-react"
+import { ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import {
@@ -26,7 +26,6 @@ import {
   type StringFilterOp,
 } from "@/components/data-table-view"
 import { RunStatusPill } from "@/components/run-card"
-import { buttonVariants } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor } from "@/lib/badge"
@@ -516,21 +515,6 @@ export default function PipelineList() {
         network
           ? `Live pipeline executions in ${network.name}${organizationId ? " for this organization" : ""}.`
           : "Active pipeline executions across your networks. Open a run to inspect the current level."
-      }
-      action={
-        network ? (
-          <Link
-            to={networkWorkspacePath({
-              networkId: network.id,
-              organizationId,
-              rest: "pipeline-definitions",
-            })}
-            className={buttonVariants()}
-          >
-            <PlayIcon />
-            Start a pipeline
-          </Link>
-        ) : null
       }
     >
       <DataTableToolbar

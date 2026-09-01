@@ -505,7 +505,7 @@ export default function PipelineDefinitionList() {
       action={
         <Button onClick={() => openCreatePipeline(network?.id)}>
           <PlusIcon />
-          Create pipeline
+          Create pipeline definition
         </Button>
       }
     >

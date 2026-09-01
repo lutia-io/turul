@@ -138,7 +138,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
     <CreateEntityContext.Provider value={value}>
       {children}
       <CreateNetworkDialog
-        key={dialogKeys.network}
+        key={`network-${dialogKeys.network}`}
         open={state?.kind === "network"}
         onOpenChange={(open) => {
           if (!open) {
@@ -148,7 +148,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         networkId={state?.kind === "network" ? state.networkId : undefined}
       />
       <CreateOrganizationDialog
-        key={dialogKeys.organization}
+        key={`organization-${dialogKeys.organization}`}
         open={state?.kind === "organization"}
         onOpenChange={(open) => {
           if (!open) {
@@ -161,7 +161,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <CreateOrganizationUserDialog
-        key={dialogKeys.organizationUser}
+        key={`organizationUser-${dialogKeys.organizationUser}`}
         open={state?.kind === "organizationUser"}
         onOpenChange={(open) => {
           if (!open) {
@@ -181,7 +181,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <SchemaDefinitionDialog
-        key={dialogKeys.schema}
+        key={`schema-${dialogKeys.schema}`}
         open={state?.kind === "schema"}
         onOpenChange={(open) => {
           if (!open) {
@@ -195,7 +195,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         schemaId={state?.kind === "schema" ? state.schemaId : undefined}
       />
       <WorkflowDefinitionDialog
-        key={dialogKeys.workflow}
+        key={`workflow-${dialogKeys.workflow}`}
         open={state?.kind === "workflow"}
         onOpenChange={(open) => {
           if (!open) {
@@ -208,7 +208,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <PipelineDefinitionDialog
-        key={dialogKeys.pipeline}
+        key={`pipeline-${dialogKeys.pipeline}`}
         open={state?.kind === "pipeline"}
         onOpenChange={(open) => {
           if (!open) {
@@ -221,7 +221,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         }
       />
       <NodeDefinitionDialog
-        key={dialogKeys.node}
+        key={`node-${dialogKeys.node}`}
         open={state?.kind === "node"}
         onOpenChange={(open) => {
           if (!open) {

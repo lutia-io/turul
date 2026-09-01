@@ -12,11 +12,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  BadgeCheckIcon,
   BellIcon,
   CreditCardIcon,
   LogOutIcon,
   SparklesIcon,
+  UserIcon,
 } from "lucide-react"
 
 function getInitials(name: string) {
@@ -84,7 +84,7 @@ export function NavUser({
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem render={<Link to="/app/account" />}>
-            <BadgeCheckIcon />
+            <UserIcon />
             Account
           </DropdownMenuItem>
           <DropdownMenuItem render={<Link to="/app/billing" />}>
