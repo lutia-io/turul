@@ -42,43 +42,43 @@ const capabilities: {
   color: BadgeColor
   icon: LucideIcon
 }[] = [
-  {
-    title: "Networks",
-    body: "The group that shares data.",
-    color: "purple",
-    icon: ListIcon,
-  },
-  {
-    title: "Organizations",
-    body: "Teams in the network, each with their own people and files.",
-    color: "orange",
-    icon: Building2Icon,
-  },
-  {
-    title: "Schemas",
-    body: "The shared form: fields, types, and what’s required.",
-    color: "blue",
-    icon: FileJsonIcon,
-  },
-  {
-    title: "Records & files",
-    body: "The rows and documents in that shape.",
-    color: "cyan",
-    icon: TableIcon,
-  },
-  {
-    title: "Workflows",
-    body: "When a row matches, Lutia does the next steps.",
-    color: "teal",
-    icon: WorkflowIcon,
-  },
-  {
-    title: "Pipelines",
-    body: "How data gets in, then gets saved.",
-    color: "pink",
-    icon: LayersIcon,
-  },
-]
+    {
+      title: "Networks",
+      body: "The group that shares data.",
+      color: "purple",
+      icon: ListIcon,
+    },
+    {
+      title: "Organizations",
+      body: "Teams in the network, each with their own people and files.",
+      color: "orange",
+      icon: Building2Icon,
+    },
+    {
+      title: "Schemas",
+      body: "The shared form: fields, types, and what’s required.",
+      color: "blue",
+      icon: FileJsonIcon,
+    },
+    {
+      title: "Records & files",
+      body: "The rows and documents in that shape.",
+      color: "cyan",
+      icon: TableIcon,
+    },
+    {
+      title: "Workflows",
+      body: "When a row matches, Lutia does the next steps.",
+      color: "teal",
+      icon: WorkflowIcon,
+    },
+    {
+      title: "Pipelines",
+      body: "How data gets in, then gets saved.",
+      color: "pink",
+      icon: LayersIcon,
+    },
+  ]
 
 function CapabilityIcon({
   color,
@@ -111,13 +111,13 @@ export default function Landing() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--primary)_14%,transparent),transparent_58%)]" />
           <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center px-6 pt-16 pb-10 text-center md:pt-24">
             <p className="text-sm font-medium tracking-widest text-primary uppercase">
-              Structured data for any network
+              Launch your network in minutes
             </p>
             <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-balance md:text-5xl">
               Keep every team on the same shape.
             </h1>
             <p className="mt-5 max-w-2xl text-lg text-balance text-muted-foreground md:text-xl">
-              Structured data in one place, all teams on the same shape.
+              Structured data for any organization in one place
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link
@@ -264,10 +264,6 @@ export default function Landing() {
       <footer className="border-t">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6 text-sm text-muted-foreground">
           <span>© {new Date().getFullYear()} Lutia</span>
-          <span className="hidden items-center gap-1.5 sm:inline-flex">
-            <FileIcon className="size-3.5" />
-            Shared data for every team
-          </span>
         </div>
       </footer>
     </div>
