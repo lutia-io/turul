@@ -12,15 +12,23 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import { networks } from "@/data/networks"
+import {
+  networks,
+  type Organization,
+  type PipelineDefinition,
+  type Schema,
+  type WorkflowDefinition,
+} from "@/data/networks"
 import { recordsForSchema } from "@/data/records"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
+  definitionDescription,
   getJsonSchemaProperties,
   getPipelineStages,
   getWorkflowSteps,
   jsonSchemaPropertyCount,
   pipelineSourceLabel,
+  workflowTriggerLabel,
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
@@ -122,8 +130,9 @@ const threads = [
 
 type ThreadConfig = (typeof threads)[number]
 
-function humanize(name: string) {
+function fieldLabel(name: string) {
   return name
+    .replace(/Id$/, " ID")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/^\w/, (letter) => letter.toUpperCase())
@@ -181,12 +190,15 @@ function previewColumns(properties: JsonSchemaProperty[]) {
 function displayCell(
   column: JsonSchemaProperty,
   raw: JsonValue | undefined,
-  organizations: { id: string; name: string }[]
+  organizations: Organization[]
 ) {
   if (typeof raw === "string") {
     const organization = organizations.find((item) => item.id === raw)
     if (organization) {
       return organization.name
+    }
+    if (column.enumValues && column.enumValues.length > 0) {
+      return fieldLabel(raw)
     }
   }
 
@@ -196,7 +208,7 @@ function displayCell(
 function previewRecords(
   schemaId: string,
   highlightRecordId: string,
-  limit = 4
+  limit = 5
 ) {
   const all = recordsForSchema(schemaId)
   const highlighted = all.find((record) => record.id === highlightRecordId)
@@ -234,6 +246,12 @@ function ToneIcon({
   )
 }
 
+function ColorDot({ color }: { color: BadgeColor | string }) {
+  const tone = getBadgeColor(color)
+
+  return <span className={cn("size-2 shrink-0 rounded-full", tone.bg)} />
+}
+
 function Pill({
   children,
   tone = "muted",
@@ -258,10 +276,12 @@ function Pill({
 
 function JumpButton({
   children,
+  step,
   active,
   onClick,
 }: {
   children: ReactNode
+  step: number
   active: boolean
   onClick: () => void
 }) {
@@ -270,29 +290,152 @@ function JumpButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium transition-colors",
+        "inline-flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 pl-1 text-left text-xs font-medium transition-colors",
         active
           ? "bg-background text-foreground shadow-xs ring-1 ring-foreground/10"
           : "bg-muted text-foreground hover:bg-muted/80"
       )}
+    >
+      <span
+        className={cn(
+          "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums",
+          active
+            ? "bg-primary text-primary-foreground"
+            : "bg-background text-muted-foreground ring-1 ring-foreground/10"
+        )}
+      >
+        {step}
+      </span>
+      {children}
+    </button>
+  )
+}
+
+function TextLink({
+  children,
+  onClick,
+}: {
+  children: ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"
+      onClick={onClick}
     >
       {children}
     </button>
   )
 }
 
-function SnapshotCard({
-  icon,
-  color,
-  label,
-  title,
+function SchemaTabs({
+  schemas,
+  activeId,
+  counts,
+  onSelect,
+}: {
+  schemas: Schema[]
+  activeId?: string
+  counts: Record<string, number>
+  onSelect: (schemaId: string) => void
+}) {
+  return (
+    <div className="flex min-w-0 gap-1 overflow-x-auto">
+      {schemas.map((schema) => {
+        const active = schema.id === activeId
+        const count = counts[schema.id] ?? 0
+
+        return (
+          <button
+            key={schema.id}
+            type="button"
+            onClick={() => onSelect(schema.id)}
+            className={cn(
+              "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors",
+              active
+                ? "border-foreground/15 bg-background font-medium shadow-xs"
+                : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            )}
+          >
+            <ColorDot color={schema.color} />
+            {schema.name}
+            <span
+              className={cn(
+                "tabular-nums",
+                active ? "text-muted-foreground" : "text-muted-foreground/80"
+              )}
+            >
+              {count}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function eventLabel(value: string) {
+  return fieldLabel(value.replace(/[._]+/g, " "))
+}
+
+function FlowSteps({
+  steps,
+  tone,
+  leading,
+}: {
+  steps: { id: string; name: string; order: number }[]
+  tone: "teal" | "pink"
+  leading?: { label: string; title: string }
+}) {
+  const badge =
+    tone === "teal"
+      ? "bg-teal-500/15 text-teal-700 dark:text-teal-400"
+      : "bg-pink-500/15 text-pink-700 dark:text-pink-400"
+
+  return (
+    <ol className="flex flex-wrap items-center gap-2">
+      {leading ? (
+        <li className="flex items-center gap-2">
+          <div className="rounded-xl border border-dashed bg-background px-3 py-2">
+            <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+              {leading.label}
+            </p>
+            <p className="text-xs font-medium">{leading.title}</p>
+          </div>
+          {steps.length > 0 ? (
+            <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : null}
+        </li>
+      ) : null}
+      {steps.map((step, index) => (
+        <li key={step.id} className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2">
+            <span
+              className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                badge
+              )}
+            >
+              {step.order}
+            </span>
+            <span className="text-xs font-medium">{step.name}</span>
+          </div>
+          {index < steps.length - 1 ? (
+            <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground" />
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function SelectableRow({
+  active,
   onClick,
   children,
 }: {
-  icon: LucideIcon
-  color: BadgeColor
-  label: string
-  title: string
+  active: boolean
   onClick: () => void
   children: ReactNode
 }) {
@@ -300,42 +443,198 @@ function SnapshotCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full cursor-pointer flex-col gap-2 rounded-xl border bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+      className={cn(
+        "flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+        active
+          ? "border-foreground/15 bg-background shadow-xs ring-1 ring-foreground/10"
+          : "bg-background/60 hover:bg-muted/50"
+      )}
     >
-      <div className="flex items-center gap-3">
-        <ToneIcon color={color} icon={icon} />
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {label}
-          </p>
-          <p className="line-clamp-2 text-sm font-medium">{title}</p>
-        </div>
-      </div>
       {children}
     </button>
   )
 }
 
+function PreviewCell({
+  column,
+  raw,
+  organizations,
+}: {
+  column: JsonSchemaProperty
+  raw: JsonValue | undefined
+  organizations: Organization[]
+}) {
+  const text = displayCell(column, raw, organizations)
+
+  if (column.enumValues && column.enumValues.length > 0 && text) {
+    return (
+      <span className="inline-flex max-w-full truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">
+        {text}
+      </span>
+    )
+  }
+
+  return <span className="truncate text-xs">{text}</span>
+}
+
+function RecordsTable({
+  columns,
+  records,
+  organizations,
+  highlightRecordId,
+}: {
+  columns: JsonSchemaProperty[]
+  records: ReturnType<typeof recordsForSchema>
+  organizations: Organization[]
+  highlightRecordId?: string
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border">
+      <div
+        className="grid min-w-[36rem] gap-x-3 border-b bg-muted/50 px-3 py-2 text-[11px] font-medium text-muted-foreground"
+        style={{
+          gridTemplateColumns: `7rem repeat(${columns.length}, minmax(0, 1fr))`,
+        }}
+      >
+        <span>Team</span>
+        {columns.map((column) => (
+          <span key={column.name}>{fieldLabel(column.name)}</span>
+        ))}
+      </div>
+      {records.length === 0 ? (
+        <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+          No rows in this table yet.
+        </p>
+      ) : (
+        records.map((record) => {
+          const highlighted = record.id === highlightRecordId
+          const team =
+            organizations.find((item) => item.id === record.organizationId)
+              ?.name ?? "—"
+
+          return (
+            <div
+              key={record.id}
+              className={cn(
+                "grid min-w-[36rem] items-center gap-x-3 border-b px-3 py-2.5 last:border-b-0",
+                highlighted && "bg-amber-500/10"
+              )}
+              style={{
+                gridTemplateColumns: `7rem repeat(${columns.length}, minmax(0, 1fr))`,
+              }}
+            >
+              <span className="truncate text-xs text-muted-foreground">
+                {team}
+              </span>
+              {columns.map((column) => (
+                <PreviewCell
+                  key={column.name}
+                  column={column}
+                  raw={record.data[column.name]}
+                  organizations={organizations}
+                />
+              ))}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+type SchemaPreview = {
+  schema: Schema
+  properties: JsonSchemaProperty[]
+  columns: JsonSchemaProperty[]
+  records: ReturnType<typeof recordsForSchema>
+  recordCount: number
+  description: string
+}
+
+type WorkflowPreview = {
+  workflow: WorkflowDefinition
+  steps: ReturnType<typeof getWorkflowSteps>
+  trigger: string
+  schema?: Schema
+}
+
+type PipelinePreview = {
+  pipeline: PipelineDefinition
+  stages: ReturnType<typeof getPipelineStages>
+  source: string
+}
+
+type PreviewExample = {
+  config: ThreadConfig
+  story: string
+  from: string
+  network: (typeof networks)[string]
+  organizations: Organization[]
+  schemas: SchemaPreview[]
+  workflows: WorkflowPreview[]
+  pipelines: PipelinePreview[]
+  highlightRecordId: string
+  totalRecords: number
+}
+
+function buildExample(config: ThreadConfig): PreviewExample | null {
+  const network = networks[config.networkId]
+  if (!network) {
+    return null
+  }
+
+  const schemas = network.schemas.map((schema) => {
+    const properties = getJsonSchemaProperties(schema.definition)
+    return {
+      schema,
+      properties,
+      columns: previewColumns(properties),
+      records: previewRecords(schema.id, config.highlightRecordId),
+      recordCount: recordsForSchema(schema.id).length,
+      description: definitionDescription(schema.definition) ?? "",
+    }
+  })
+
+  const workflows = network.workflowDefinitions.map((workflow) => ({
+    workflow,
+    steps: getWorkflowSteps(workflow.definition),
+    trigger: workflowTriggerLabel(workflow.definition),
+    schema: network.schemas.find((item) => item.id === workflow.schemaId),
+  }))
+
+  const pipelines = network.pipelineDefinitions.map((pipeline) => ({
+    pipeline,
+    stages: getPipelineStages(pipeline.definition),
+    source: pipelineSourceLabel(pipeline.definition),
+  }))
+
+  return {
+    config,
+    story: config.story,
+    from: config.from,
+    network,
+    organizations: network.organizations,
+    schemas,
+    workflows,
+    pipelines,
+    highlightRecordId: config.highlightRecordId,
+    totalRecords: schemas.reduce((sum, item) => sum + item.recordCount, 0),
+  }
+}
+
 function NetworkPane({
   example,
-  onView,
+  selectedSchemaId,
+  onOpen,
 }: {
   example: PreviewExample
-  onView: (view: PreviewView) => void
+  selectedSchemaId: string
+  onOpen: (
+    view: PreviewView,
+    ids?: { schemaId?: string; workflowId?: string; pipelineId?: string }
+  ) => void
 }) {
-  const {
-    network,
-    schema,
-    workflow,
-    pipeline,
-    columns,
-    records,
-    highlightRecordId,
-    organizations,
-    steps,
-  } = example
-  const row =
-    records.find((record) => record.id === highlightRecordId) ?? records[0]
+  const { network, schemas, workflows, pipelines, organizations } = example
 
   return (
     <div className="flex flex-col gap-4">
@@ -348,62 +647,119 @@ function NetworkPane({
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{example.story}</p>
       </div>
-      <p className="text-sm leading-6 text-muted-foreground">
-        These teams share one table. When a row lands, Lutia runs the next step.
-      </p>
-      <SnapshotCard
-        icon={Building2Icon}
-        color={network.color}
-        label="Teams"
-        title={`${network.organizations.length} organizations`}
-        onClick={() => onView("organizations")}
-      >
-        <p className="text-xs leading-5 text-muted-foreground">
-          {network.organizations.map((item) => item.name).join(" · ")}
-        </p>
-      </SnapshotCard>
-      <SnapshotCard
-        icon={TableIcon}
-        color={schema.color}
-        label="Shared table"
-        title={schema.name}
-        onClick={() => onView("records")}
-      >
-        {row ? (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-4">
-            {columns.map((column) => (
-              <div key={column.name} className="min-w-0">
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {humanize(column.name)}
-                </p>
-                <p className="truncate text-xs font-medium">
-                  {displayCell(column, row.data[column.name], organizations)}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </SnapshotCard>
-      <SnapshotCard
-        icon={WorkflowIcon}
-        color="teal"
-        label="What Lutia does next"
-        title={workflow.name}
-        onClick={() => onView("workflow")}
-      >
-        <p className="line-clamp-2 text-xs text-muted-foreground">
-          {steps.map((step) => step.name).join(" → ")}
-        </p>
-      </SnapshotCard>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {(
+          [
+            {
+              view: "schema" as const,
+              label: "Schemas",
+              value: schemas.length,
+              color: "blue" as const,
+              icon: FileJsonIcon,
+            },
+            {
+              view: "records" as const,
+              label: "Records",
+              value: example.totalRecords,
+              color: "cyan" as const,
+              icon: TableIcon,
+            },
+            {
+              view: "workflow" as const,
+              label: "Workflows",
+              value: workflows.length,
+              color: "teal" as const,
+              icon: WorkflowIcon,
+            },
+            {
+              view: "pipeline" as const,
+              label: "Pipelines",
+              value: pipelines.length,
+              color: "pink" as const,
+              icon: LayersIcon,
+            },
+          ] as const
+        ).map((stat) => (
+          <button
+            key={stat.view}
+            type="button"
+            onClick={() => onOpen(stat.view)}
+            className="flex cursor-pointer flex-col gap-2 rounded-xl border bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted/50"
+          >
+            <ToneIcon color={stat.color} icon={stat.icon} className="size-7" />
+            <div>
+              <p className="text-lg font-semibold tracking-tight tabular-nums">
+                {stat.value}
+              </p>
+              <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            Shared tables
+          </p>
+          <button
+            type="button"
+            className="cursor-pointer text-[11px] font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => onOpen("organizations")}
+          >
+            {organizations.length} teams
+          </button>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {schemas.map((item) => {
+            const active = item.schema.id === selectedSchemaId
+
+            return (
+              <button
+                key={item.schema.id}
+                type="button"
+                onClick={() => onOpen("schema", { schemaId: item.schema.id })}
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                  active
+                    ? "border-foreground/15 bg-background shadow-xs ring-1 ring-foreground/10"
+                    : "bg-background hover:bg-muted/50"
+                )}
+              >
+                <ColorDot color={item.schema.color} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {item.schema.name}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground tabular-nums">
+                    {item.properties.length} fields · {item.recordCount} rows
+                  </p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
       <p className="text-xs text-muted-foreground">
         Rows arrive from {example.from} through{" "}
-        <button
-          type="button"
-          className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"
-          onClick={() => onView("pipeline")}
+        <TextLink
+          onClick={() =>
+            onOpen("pipeline", { pipelineId: example.config.pipelineId })
+          }
         >
-          {pipeline.name}
-        </button>
+          {pipelines.find(
+            (item) => item.pipeline.id === example.config.pipelineId
+          )?.pipeline.name ?? "a pipeline"}
+        </TextLink>
+        . Matching rows run{" "}
+        <TextLink
+          onClick={() =>
+            onOpen("workflow", { workflowId: example.config.workflowId })
+          }
+        >
+          {workflows.find(
+            (item) => item.workflow.id === example.config.workflowId
+          )?.workflow.name ?? "a workflow"}
+        </TextLink>
         .
       </p>
     </div>
@@ -412,12 +768,12 @@ function NetworkPane({
 
 function OrganizationsPane({
   example,
-  onView,
+  onOpen,
 }: {
   example: PreviewExample
-  onView: (view: PreviewView) => void
+  onOpen: (view: PreviewView, ids?: { schemaId?: string }) => void
 }) {
-  const { network, schema } = example
+  const { network, schemas } = example
 
   return (
     <div className="flex flex-col gap-4">
@@ -425,12 +781,11 @@ function OrganizationsPane({
         <ToneIcon color={network.color} icon={Building2Icon} />
         <div>
           <h3 className="text-sm font-semibold">Organizations</h3>
-          <p className="text-xs text-muted-foreground">Teams in this network</p>
+          <p className="text-xs text-muted-foreground">
+            {network.organizations.length} teams writing to the same tables
+          </p>
         </div>
       </div>
-      <p className="text-sm leading-6 text-muted-foreground">
-        They all write to the same table.
-      </p>
       <div className="grid gap-2">
         {network.organizations.map((organization) => (
           <div
@@ -443,73 +798,123 @@ function OrganizationsPane({
               <p className="text-xs text-muted-foreground">
                 {organization.type} · {organization.location}
               </p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {organization.description}
-              </p>
             </div>
           </div>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">
-        Shared table:{" "}
-        <button
-          type="button"
-          className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"
-          onClick={() => onView("schema")}
-        >
-          {schema.name}
-        </button>
-        .
-      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {schemas.map((item) => (
+          <button
+            key={item.schema.id}
+            type="button"
+            onClick={() => onOpen("schema", { schemaId: item.schema.id })}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-[11px] font-medium hover:bg-muted/60"
+          >
+            <ColorDot color={item.schema.color} />
+            {item.schema.name}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
 
 function SchemaPane({
   example,
-  onView,
+  selected,
+  onOpen,
 }: {
   example: PreviewExample
-  onView: (view: PreviewView) => void
+  selected: SchemaPreview
+  onOpen: (view: PreviewView, ids?: { schemaId?: string }) => void
 }) {
-  const { schema, properties } = example
+  const published = example.schemas.filter((item) => item.schema.active).length
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <ToneIcon color={schema.color} icon={FileJsonIcon} />
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">{schema.name}</h3>
-            <Pill tone={schema.active ? "live" : "warn"}>
-              {schema.active ? "In use" : "Draft"}
-            </Pill>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <ToneIcon color="blue" icon={FileJsonIcon} />
+          <div>
+            <h3 className="text-sm font-semibold">Schemas</h3>
+            <p className="text-xs text-muted-foreground">
+              {example.schemas.length} shared forms · {published} in use
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {jsonSchemaPropertyCount(schema.definition)} fields every row uses
-          </p>
         </div>
       </div>
-      <p className="text-sm leading-6 text-muted-foreground">
-        The shared form. Nothing is saved unless it matches.
-      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {example.schemas.map((item) => {
+          const active = item.schema.id === selected.schema.id
+
+          return (
+            <button
+              key={item.schema.id}
+              type="button"
+              onClick={() => onOpen("schema", { schemaId: item.schema.id })}
+              className={cn(
+                "flex cursor-pointer flex-col gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                active
+                  ? "border-foreground/15 bg-background shadow-xs ring-1 ring-foreground/10"
+                  : "bg-background hover:bg-muted/50"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <ColorDot color={item.schema.color} />
+                <p className="min-w-0 truncate text-sm font-medium">
+                  {item.schema.name}
+                </p>
+                <Pill tone={item.schema.active ? "live" : "warn"}>
+                  {item.schema.active ? "In use" : "Draft"}
+                </Pill>
+              </div>
+              <p className="text-[11px] text-muted-foreground tabular-nums">
+                {jsonSchemaPropertyCount(item.schema.definition)} fields ·{" "}
+                {item.recordCount} rows
+              </p>
+            </button>
+          )
+        })}
+      </div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="text-sm font-semibold">{selected.schema.name}</h4>
+          {selected.description ? (
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {selected.description}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Every saved row has to match these fields.
+            </p>
+          )}
+        </div>
+        <Pill>{selected.properties.length} fields</Pill>
+      </div>
       <div className="overflow-hidden rounded-xl border">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 border-b bg-muted/50 px-3 py-2 text-[11px] font-medium text-muted-foreground">
           <span>Field</span>
           <span>Kind</span>
           <span>Needed</span>
         </div>
-        {properties.map((property) => (
+        {selected.properties.map((property) => (
           <div
             key={property.name}
             className="grid grid-cols-[1fr_auto_auto] items-start gap-x-4 border-b px-3 py-2 last:border-b-0"
           >
             <div className="min-w-0">
-              <p className="text-xs font-medium">{humanize(property.name)}</p>
+              <p className="text-xs font-medium">{fieldLabel(property.name)}</p>
               {property.enumValues && property.enumValues.length > 0 ? (
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  {property.enumValues.map(humanize).join(" · ")}
-                </p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {property.enumValues.map((value) => (
+                    <span
+                      key={value}
+                      className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      {fieldLabel(value)}
+                    </span>
+                  ))}
+                </div>
               ) : property.description ? (
                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                   {property.description}
@@ -526,14 +931,12 @@ function SchemaPane({
         ))}
       </div>
       <p className="text-xs text-muted-foreground">
-        See saved rows in{" "}
-        <button
-          type="button"
-          className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"
-          onClick={() => onView("records")}
+        See {selected.recordCount} saved rows in{" "}
+        <TextLink
+          onClick={() => onOpen("records", { schemaId: selected.schema.id })}
         >
           records
-        </button>
+        </TextLink>
         .
       </p>
     </div>
@@ -542,75 +945,74 @@ function SchemaPane({
 
 function RecordsPane({
   example,
-  onView,
+  selected,
+  onOpen,
 }: {
   example: PreviewExample
-  onView: (view: PreviewView) => void
+  selected: SchemaPreview
+  onOpen: (
+    view: PreviewView,
+    ids?: { schemaId?: string; workflowId?: string }
+  ) => void
 }) {
-  const { schema, columns, records, highlightRecordId, organizations } = example
+  const workflow = example.workflows.find(
+    (item) => item.schema?.id === selected.schema.id && item.workflow.active
+  )
+  const highlightRecordId =
+    selected.schema.id === example.config.schemaId
+      ? example.highlightRecordId
+      : undefined
+  const counts = Object.fromEntries(
+    example.schemas.map((item) => [item.schema.id, item.recordCount])
+  )
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <ToneIcon color={schema.color} icon={TableIcon} />
+          <ToneIcon color={selected.schema.color} icon={TableIcon} />
           <div>
-            <h3 className="text-sm font-semibold">{schema.name}</h3>
-            <p className="text-xs text-muted-foreground">The live table</p>
+            <h3 className="text-sm font-semibold">Records</h3>
+            <p className="text-xs text-muted-foreground">
+              {example.schemas.length} tables · {example.totalRecords} rows
+            </p>
           </div>
         </div>
-        <Pill>{records.length} rows</Pill>
+        <Pill>{selected.recordCount} in this table</Pill>
       </div>
-      <div className="overflow-x-auto rounded-xl border">
-        <div
-          className="grid min-w-[32rem] gap-x-3 border-b bg-muted/50 px-3 py-2 text-[11px] font-medium text-muted-foreground"
-          style={{
-            gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
-          }}
-        >
-          {columns.map((column) => (
-            <span key={column.name}>{humanize(column.name)}</span>
-          ))}
-        </div>
-        {records.map((record) => {
-          const highlighted = record.id === highlightRecordId
-          const title = columns
-            .map((column) =>
-              displayCell(column, record.data[column.name], organizations)
-            )
-            .join(" · ")
-
-          return (
-            <div
-              key={record.id}
-              title={title}
-              className={cn(
-                "grid min-w-[32rem] items-center gap-x-3 border-b px-3 py-2.5 last:border-b-0",
-                highlighted && "bg-amber-500/10"
-              )}
-              style={{
-                gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
-              }}
-            >
-              {columns.map((column) => (
-                <span key={column.name} className="truncate text-xs">
-                  {displayCell(column, record.data[column.name], organizations)}
-                </span>
-              ))}
-            </div>
-          )
-        })}
-      </div>
+      <SchemaTabs
+        schemas={example.schemas.map((item) => item.schema)}
+        activeId={selected.schema.id}
+        counts={counts}
+        onSelect={(schemaId) => onOpen("records", { schemaId })}
+      />
+      <RecordsTable
+        columns={selected.columns}
+        records={selected.records}
+        organizations={example.organizations}
+        highlightRecordId={highlightRecordId}
+      />
       <p className="text-xs text-muted-foreground">
-        Highlighted row is the one Lutia is acting on —{" "}
-        <button
-          type="button"
-          className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"
-          onClick={() => onView("workflow")}
-        >
-          {example.workflow.name}
-        </button>
-        .
+        {highlightRecordId
+          ? "Highlighted row is the one Lutia is acting on"
+          : `Rows in ${selected.schema.name}`}
+        {workflow ? (
+          <>
+            {" — "}
+            <TextLink
+              onClick={() =>
+                onOpen("workflow", {
+                  schemaId: selected.schema.id,
+                  workflowId: workflow.workflow.id,
+                })
+              }
+            >
+              {workflow.workflow.name}
+            </TextLink>
+          </>
+        ) : (
+          "."
+        )}
       </p>
     </div>
   )
@@ -618,54 +1020,90 @@ function RecordsPane({
 
 function WorkflowPane({
   example,
-  onView,
+  selected,
+  onOpen,
 }: {
   example: PreviewExample
-  onView: (view: PreviewView) => void
+  selected: WorkflowPreview
+  onOpen: (
+    view: PreviewView,
+    ids?: { schemaId?: string; workflowId?: string }
+  ) => void
 }) {
-  const { workflow, schema, steps } = example
+  const live = example.workflows.filter((item) => item.workflow.active).length
+  const watchedSchema = selected.schema
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <ToneIcon color="teal" icon={WorkflowIcon} />
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">{workflow.name}</h3>
-            <Pill tone={workflow.active ? "live" : "warn"}>
-              {workflow.active ? "On" : "Off"}
-            </Pill>
-          </div>
+          <h3 className="text-sm font-semibold">Workflows</h3>
           <p className="text-xs text-muted-foreground">
-            Watches{" "}
-            <button
-              type="button"
-              className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"
-              onClick={() => onView("schema")}
-            >
-              {schema.name}
-            </button>{" "}
-            records
+            {example.workflows.length} automations · {live} on
           </p>
         </div>
       </div>
-      <p className="text-sm leading-6 text-muted-foreground">{example.story}</p>
-      <ol className="grid gap-2">
-        {steps.map((step) => (
-          <li
-            key={step.id}
-            className="flex items-center gap-3 rounded-xl border bg-background px-3 py-2.5"
-          >
-            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-teal-500/15 text-[11px] font-semibold text-teal-700 dark:text-teal-400">
-              {step.order}
-            </span>
-            <p className="text-xs font-medium">{step.name}</p>
-          </li>
-        ))}
-      </ol>
-      <div className="flex items-center gap-2 rounded-xl border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
-        <PlayIcon className="size-3.5 text-teal-600 dark:text-teal-400" />
-        When that row lands, Lutia does this.
+      <div className="grid gap-2">
+        {example.workflows.map((item) => {
+          const active = item.workflow.id === selected.workflow.id
+
+          return (
+            <SelectableRow
+              key={item.workflow.id}
+              active={active}
+              onClick={() =>
+                onOpen("workflow", {
+                  workflowId: item.workflow.id,
+                  schemaId: item.schema?.id,
+                })
+              }
+            >
+              <ToneIcon color="teal" icon={WorkflowIcon} className="size-7" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-medium">
+                    {item.workflow.name}
+                  </p>
+                  <Pill tone={item.workflow.active ? "live" : "warn"}>
+                    {item.workflow.active ? "On" : "Off"}
+                  </Pill>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {item.schema?.name ?? "Schema"} · {item.steps.length}{" "}
+                  {item.steps.length === 1 ? "step" : "steps"}
+                </p>
+              </div>
+            </SelectableRow>
+          )
+        })}
+      </div>
+      <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h4 className="text-sm font-semibold">{selected.workflow.name}</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Watches{" "}
+              {watchedSchema ? (
+                <TextLink
+                  onClick={() =>
+                    onOpen("schema", { schemaId: watchedSchema.id })
+                  }
+                >
+                  {watchedSchema.name}
+                </TextLink>
+              ) : (
+                "a schema"
+              )}{" "}
+              · {eventLabel(selected.trigger)}
+            </p>
+          </div>
+        </div>
+        <FlowSteps steps={selected.steps} tone="teal" />
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <PlayIcon className="size-3.5 text-teal-600 dark:text-teal-400" />
+          When a matching row lands, Lutia does this.
+        </div>
       </div>
     </div>
   )
@@ -673,114 +1111,92 @@ function WorkflowPane({
 
 function PipelinePane({
   example,
-  onView,
+  selected,
+  onOpen,
 }: {
   example: PreviewExample
-  onView: (view: PreviewView) => void
+  selected: PipelinePreview
+  onOpen: (
+    view: PreviewView,
+    ids?: { schemaId?: string; pipelineId?: string }
+  ) => void
 }) {
-  const { pipeline, schema, stages, source } = example
+  const live = example.pipelines.filter((item) => item.pipeline.active).length
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <ToneIcon color="pink" icon={LayersIcon} />
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">{pipeline.name}</h3>
-            <Pill tone={pipeline.active ? "live" : "warn"}>
-              {pipeline.active ? "On" : "Off"}
-            </Pill>
-          </div>
-          <p className="text-xs text-muted-foreground">From {source}</p>
+          <h3 className="text-sm font-semibold">Pipelines</h3>
+          <p className="text-xs text-muted-foreground">
+            {example.pipelines.length} ingest paths · {live} on
+          </p>
         </div>
       </div>
-      <p className="text-sm leading-6 text-muted-foreground">
-        How rows get into Lutia from {example.from}.
-      </p>
-      <ol className="grid gap-2 sm:grid-cols-2">
-        {stages.map((stage) => (
-          <li
-            key={stage.id}
-            className="flex items-start gap-2 rounded-xl border bg-background px-3 py-2.5"
-          >
-            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-pink-500/15 text-[11px] font-semibold text-pink-700 dark:text-pink-400">
-              {stage.order}
-            </span>
-            <p className="text-xs leading-5 font-medium">{stage.name}</p>
-          </li>
-        ))}
-      </ol>
-      <p className="text-xs text-muted-foreground">
-        Then Lutia checks{" "}
-        <button
-          type="button"
-          className="cursor-pointer font-medium text-foreground underline-offset-2 hover:underline"
-          onClick={() => onView("schema")}
-        >
-          {schema.name}
-        </button>
-        .
-      </p>
+      <div className="grid gap-2">
+        {example.pipelines.map((item) => {
+          const active = item.pipeline.id === selected.pipeline.id
+
+          return (
+            <SelectableRow
+              key={item.pipeline.id}
+              active={active}
+              onClick={() =>
+                onOpen("pipeline", { pipelineId: item.pipeline.id })
+              }
+            >
+              <ToneIcon color="pink" icon={LayersIcon} className="size-7" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-medium">
+                    {item.pipeline.name}
+                  </p>
+                  <Pill tone={item.pipeline.active ? "live" : "warn"}>
+                    {item.pipeline.active ? "On" : "Off"}
+                  </Pill>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  From {item.source} · {item.stages.length}{" "}
+                  {item.stages.length === 1 ? "stage" : "stages"}
+                </p>
+              </div>
+            </SelectableRow>
+          )
+        })}
+      </div>
+      <div className="rounded-xl border bg-muted/30 p-3">
+        <div className="mb-3">
+          <h4 className="text-sm font-semibold">{selected.pipeline.name}</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            How rows get into Lutia from {selected.source}.
+          </p>
+        </div>
+        <FlowSteps
+          steps={selected.stages}
+          tone="pink"
+          leading={{ label: "Source", title: selected.source }}
+        />
+        <p className="mt-3 text-xs text-muted-foreground">
+          Then Lutia checks the matching{" "}
+          <TextLink onClick={() => onOpen("schema")}>schema</TextLink> before a
+          row is saved.
+        </p>
+      </div>
     </div>
   )
-}
-
-type PreviewExample = {
-  config: ThreadConfig
-  story: string
-  from: string
-  network: (typeof networks)[string]
-  schema: (typeof networks)[string]["schemas"][number]
-  workflow: (typeof networks)[string]["workflowDefinitions"][number]
-  pipeline: (typeof networks)[string]["pipelineDefinitions"][number]
-  properties: JsonSchemaProperty[]
-  columns: JsonSchemaProperty[]
-  records: ReturnType<typeof recordsForSchema>
-  organizations: (typeof networks)[string]["organizations"]
-  highlightRecordId: string
-  steps: ReturnType<typeof getWorkflowSteps>
-  stages: ReturnType<typeof getPipelineStages>
-  source: string
-}
-
-function buildExample(config: ThreadConfig): PreviewExample | null {
-  const network = networks[config.networkId]
-  const schema = network?.schemas.find((item) => item.id === config.schemaId)
-  const workflow = network?.workflowDefinitions.find(
-    (item) => item.id === config.workflowId
-  )
-  const pipeline = network?.pipelineDefinitions.find(
-    (item) => item.id === config.pipelineId
-  )
-
-  if (!network || !schema || !workflow || !pipeline) {
-    return null
-  }
-
-  const properties = getJsonSchemaProperties(schema.definition)
-
-  return {
-    config,
-    story: config.story,
-    from: config.from,
-    network,
-    schema,
-    workflow,
-    pipeline,
-    properties,
-    columns: previewColumns(properties),
-    records: previewRecords(config.schemaId, config.highlightRecordId),
-    organizations: network.organizations,
-    highlightRecordId: config.highlightRecordId,
-    steps: getWorkflowSteps(workflow.definition),
-    stages: getPipelineStages(pipeline.definition),
-    source: pipelineSourceLabel(pipeline.definition),
-  }
 }
 
 export function LandingProductPreview() {
   const [threadId, setThreadId] = useState<ThreadConfig["id"]>(threads[0].id)
   const [view, setView] = useState<PreviewView>("network")
+  const [selectedSchemaId, setSelectedSchemaId] = useState(threads[0].schemaId)
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState(
+    threads[0].workflowId
+  )
+  const [selectedPipelineId, setSelectedPipelineId] = useState(
+    threads[0].pipelineId
+  )
   const example = useMemo(() => {
     const config = threads.find((item) => item.id === threadId) ?? threads[0]
     return buildExample(config)
@@ -790,27 +1206,88 @@ export function LandingProductPreview() {
     return null
   }
 
+  const selectedSchema =
+    example.schemas.find((item) => item.schema.id === selectedSchemaId) ??
+    example.schemas.find(
+      (item) => item.schema.id === example.config.schemaId
+    ) ??
+    example.schemas[0]
+  const selectedWorkflow =
+    example.workflows.find((item) => item.workflow.id === selectedWorkflowId) ??
+    example.workflows.find(
+      (item) => item.workflow.id === example.config.workflowId
+    ) ??
+    example.workflows[0]
+  const selectedPipeline =
+    example.pipelines.find((item) => item.pipeline.id === selectedPipelineId) ??
+    example.pipelines.find(
+      (item) => item.pipeline.id === example.config.pipelineId
+    ) ??
+    example.pipelines[0]
+
   function selectThread(id: ThreadConfig["id"]) {
+    const config = threads.find((item) => item.id === id) ?? threads[0]
     setThreadId(id)
     setView("network")
+    setSelectedSchemaId(config.schemaId)
+    setSelectedWorkflowId(config.workflowId)
+    setSelectedPipelineId(config.pipelineId)
   }
 
-  const pane = {
-    network: <NetworkPane example={example} onView={setView} />,
-    organizations: <OrganizationsPane example={example} onView={setView} />,
-    schema: <SchemaPane example={example} onView={setView} />,
-    records: <RecordsPane example={example} onView={setView} />,
-    workflow: <WorkflowPane example={example} onView={setView} />,
-    pipeline: <PipelinePane example={example} onView={setView} />,
-  }[view]
+  function onOpen(
+    next: PreviewView,
+    ids?: { schemaId?: string; workflowId?: string; pipelineId?: string }
+  ) {
+    if (ids?.schemaId) {
+      setSelectedSchemaId(ids.schemaId)
+    }
+    if (ids?.workflowId) {
+      setSelectedWorkflowId(ids.workflowId)
+    }
+    if (ids?.pipelineId) {
+      setSelectedPipelineId(ids.pipelineId)
+    }
+    setView(next)
+  }
+
+  const pane =
+    view === "network" ? (
+      <NetworkPane
+        example={example}
+        selectedSchemaId={selectedSchema?.schema.id ?? selectedSchemaId}
+        onOpen={onOpen}
+      />
+    ) : view === "organizations" ? (
+      <OrganizationsPane example={example} onOpen={onOpen} />
+    ) : view === "schema" && selectedSchema ? (
+      <SchemaPane example={example} selected={selectedSchema} onOpen={onOpen} />
+    ) : view === "records" && selectedSchema ? (
+      <RecordsPane
+        example={example}
+        selected={selectedSchema}
+        onOpen={onOpen}
+      />
+    ) : view === "workflow" && selectedWorkflow ? (
+      <WorkflowPane
+        example={example}
+        selected={selectedWorkflow}
+        onOpen={onOpen}
+      />
+    ) : view === "pipeline" && selectedPipeline ? (
+      <PipelinePane
+        example={example}
+        selected={selectedPipeline}
+        onOpen={onOpen}
+      />
+    ) : null
 
   const loop = [
     { id: "network" as const, label: "Network" },
     { id: "organizations" as const, label: "Organizations" },
-    { id: "schema" as const, label: example.schema.name },
+    { id: "schema" as const, label: "Schemas" },
     { id: "records" as const, label: "Records" },
-    { id: "workflow" as const, label: example.workflow.name },
-    { id: "pipeline" as const, label: example.pipeline.name },
+    { id: "workflow" as const, label: "Workflows" },
+    { id: "pipeline" as const, label: "Pipelines" },
   ]
 
   return (
@@ -870,8 +1347,9 @@ export function LandingProductPreview() {
                 <ArrowRightIcon className="size-3.5 text-muted-foreground" />
               ) : null}
               <JumpButton
+                step={index + 1}
                 active={view === item.id}
-                onClick={() => setView(item.id)}
+                onClick={() => onOpen(item.id)}
               >
                 {item.label}
               </JumpButton>
@@ -892,7 +1370,7 @@ export function LandingProductPreview() {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setView(item.id)}
+                    onClick={() => onOpen(item.id)}
                     className={cn(
                       "flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium transition-colors",
                       active
@@ -907,7 +1385,7 @@ export function LandingProductPreview() {
               })}
             </nav>
           </aside>
-          <div className="min-h-[24rem] p-4 sm:p-5">{pane}</div>
+          <div className="min-h-[26rem] p-4 sm:p-5">{pane}</div>
         </div>
       </div>
       <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-muted-foreground">

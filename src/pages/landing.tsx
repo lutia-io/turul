@@ -111,13 +111,13 @@ export default function Landing() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--primary)_14%,transparent),transparent_58%)]" />
           <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center px-6 pt-16 pb-10 text-center md:pt-24">
             <p className="text-sm font-medium tracking-widest text-primary uppercase">
-              Structured data for every team
+              Structured data for any network
             </p>
             <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-balance md:text-5xl">
               Keep every team on the same shape.
             </h1>
             <p className="mt-5 max-w-2xl text-lg text-balance text-muted-foreground md:text-xl">
-              Define a shape, keep every row in it, and on row changes, Lutia runs the next steps.
+              Structured data in one place, all teams on the same shape.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link
@@ -148,11 +148,6 @@ export default function Landing() {
           id="product"
           className="mx-auto w-full max-w-6xl scroll-mt-20 px-6 pb-20"
         >
-          <div className="mx-auto mb-8 max-w-2xl text-center">
-            <p className="text-sm font-medium tracking-widest text-primary uppercase">
-              See the product
-            </p>
-          </div>
           <LandingProductPreview />
         </section>
 
