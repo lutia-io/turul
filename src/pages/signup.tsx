@@ -1,6 +1,6 @@
 import { Navigate } from "react-router"
 
-import sunSvg from "@/assets/sun.svg"
+import flowerSvg from "@/assets/flower.svg"
 import { MarketingHeader } from "@/components/marketing-header"
 import { SignupForm } from "@/components/signup-form"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -18,7 +18,7 @@ export default function Signup() {
       <MarketingHeader />
       <div className="grid flex-1 lg:grid-cols-2">
         <div className="relative hidden bg-white lg:block">
-          <img src={sunSvg} className="absolute inset-0 size-full object-contain p-10 lg:p-16" />
+          <img src={flowerSvg} className="absolute inset-0 size-full object-contain p-10 lg:p-16" />
         </div>
         <div className="flex items-center justify-center p-6 md:p-10">
           <div className="w-full max-w-xs">
