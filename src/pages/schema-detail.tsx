@@ -28,6 +28,7 @@ import { getBadgeColor } from "@/lib/badge"
 import {
   definitionDescription,
   getJsonSchemaProperties,
+  isAddressProperty,
   isFileProperty,
   isForeignProperty,
   type JsonSchemaProperty,
@@ -374,6 +375,9 @@ function propertyTypeLabel(property: JsonSchemaProperty) {
   }
   if (isForeignProperty(property)) {
     return "related record"
+  }
+  if (isAddressProperty(property)) {
+    return "address"
   }
   if (property.type === "array" && property.itemsType) {
     return `array of ${property.itemsType}`

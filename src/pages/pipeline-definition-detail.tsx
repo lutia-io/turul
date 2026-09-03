@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { Link, useParams } from "react-router"
 import {
   BoxIcon,
@@ -39,7 +39,11 @@ import {
   useWorkspacePipelineRuns,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
-import { nodeTypeLabel } from "@/lib/node-definition"
+import {
+  nodeConfigSummary,
+  nodeTypeLabel,
+  pipelineTemplateContextForLevel,
+} from "@/lib/node-definition"
 import {
   appendNodeToPipelineLevel,
   pipelineNodeCount,
@@ -73,10 +77,10 @@ export default function PipelineDefinitionDetail() {
   const [pipelineView, setPipelineView] = useState<PipelineView>("levels")
   const [createNodeOpen, setCreateNodeOpen] = useState(false)
   const [createNodeKey, setCreateNodeKey] = useState(0)
-  const createNodeLevelRef = useRef(0)
+  const [createNodeLevel, setCreateNodeLevel] = useState(0)
 
   function openCreateNode(levelIndex: number) {
-    createNodeLevelRef.current = levelIndex
+    setCreateNodeLevel(levelIndex)
     setCreateNodeKey((key) => key + 1)
     setCreateNodeOpen(true)
   }
@@ -309,7 +313,12 @@ export default function PipelineDefinitionDetail() {
                   levelIndex={0}
                   totalLevels={1}
                   nodesById={nodesById}
-                  onSelectNode={openEditNode}
+                  onSelectNode={(nodeId) =>
+                    openEditNode(
+                      nodeId,
+                      templateContextForLevel(0, levels, nodesById)
+                    )
+                  }
                   onAddNode={
                     visiblePipeline.internal
                       ? undefined
@@ -327,7 +336,12 @@ export default function PipelineDefinitionDetail() {
                       levelIndex={levelIndex}
                       totalLevels={levels.length}
                       nodesById={nodesById}
-                      onSelectNode={openEditNode}
+                      onSelectNode={(nodeId) =>
+                        openEditNode(
+                          nodeId,
+                          templateContextForLevel(levelIndex, levels, nodesById)
+                        )
+                      }
                       onAddNode={
                         visiblePipeline.internal
                           ? undefined
@@ -354,6 +368,11 @@ export default function PipelineDefinitionDetail() {
         open={createNodeOpen}
         onOpenChange={setCreateNodeOpen}
         networkId={network.id}
+        pipelineTemplateContext={templateContextForLevel(
+          createNodeLevel,
+          levels,
+          nodesById
+        )}
         onCreated={(nodeId) => {
           void updatePipeline({
             id: visiblePipeline.id,
@@ -361,13 +380,25 @@ export default function PipelineDefinitionDetail() {
             active: visiblePipeline.active,
             definition: appendNodeToPipelineLevel(
               visiblePipeline.definition,
-              createNodeLevelRef.current,
+              createNodeLevel,
               nodeId
             ),
           })
         }}
       />
     </DefinitionPage>
+  )
+}
+
+function templateContextForLevel(
+  levelIndex: number,
+  levels: PipelineLevelNode[][],
+  nodesById: Map<string, NodeDefinition>
+) {
+  return pipelineTemplateContextForLevel(
+    levelIndex,
+    (levels[levelIndex - 1] ?? []).map((ref) => ref.id),
+    (id) => nodesById.get(id)?.name
   )
 }
 
@@ -491,6 +522,10 @@ function NodeCard({
   nodeId: string
   onSelect: (nodeId: string) => void
 }) {
+  const summary = node
+    ? nodeConfigSummary(node.type, node.definition)
+    : undefined
+  const canEdit = Boolean(node) && !node?.internal
   const body = (
     <>
       <div className="flex items-start gap-3">
@@ -512,16 +547,27 @@ function NodeCard({
             {node?.slug ?? nodeId}
           </p>
         </div>
+        {canEdit ? (
+          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground">
+            <PencilIcon className="size-3.5" />
+            <span className="sr-only">Edit node</span>
+          </span>
+        ) : null}
       </div>
-      <dl className="mt-4">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         <MetaPart label="Type">
           {node ? nodeTypeLabel(node.type) : "Unknown"}
         </MetaPart>
+        {summary ? (
+          <MetaPart label="Config">
+            <span className="font-mono text-xs">{summary}</span>
+          </MetaPart>
+        ) : null}
       </dl>
     </>
   )
 
-  if (!node) {
+  if (!canEdit || !node) {
     return (
       <div className="rounded-xl border bg-background p-4 shadow-xs">
         {body}

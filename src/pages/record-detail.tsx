@@ -27,9 +27,11 @@ import {
   formatFileSize,
   recordDisplayTitle,
 } from "@/lib/records"
+import { formatAddressLines } from "@/lib/address"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
+  isAddressProperty,
   isEmailProperty,
   isFileProperty,
   isForeignProperty,
@@ -429,6 +431,14 @@ function FieldValue({
     return <EmailRecordLink value={value} />
   }
 
+  if (isAddressProperty(property) && typeof value === "object") {
+    const lines = formatAddressLines(value)
+    if (lines.length === 0) {
+      return <span className="text-muted-foreground">—</span>
+    }
+    return <span className="whitespace-pre-line">{lines.join("\n")}</span>
+  }
+
   if (typeof value === "boolean") {
     return (
       <span
@@ -558,7 +568,11 @@ function isWideField(
   property: JsonSchemaProperty,
   value: JsonValue | undefined
 ) {
-  if (property.type === "object" || property.type === "array") {
+  if (
+    isAddressProperty(property) ||
+    property.type === "object" ||
+    property.type === "array"
+  ) {
     return true
   }
 

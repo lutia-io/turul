@@ -55,6 +55,7 @@ import {
   useWorkspaceNodes,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
+import { pipelineTemplateContextForLevel } from "@/lib/node-definition"
 import {
   parsePipelineDefinition,
   type PipelineDefinitionBody,
@@ -122,13 +123,18 @@ export function PipelineDefinitionDialog({
   const [levels, setLevels] = useState<PipelineLevelDraft[]>([
     newPipelineLevel(),
   ])
-  const [createNodeOpen, setCreateNodeOpen] = useState(false)
-  const [createNodeKey, setCreateNodeKey] = useState(0)
+  const [nodeDialogOpen, setNodeDialogOpen] = useState(false)
+  const [nodeDialogKey, setNodeDialogKey] = useState(0)
+  const [nodeDialogId, setNodeDialogId] = useState<string>()
+  const [nodeDialogContext, setNodeDialogContext] = useState(
+    pipelineTemplateContextForLevel(0, [], () => undefined)
+  )
   const createNodeTargetRef = useRef<CreatePipelineNodeTarget | null>(null)
 
   useEffect(() => {
     if (!open) {
-      setCreateNodeOpen(false)
+      setNodeDialogOpen(false)
+      setNodeDialogId(undefined)
       createNodeTargetRef.current = null
       return
     }
@@ -162,15 +168,51 @@ export function PipelineDefinitionDialog({
     label: item.name,
   }))
 
+  function templateContextForLevelIndex(levelIndex: number) {
+    const index = Math.max(0, levelIndex)
+    return pipelineTemplateContextForLevel(
+      index,
+      levels[index - 1]?.nodeIds ?? [],
+      (id) => networkNodes.find((node) => node.id === id)?.name
+    )
+  }
+
+  function openNodeDialog(options: {
+    nodeDefinitionId?: string
+    levelIndex: number
+    createTarget?: CreatePipelineNodeTarget | null
+  }) {
+    createNodeTargetRef.current = options.createTarget ?? null
+    setNodeDialogId(options.nodeDefinitionId)
+    setNodeDialogContext(templateContextForLevelIndex(options.levelIndex))
+    setNodeDialogKey((key) => key + 1)
+    setNodeDialogOpen(true)
+  }
+
   function openCreateNode(target: CreatePipelineNodeTarget) {
-    createNodeTargetRef.current = target
-    setCreateNodeKey((key) => key + 1)
-    setCreateNodeOpen(true)
+    const levelIndex =
+      target.kind === "level"
+        ? levels.findIndex((level) => level.key === target.levelKey)
+        : levels.findIndex((level) => level.nodeIds.some((id) => !id))
+    openNodeDialog({
+      levelIndex,
+      createTarget: target,
+    })
+  }
+
+  function openEditNode(nodeId: string, levelKey: string) {
+    openNodeDialog({
+      nodeDefinitionId: nodeId,
+      levelIndex: levels.findIndex((level) => level.key === levelKey),
+    })
   }
 
   function handleNodeCreated(nodeId: string) {
-    const target = createNodeTargetRef.current ?? { kind: "empty" }
+    const target = createNodeTargetRef.current
     createNodeTargetRef.current = null
+    if (!target) {
+      return
+    }
     setLevels((current) => insertCreatedNode(current, nodeId, target))
   }
 
@@ -212,8 +254,8 @@ export function PipelineDefinitionDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && createNodeOpen) {
-          setCreateNodeOpen(false)
+        if (!nextOpen && nodeDialogOpen) {
+          setNodeDialogOpen(false)
           return
         }
         onOpenChange(nextOpen)
@@ -317,8 +359,9 @@ export function PipelineDefinitionDialog({
               <div>
                 <h3 className="text-sm font-medium">Levels</h3>
                 <p className="text-xs text-muted-foreground">
-                  All nodes in a level run. After the barrier, later levels read
-                  previous outputs as {"{{ .Input.0 }}"}, {"{{ .Input.1 }}"}.
+                  All nodes in a level run. Edit a node to change its request.
+                  Later levels read previous outputs as {"{{ .Input.0 }}"},{" "}
+                  {"{{ .Input.1 }}"}.
                 </p>
               </div>
               <PipelineLevelsEditor
@@ -326,6 +369,7 @@ export function PipelineDefinitionDialog({
                 nodes={networkNodes}
                 onChange={setLevels}
                 onCreateNode={openCreateNode}
+                onEditNode={openEditNode}
                 createDisabled={!selectedNetworkId}
               />
             </div>
@@ -361,11 +405,13 @@ export function PipelineDefinitionDialog({
         </form>
       </DialogContent>
       <NodeDefinitionDialog
-        key={createNodeKey}
-        open={createNodeOpen}
-        onOpenChange={setCreateNodeOpen}
+        key={nodeDialogKey}
+        open={nodeDialogOpen}
+        onOpenChange={setNodeDialogOpen}
         networkId={selectedNetworkId || undefined}
+        nodeDefinitionId={nodeDialogId}
         onCreated={handleNodeCreated}
+        pipelineTemplateContext={nodeDialogContext}
       />
     </Dialog>
   )

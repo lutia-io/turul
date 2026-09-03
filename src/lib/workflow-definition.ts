@@ -406,7 +406,11 @@ export function actionsToApi(actions: ActionDraft[]): WorkflowAction[] {
         return [
           {
             type: action.type,
-            context: { recordId: action.recordId.trim(), data },
+            context: {
+              ...(action.schemaId ? { schemaId: action.schemaId } : {}),
+              recordId: action.recordId.trim(),
+              data,
+            },
           },
         ]
       case "UPSERT_RECORD":

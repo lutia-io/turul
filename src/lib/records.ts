@@ -1,8 +1,10 @@
 import type { StoredRecord } from "@/data/files"
 import type { Schema } from "@/data/networks"
+import { formatAddressLine, isEmptyAddress, parseAddress } from "@/lib/address"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
+  isAddressProperty,
   isFileProperty,
   isForeignProperty,
   type JsonObject,
@@ -65,6 +67,11 @@ export function formatCellValue(
         minute: "2-digit",
       }).format(date)
     }
+  }
+
+  if (isAddressProperty(property) && typeof value === "object") {
+    const address = parseAddress(value)
+    return isEmptyAddress(address) ? "" : formatAddressLine(address)
   }
 
   if (typeof value === "object") {

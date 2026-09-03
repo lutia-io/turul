@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { ViewIcon } from "lucide-react"
+import { PlusIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
+import { useCreateEntity } from "@/components/create-entity"
 import {
   DataTableCellLink,
   DataTablePage,
@@ -29,6 +30,7 @@ import {
   type StringFilterOp,
 } from "@/components/data-table-view"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 import type { StoredFile } from "@/data/files"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { fileKindLabel } from "@/lib/file-preview"
@@ -102,6 +104,7 @@ function formatCreatedAt(value: string) {
 export default function FilesPage() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organizationId } = useNetworkWorkspace()
+  const { openCreateFile } = useCreateEntity()
   const { organizations } = useWorkspaceOrganizations()
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
@@ -483,6 +486,19 @@ export default function FilesPage() {
     <DataTablePage
       title="Files"
       description="Uploaded files referenced from record data. Click a file to preview it, or open the row for the full page."
+      action={
+        <Button
+          onClick={() =>
+            openCreateFile({
+              networkId: network?.id,
+              organizationId,
+            })
+          }
+        >
+          <PlusIcon />
+          Upload file
+        </Button>
+      }
     >
       <DataTableToolbar
         query={query}

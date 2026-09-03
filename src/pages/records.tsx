@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useSearchParams } from "react-router"
-import { TableIcon, ViewIcon } from "lucide-react"
+import { PlusIcon, TableIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
+import { useCreateEntity } from "@/components/create-entity"
 import { FilePreviewDialog } from "@/components/file-preview"
 import {
   DataTableCellLink,
@@ -36,12 +37,14 @@ import {
   SchemaSheetTabs,
 } from "@/components/schema-records-table"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 import type { StoredFile, StoredRecord } from "@/data/files"
 import type { Network, Organization, Schema } from "@/data/networks"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor } from "@/lib/badge"
 import {
   getJsonSchemaProperties,
+  isAddressProperty,
   isEmailProperty,
   isFileProperty,
   isForeignProperty,
@@ -207,6 +210,7 @@ function fieldFilterChip(filter: FieldFilter): string {
 export default function RecordsPage() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organizationId } = useNetworkWorkspace()
+  const { openCreateRecord } = useCreateEntity()
   const {
     networks: workspaceNetworks,
     refetch: refetchNetworks,
@@ -260,6 +264,20 @@ export default function RecordsPage() {
     <DataTablePage
       title="Records"
       description="Each schema is a table. Hover a related record, URL, or file for a preview, then click to open it."
+      action={
+        <Button
+          onClick={() =>
+            openCreateRecord({
+              networkId: activeNetwork?.id,
+              organizationId,
+              schemaId: activeSchema?.id,
+            })
+          }
+        >
+          <PlusIcon />
+          Create record
+        </Button>
+      }
     >
       {!network ? (
         <div className="flex min-w-0 shrink-0 gap-1 overflow-x-auto">
@@ -524,7 +542,8 @@ function SchemaRecordsDataTable({
               isForeignProperty(property) ||
               isFileProperty(property) ||
               isUriProperty(property) ||
-              isEmailProperty(property)
+              isEmailProperty(property) ||
+              isAddressProperty(property)
                 ? 200
                 : 160,
           })

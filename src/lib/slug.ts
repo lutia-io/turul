@@ -32,14 +32,22 @@ export function toFieldName(value: string) {
     return "field"
   }
 
-  return parts
-    .map((part, index) => {
-      const lower = part.toLowerCase()
-      if (index === 0) {
-        return lower
-      }
+  return parts.map((part, index) => toCamelPart(part, index === 0)).join("")
+}
 
-      return lower.slice(0, 1).toUpperCase() + lower.slice(1)
-    })
-    .join("")
+function toCamelPart(part: string, isFirst: boolean) {
+  const mixedCase = /[a-z]/.test(part) && /[A-Z]/.test(part)
+  if (mixedCase) {
+    const first = isFirst
+      ? part.slice(0, 1).toLowerCase()
+      : part.slice(0, 1).toUpperCase()
+    return first + part.slice(1)
+  }
+
+  const lower = part.toLowerCase()
+  if (isFirst) {
+    return lower
+  }
+
+  return lower.slice(0, 1).toUpperCase() + lower.slice(1)
 }

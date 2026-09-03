@@ -20,6 +20,7 @@ export type CreateFileRequest = {
   filename?: string
   contentType?: string
   idempotencyKey?: string
+  organizationUserId: string
 }
 
 export type CreateFileResponse = {
@@ -156,7 +157,7 @@ const fileApi = api.injectEndpoints({
       },
     }),
     createFile: build.mutation<CreateFileResponse, CreateFileRequest>({
-      query: ({ file, filename, contentType, idempotencyKey }) => {
+      query: ({ file, filename, contentType, idempotencyKey, organizationUserId }) => {
         const body = new FormData()
         body.append("file", file)
         if (filename) {
@@ -167,6 +168,9 @@ const fileApi = api.injectEndpoints({
         }
         if (idempotencyKey) {
           body.append("idempotencyKey", idempotencyKey)
+        }
+        if (organizationUserId) {
+          body.append("organizationUserId", organizationUserId)
         }
         return {
           url: "/file",

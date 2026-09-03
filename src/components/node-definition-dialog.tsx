@@ -1,12 +1,16 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
 
 import { CheckboxField } from "@/components/checkbox-field"
-import { Button } from "@/components/ui/button"
 import {
   DefinitionDialogBody,
   DefinitionJsonPane,
   definitionDialogClassName,
 } from "@/components/definition-dialog-layout"
+import {
+  TemplateValueInput,
+  type TemplateVariableGroup,
+} from "@/components/template-value-input"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogClose,
@@ -31,12 +35,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import {
   parseJsonObject,
   stringifyDefinition,
   type JsonObject,
 } from "@/lib/json-definition"
+import { useWorkspaceNetworkList } from "@/lib/network-workspace"
 import {
   defaultDefinition,
   executableNodeTypes,
@@ -47,10 +51,14 @@ import {
   isNodeType,
   nodeTypeLabels,
   nodeTypes,
+  nowTemplate,
+  pipelineInputFieldTemplate,
+  pipelineInputTemplate,
+  pipelineOutputTemplate,
   type HttpDefinitionDraft,
   type NodeType,
+  type PipelineTemplateContext,
 } from "@/lib/node-definition"
-import { useWorkspaceNetworkList } from "@/lib/network-workspace"
 import { slugifyId } from "@/lib/slug"
 import { getHumaErrorMessage } from "@/store/api"
 import {
@@ -78,18 +86,61 @@ function definitionFromFields(
   return { definition: parsed }
 }
 
+function pipelineTemplateGroups(
+  context?: PipelineTemplateContext
+): TemplateVariableGroup[] {
+  const namedField = pipelineInputFieldTemplate()
+  const common: TemplateVariableGroup = {
+    variables: [
+      { label: "Entire input", token: pipelineInputTemplate },
+      { label: "Current time", token: nowTemplate },
+    ],
+  }
+  const named: TemplateVariableGroup = {
+    label: "Named input fields",
+    variables: [
+      {
+        label: "Field path",
+        token: namedField,
+        caretOffset: namedField.lastIndexOf(".") + 1,
+      },
+    ],
+  }
+  const previousOutputs =
+    context && context.previousOutputs.length > 0
+      ? context.previousOutputs
+      : [0, 1, 2].map((index) => ({ index, label: `Output ${index}` }))
+  const previous: TemplateVariableGroup = {
+    label: "Previous level",
+    variables: previousOutputs.map((output) => ({
+      label: output.label,
+      token: pipelineOutputTemplate(output.index),
+    })),
+  }
+
+  if (context?.levelIndex === 0) {
+    return [common, named]
+  }
+  if (context && context.levelIndex > 0) {
+    return [common, previous]
+  }
+  return [common, named, previous]
+}
+
 export function NodeDefinitionDialog({
   open,
   onOpenChange,
   networkId,
   nodeDefinitionId,
   onCreated,
+  pipelineTemplateContext,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
   nodeDefinitionId?: string
   onCreated?: (nodeId: string) => void
+  pipelineTemplateContext?: PipelineTemplateContext
 }) {
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
@@ -154,6 +205,10 @@ export function NodeDefinitionDialog({
     setJsonText(stringifyDefinition(nextDefinition))
   }
 
+  const templateGroups = useMemo(
+    () => pipelineTemplateGroups(pipelineTemplateContext),
+    [pipelineTemplateContext]
+  )
   const typeItems = useMemo(
     () =>
       nodeTypes.map((item) => ({
@@ -208,8 +263,11 @@ export function NodeDefinitionDialog({
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>{editing ? "Edit node" : "Create a node"}</DialogTitle>
           <DialogDescription>
-            Pipeline steps. HTTP and no-op nodes run today; mapper and file
-            types can be stored but are not executed yet.
+            {pipelineTemplateContext
+              ? pipelineTemplateContext.levelIndex === 0
+                ? "This step runs first with the pipeline input. Insert {{ }} next to any text in a field."
+                : `This step runs in level ${pipelineTemplateContext.levelIndex} and can read the previous level. Insert {{ }} next to any text in a field.`
+              : "Pipeline steps. HTTP and no-op nodes run today; mapper and file types can be stored but are not executed yet."}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -335,17 +393,17 @@ export function NodeDefinitionDialog({
                     </Field>
                     <Field>
                       <FieldLabel htmlFor={`${formId}-url`}>URL</FieldLabel>
-                      <Input
+                      <TemplateValueInput
                         id={`${formId}-url`}
                         value={http.url}
-                        onChange={(event) =>
+                        onChange={(url) =>
                           setHttp((current) => ({
                             ...current,
-                            url: event.target.value,
+                            url,
                           }))
                         }
+                        groups={templateGroups}
                         placeholder="https://api.example.com/orgs/{{ .Input.orgId }}"
-                        className="font-mono text-xs"
                         required
                         disabled={isLoading}
                       />
@@ -355,16 +413,18 @@ export function NodeDefinitionDialog({
                     <FieldLabel htmlFor={`${formId}-headers`}>
                       Headers
                     </FieldLabel>
-                    <Textarea
+                    <TemplateValueInput
                       id={`${formId}-headers`}
-                      className="min-h-24 font-mono text-xs"
+                      multiline
+                      inputClassName="min-h-24"
                       value={http.headersText}
-                      onChange={(event) =>
+                      onChange={(headersText) =>
                         setHttp((current) => ({
                           ...current,
-                          headersText: event.target.value,
+                          headersText,
                         }))
                       }
+                      groups={templateGroups}
                       disabled={isLoading}
                     />
                     <FieldDescription>
@@ -375,16 +435,18 @@ export function NodeDefinitionDialog({
                   </Field>
                   <Field>
                     <FieldLabel htmlFor={`${formId}-body`}>Body</FieldLabel>
-                    <Textarea
+                    <TemplateValueInput
                       id={`${formId}-body`}
-                      className="min-h-28 font-mono text-xs"
+                      multiline
+                      inputClassName="min-h-28"
                       value={http.bodyText}
-                      onChange={(event) =>
+                      onChange={(bodyText) =>
                         setHttp((current) => ({
                           ...current,
-                          bodyText: event.target.value,
+                          bodyText,
                         }))
                       }
+                      groups={templateGroups}
                       placeholder="Leave empty for GET"
                       disabled={isLoading}
                     />
@@ -393,15 +455,17 @@ export function NodeDefinitionDialog({
               ) : type === "NOOP" ? (
                 <Field>
                   <FieldLabel htmlFor={`${formId}-message`}>Message</FieldLabel>
-                  <Input
+                  <TemplateValueInput
                     id={`${formId}-message`}
                     value={message}
-                    onChange={(event) => setMessage(event.target.value)}
+                    onChange={setMessage}
+                    groups={templateGroups}
                     placeholder="ok"
                     disabled={isLoading}
                   />
                   <FieldDescription>
-                    Returned as {'{ "message": "..." }'}.
+                    Returned as {'{ "message": "..." }'}. Insert pipeline input
+                    with {"{{ }}"}.
                   </FieldDescription>
                 </Field>
               ) : (
@@ -409,11 +473,13 @@ export function NodeDefinitionDialog({
                   <FieldLabel htmlFor={`${formId}-json`}>
                     Definition JSON
                   </FieldLabel>
-                  <Textarea
+                  <TemplateValueInput
                     id={`${formId}-json`}
-                    className="min-h-40 font-mono text-xs"
+                    multiline
+                    inputClassName="min-h-40"
                     value={jsonText}
-                    onChange={(event) => setJsonText(event.target.value)}
+                    onChange={setJsonText}
+                    groups={templateGroups}
                     disabled={isLoading}
                   />
                   <FieldDescription>

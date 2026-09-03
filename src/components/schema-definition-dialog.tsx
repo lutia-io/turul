@@ -60,6 +60,11 @@ import {
 import type { JsonSchemaPropertySpec } from "@/data/define-records"
 import { getSchema } from "@/data/networks"
 import {
+  ADDRESS_FORMAT,
+  ADDRESS_REQUIRED_FIELDS,
+  addressPropertySchema,
+} from "@/lib/address"
+import {
   getJsonSchemaProperties,
   parseJsonObject,
   stringifyDefinition,
@@ -108,6 +113,7 @@ const formatOptions = [
   "uri",
   "file",
   "foreign",
+  "address",
 ] as const
 
 const formatLabels: Record<
@@ -120,7 +126,18 @@ const formatLabels: Record<
   uri: "URL",
   file: "File",
   foreign: "Related record",
+  address: "Address",
 }
+
+const stringFormats = [
+  "date",
+  "date-time",
+  "email",
+  "uri",
+  "file",
+  "foreign",
+  "address",
+] as const
 
 const itemTypes = ["string", "number", "integer", "boolean"] as const
 
@@ -218,33 +235,59 @@ function definitionFromDrafts({
 
   for (const [key, spec] of Object.entries(input.properties)) {
     const previous = asJsonObject(previousProperties?.[key])
-    const merged: JsonObject = previous ? { ...previous, ...spec } : spec
+    const merged: JsonObject = { ...(previous ?? {}), ...spec }
     if (spec.format !== "foreign") {
       delete merged.schemaId
     } else {
       delete merged.enum
     }
+    if (!spec.format) {
+      delete merged.format
+    }
+    if (spec.type !== "object") {
+      delete merged.properties
+      delete merged.additionalProperties
+      delete merged.required
+    }
+    if (spec.type !== "array") {
+      delete merged.items
+    }
+    if (spec.format === ADDRESS_FORMAT) {
+      merged.additionalProperties = false
+      if (!asJsonObject(merged.properties)) {
+        merged.properties = addressPropertySchema()
+        merged.required = [...ADDRESS_REQUIRED_FIELDS]
+      }
+    }
     mergedProperties[key] = merged
   }
 
-  const next: JsonObject = {
-    ...base,
-    $schema: base?.$schema ?? "https://json-schema.org/draft/2020-12/schema",
-    title: name.trim() || "Untitled schema",
-    type: base?.type ?? "object",
-    additionalProperties:
-      base?.additionalProperties === undefined
-        ? false
-        : base.additionalProperties,
-    properties: mergedProperties,
-    required: input.required,
-  }
   const trimmedDescription = description.trim()
+  const next: JsonObject = {
+    $schema: base?.$schema ?? "https://json-schema.org/draft/2020-12/schema",
+  }
 
+  if (base?.$id !== undefined) {
+    next.$id = base.$id
+  }
+
+  next.title = name.trim() || "Untitled schema"
   if (trimmedDescription) {
     next.description = trimmedDescription
-  } else {
-    delete next.description
+  }
+  next.type = base?.type ?? "object"
+  next.additionalProperties =
+    base?.additionalProperties === undefined ? false : base.additionalProperties
+  next.properties = mergedProperties
+  next.required = input.required
+
+  if (base) {
+    for (const [key, value] of Object.entries(base)) {
+      if (key === "description" || Object.hasOwn(next, key)) {
+        continue
+      }
+      next[key] = value
+    }
   }
 
   return next
@@ -283,7 +326,11 @@ function toSchemaInput(properties: PropertyDraft[]) {
       description: property.description.trim() || name,
     }
 
-    if (property.format && property.type === "string") {
+    if (
+      property.format &&
+      (property.type === "string" ||
+        (property.type === "object" && property.format === ADDRESS_FORMAT))
+    ) {
       spec.format = property.format
     }
 
@@ -562,22 +609,46 @@ export function SchemaDefinitionDialog({
 
   function updateProperty(key: string, patch: Partial<PropertyDraft>) {
     markBuilderSource()
-    const nextPatch: Partial<PropertyDraft> = { ...patch }
-    if (patch.type && patch.type !== "string") {
-      nextPatch.format = ""
-      nextPatch.enumValues = []
-      nextPatch.schemaId = ""
-    }
-    if (patch.format !== undefined && patch.format !== "foreign") {
-      nextPatch.schemaId = ""
-    }
-    if (patch.format === "foreign") {
-      nextPatch.enumValues = []
-    }
     setProperties((current) =>
-      current.map((property) =>
-        property.key === key ? { ...property, ...nextPatch } : property
-      )
+      current.map((property) => {
+        if (property.key !== key) {
+          return property
+        }
+
+        const next: PropertyDraft = { ...property, ...patch }
+
+        if (patch.format === ADDRESS_FORMAT) {
+          next.type = "object"
+          next.enumValues = []
+          next.schemaId = ""
+        } else if (patch.format === "foreign") {
+          next.type = "string"
+          next.enumValues = []
+        } else if (patch.format) {
+          next.type = "string"
+          next.schemaId = ""
+        }
+
+        if (patch.type === "object") {
+          if (next.format !== ADDRESS_FORMAT) {
+            next.format = ""
+            next.enumValues = []
+            next.schemaId = ""
+          }
+        } else if (patch.type && patch.type !== "string") {
+          next.format = ""
+          next.enumValues = []
+          next.schemaId = ""
+        } else if (patch.type === "string" && next.format === ADDRESS_FORMAT) {
+          next.format = ""
+        }
+
+        if (next.format !== "foreign") {
+          next.schemaId = ""
+        }
+
+        return next
+      })
     )
   }
 
@@ -1154,14 +1225,8 @@ function PropertyRow({
   const relatedSchemaId = `${property.key}-schema`
   const itemsId = `${property.key}-items`
   const enumId = `${property.key}-enum`
-  const stringFormats = [
-    "date",
-    "date-time",
-    "email",
-    "uri",
-    "file",
-    "foreign",
-  ] as const
+  const emptyFormatLabel =
+    property.type === "object" ? "Any object" : "Any text"
 
   function handleNameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") {
@@ -1188,7 +1253,9 @@ function PropertyRow({
             </span>
           </p>
           <p className="truncate text-xs text-muted-foreground">
-            {propertyTypeLabels[property.type]}
+            {property.format
+              ? formatLabels[property.format]
+              : propertyTypeLabels[property.type]}
             {property.required ? " · Required" : " · Optional"}
             {property.name.trim() ? ` · ${jsonKey}` : ""}
           </p>
@@ -1291,89 +1358,88 @@ function PropertyRow({
             placeholder="What this field stores"
           />
         </Field>
-        {property.type === "string" ? (
-          <>
-            <Field className="gap-1">
-              <FieldLabel htmlFor={formatId}>Format</FieldLabel>
-              <Select
-                value={property.format || anyFormatValue}
-                modal={false}
-                items={[
-                  { value: anyFormatValue, label: "Any text" },
-                  ...stringFormats.map((format) => ({
-                    value: format,
-                    label: formatLabels[format],
-                  })),
-                ]}
-                onValueChange={(value) => {
-                  if (!value || value === anyFormatValue) {
-                    onUpdate({ format: "" })
-                    return
-                  }
-                  onUpdate({ format: asFormat(value) })
-                }}
-              >
-                <SelectTrigger id={formatId}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={anyFormatValue}>Any text</SelectItem>
-                  {stringFormats.map((format) => (
-                    <SelectItem key={format} value={format}>
-                      {formatLabels[format]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            {property.format === "foreign" ? (
-              <Field className="gap-1">
-                <FieldLabel htmlFor={relatedSchemaId}>
-                  Related schema
-                </FieldLabel>
-                <Select
-                  value={property.schemaId || undefined}
-                  modal={false}
-                  items={relatedSchemas.map((schema) => ({
-                    value: schema.id,
-                    label: schema.name,
-                  }))}
-                  onValueChange={(value) => {
-                    if (value) {
-                      onUpdate({ schemaId: value })
-                    }
-                  }}
-                >
-                  <SelectTrigger id={relatedSchemaId}>
-                    <SelectValue placeholder="Select a schema" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {relatedSchemas.map((schema) => (
-                      <SelectItem key={schema.id} value={schema.id}>
-                        {schema.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldDescription className="text-xs">
-                  The record ID stored in this field must belong to that schema.
-                </FieldDescription>
-              </Field>
-            ) : (
-              <Field className="gap-1">
-                <FieldLabel htmlFor={enumId}>Allowed values</FieldLabel>
-                <TagInput
-                  id={enumId}
-                  values={property.enumValues}
-                  onChange={(enumValues) => onUpdate({ enumValues })}
-                  placeholder="Type a value and press Enter"
-                />
-                <FieldDescription className="text-xs">
-                  Optional. Leave empty to allow any text.
-                </FieldDescription>
-              </Field>
-            )}
-          </>
+        {property.type === "string" || property.type === "object" ? (
+          <Field className="gap-1">
+            <FieldLabel htmlFor={formatId}>Format</FieldLabel>
+            <Select
+              value={property.format || anyFormatValue}
+              modal={false}
+              items={[
+                { value: anyFormatValue, label: emptyFormatLabel },
+                ...stringFormats.map((format) => ({
+                  value: format,
+                  label: formatLabels[format],
+                })),
+              ]}
+              onValueChange={(value) => {
+                if (!value || value === anyFormatValue) {
+                  onUpdate({ format: "" })
+                  return
+                }
+                onUpdate({ format: asFormat(value) })
+              }}
+            >
+              <SelectTrigger id={formatId}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={anyFormatValue}>
+                  {emptyFormatLabel}
+                </SelectItem>
+                {stringFormats.map((format) => (
+                  <SelectItem key={format} value={format}>
+                    {formatLabels[format]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
+        {property.type === "string" && property.format === "foreign" ? (
+          <Field className="gap-1">
+            <FieldLabel htmlFor={relatedSchemaId}>Related schema</FieldLabel>
+            <Select
+              value={property.schemaId || undefined}
+              modal={false}
+              items={relatedSchemas.map((schema) => ({
+                value: schema.id,
+                label: schema.name,
+              }))}
+              onValueChange={(value) => {
+                if (value) {
+                  onUpdate({ schemaId: value })
+                }
+              }}
+            >
+              <SelectTrigger id={relatedSchemaId}>
+                <SelectValue placeholder="Select a schema" />
+              </SelectTrigger>
+              <SelectContent>
+                {relatedSchemas.map((schema) => (
+                  <SelectItem key={schema.id} value={schema.id}>
+                    {schema.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldDescription className="text-xs">
+              The record ID stored in this field must belong to that schema.
+            </FieldDescription>
+          </Field>
+        ) : null}
+        {property.type === "string" && property.format !== "foreign" ? (
+          <Field className="gap-1">
+            <FieldLabel htmlFor={enumId}>Allowed values</FieldLabel>
+            <TagInput
+              id={enumId}
+              values={property.enumValues}
+              onChange={(enumValues) => onUpdate({ enumValues })}
+              placeholder="Type a value and press Enter"
+            />
+            <FieldDescription className="text-xs">
+              Optional. Leave empty to allow any text.
+            </FieldDescription>
+          </Field>
         ) : null}
         {property.type === "array" ? (
           <Field className="gap-1">
@@ -1406,7 +1472,12 @@ function PropertyRow({
             </Select>
           </Field>
         ) : null}
-        {property.type === "object" ? (
+        {property.format === ADDRESS_FORMAT ? (
+          <FieldDescription className="sm:col-span-2">
+            Stores a postal address with street, city, region, postal code, and
+            country.
+          </FieldDescription>
+        ) : property.type === "object" ? (
           <FieldDescription className="sm:col-span-2">
             Object fields store nested JSON on the record.
           </FieldDescription>

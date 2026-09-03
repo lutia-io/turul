@@ -8,6 +8,10 @@ import {
   Trash2Icon,
 } from "lucide-react"
 
+import {
+  TemplateValueInput,
+  type TemplateVariableGroup,
+} from "@/components/template-value-input"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -24,7 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import type { Schema } from "@/data/networks"
+import type { PipelineDefinition, Schema } from "@/data/networks"
 import {
   getJsonSchemaProperties,
   type JsonSchemaProperty,
@@ -47,7 +51,52 @@ import {
 
 const CHOOSE_SCHEMA = "__choose_schema__"
 const CHOOSE_FIELD = "__choose_field__"
-const INSERT_VALUE = "__insert__"
+const CHOOSE_PIPELINE = "__choose_pipeline__"
+
+function pipelineRef(pipeline: PipelineDefinition) {
+  return pipeline.slug || pipeline.id
+}
+
+function findPipeline(pipelines: PipelineDefinition[], value: string) {
+  return pipelines.find(
+    (pipeline) => pipeline.id === value || pipeline.slug === value
+  )
+}
+
+function writesRecord(type: WorkflowActionType) {
+  return (
+    type === "CREATE_RECORD" ||
+    type === "UPDATE_RECORD" ||
+    type === "UPSERT_RECORD"
+  )
+}
+
+function dataForSchema(schema: Schema | undefined, current: DataEntryDraft[]) {
+  const properties = schema ? getJsonSchemaProperties(schema.definition) : []
+  const blank = current.every((entry) => !entry.name && !entry.value)
+  if (blank && properties.length > 0) {
+    return properties.map((property) => emptyDataEntry(property.name))
+  }
+  return current
+}
+
+function recordTemplateGroups(fields: JsonSchemaProperty[]) {
+  return [
+    {
+      variables: [
+        { label: "Record ID", token: recordIDTemplate },
+        { label: "Current time", token: nowTemplate },
+      ],
+    },
+    {
+      label: "Record fields",
+      variables: fields.map((field) => ({
+        label: field.name,
+        token: recordFieldTemplate(field.name),
+      })),
+    },
+  ]
+}
 
 function duplicateAction(action: ActionDraft): ActionDraft {
   return {
@@ -99,80 +148,14 @@ function IconTooltipButton({
   )
 }
 
-function TemplateValueInput({
-  id,
-  value,
-  onChange,
-  fields,
-  placeholder,
-}: {
-  id?: string
-  value: string
-  onChange: (value: string) => void
-  fields: JsonSchemaProperty[]
-  placeholder?: string
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Input
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-      <Select
-        value={INSERT_VALUE}
-        modal={false}
-        items={[
-          { value: INSERT_VALUE, label: "Insert a value…" },
-          { value: "__record_id", label: "Record ID" },
-          { value: "__now", label: "Current time" },
-          ...fields.map((field) => ({
-            value: field.name,
-            label: `From the record: ${field.name}`,
-          })),
-        ]}
-        onValueChange={(next) => {
-          if (!next || next === INSERT_VALUE) {
-            return
-          }
-          if (next === "__now") {
-            onChange(nowTemplate)
-            return
-          }
-          if (next === "__record_id") {
-            onChange(recordIDTemplate)
-            return
-          }
-          onChange(recordFieldTemplate(next))
-        }}
-      >
-        <SelectTrigger size="sm" aria-label="Insert a value from the record">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={INSERT_VALUE}>Insert a value…</SelectItem>
-          <SelectItem value="__record_id">Record ID</SelectItem>
-          <SelectItem value="__now">Current time</SelectItem>
-          {fields.map((field) => (
-            <SelectItem key={field.name} value={field.name}>
-              From the record: {field.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-}
-
 function DataEntriesEditor({
   entries,
-  triggerFields,
+  templateGroups,
   targetFields,
   onChange,
 }: {
   entries: DataEntryDraft[]
-  triggerFields: JsonSchemaProperty[]
+  templateGroups: TemplateVariableGroup[]
   targetFields: JsonSchemaProperty[]
   onChange: (entries: DataEntryDraft[]) => void
 }) {
@@ -194,6 +177,13 @@ function DataEntriesEditor({
       {entries.map((entry) => {
         const nameId = `${entry.key}-name`
         const valueId = `${entry.key}-value`
+        const selectedField = targetFields.find(
+          (field) => field.name === entry.name
+        )
+        const enumOptions = (selectedField?.enumValues ?? []).map((value) => ({
+          value,
+          label: value,
+        }))
         return (
           <div key={entry.key} className="rounded-lg border bg-muted/20 p-2.5">
             <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_auto]">
@@ -208,6 +198,8 @@ function DataEntriesEditor({
                       ...targetFields.map((field) => ({
                         value: field.name,
                         label: field.name,
+                        disabled:
+                          used.has(field.name) && field.name !== entry.name,
                       })),
                       ...(entry.name &&
                       !targetFields.some((field) => field.name === entry.name)
@@ -219,7 +211,18 @@ function DataEntriesEditor({
                         update(entry.key, { name: "" })
                         return
                       }
-                      update(entry.key, { name: value })
+                      const nextField = targetFields.find(
+                        (field) => field.name === value
+                      )
+                      const allowed = nextField?.enumValues
+                      const nextValue =
+                        allowed &&
+                        allowed.length > 0 &&
+                        entry.value &&
+                        !allowed.includes(entry.value)
+                          ? ""
+                          : entry.value
+                      update(entry.key, { name: value, value: nextValue })
                     }}
                   >
                     <SelectTrigger id={nameId}>
@@ -230,7 +233,13 @@ function DataEntriesEditor({
                         Choose a field
                       </SelectItem>
                       {targetFields.map((field) => (
-                        <SelectItem key={field.name} value={field.name}>
+                        <SelectItem
+                          key={field.name}
+                          value={field.name}
+                          disabled={
+                            used.has(field.name) && field.name !== entry.name
+                          }
+                        >
                           {field.name}
                         </SelectItem>
                       ))}
@@ -260,8 +269,13 @@ function DataEntriesEditor({
                   id={valueId}
                   value={entry.value}
                   onChange={(next) => update(entry.key, { value: next })}
-                  fields={triggerFields}
-                  placeholder="Value or insert from the record"
+                  groups={templateGroups}
+                  options={enumOptions}
+                  placeholder={
+                    enumOptions.length > 0
+                      ? "Choose a value"
+                      : "Hello {{ .Record.data.name }}"
+                  }
                 />
               </Field>
               <div className="flex h-8 items-center sm:mt-6">
@@ -302,7 +316,9 @@ function ActionCard({
   index,
   total,
   schemas,
+  pipelines,
   triggerFields,
+  triggerSchemaId,
   canMoveUp,
   canMoveDown,
   onChange,
@@ -314,7 +330,9 @@ function ActionCard({
   index: number
   total: number
   schemas: Schema[]
+  pipelines: PipelineDefinition[]
   triggerFields: JsonSchemaProperty[]
+  triggerSchemaId?: string
   canMoveUp: boolean
   canMoveDown: boolean
   onChange: (patch: Partial<ActionDraft>) => void
@@ -322,16 +340,20 @@ function ActionCard({
   onDuplicate: () => void
   onRemove: () => void
 }) {
-  const needsSchema =
-    action.type === "CREATE_RECORD" || action.type === "UPSERT_RECORD"
+  const needsSchema = writesRecord(action.type)
   const needsRecord =
     action.type === "UPDATE_RECORD" || action.type === "UPSERT_RECORD"
   const targetSchema = schemas.find((schema) => schema.id === action.schemaId)
   const targetFields = targetSchema
     ? getJsonSchemaProperties(targetSchema.definition)
     : []
+  const selectedPipeline = findPipeline(pipelines, action.pipeline)
+  const pipelineValue = selectedPipeline
+    ? pipelineRef(selectedPipeline)
+    : action.pipeline || CHOOSE_PIPELINE
   const dataLabel =
     action.type === "TRIGGER_PIPELINE" ? "Pipeline input" : "Record fields"
+  const templateGroups = recordTemplateGroups(triggerFields)
   const typeId = `${action.key}-type`
   const schemaFieldId = `${action.key}-schema`
   const recordId = `${action.key}-record`
@@ -351,9 +373,11 @@ function ActionCard({
           <p className="truncate text-xs text-muted-foreground">
             {actionTypeLabels[action.type]}
             {needsSchema && targetSchema ? ` · ${targetSchema.name}` : ""}
-            {action.type === "TRIGGER_PIPELINE" && action.pipeline.trim()
-              ? ` · ${action.pipeline}`
-              : ""}
+            {action.type === "TRIGGER_PIPELINE" && selectedPipeline
+              ? ` · ${selectedPipeline.name}`
+              : action.type === "TRIGGER_PIPELINE" && action.pipeline.trim()
+                ? ` · ${action.pipeline}`
+                : ""}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
@@ -394,9 +418,22 @@ function ActionCard({
             label: actionTypeLabels[type],
           }))}
           onValueChange={(value) => {
-            if (value) {
-              onChange({ type: value as WorkflowActionType })
+            if (!value) {
+              return
             }
+            const type = value as WorkflowActionType
+            const schemaId =
+              writesRecord(type) && !action.schemaId && triggerSchemaId
+                ? triggerSchemaId
+                : action.schemaId
+            const schema = schemas.find((item) => item.id === schemaId)
+            onChange({
+              type,
+              schemaId,
+              data: writesRecord(type)
+                ? dataForSchema(schema, action.data)
+                : action.data,
+            })
           }}
         >
           <SelectTrigger id={typeId} aria-label={`Action ${index + 1} type`}>
@@ -420,7 +457,9 @@ function ActionCard({
           <FieldLabel htmlFor={schemaFieldId}>
             {action.type === "UPSERT_RECORD"
               ? "Schema if a new record is created"
-              : "Create on schema"}
+              : action.type === "UPDATE_RECORD"
+                ? "Update on schema"
+                : "Create on schema"}
           </FieldLabel>
           {schemas.length > 0 ? (
             <Select
@@ -436,20 +475,9 @@ function ActionCard({
               onValueChange={(value) => {
                 const schemaId = !value || value === CHOOSE_SCHEMA ? "" : value
                 const schema = schemas.find((item) => item.id === schemaId)
-                const properties = schema
-                  ? getJsonSchemaProperties(schema.definition)
-                  : []
-                const blank = action.data.every(
-                  (entry) => !entry.name && !entry.value
-                )
                 onChange({
                   schemaId,
-                  data:
-                    blank && properties.length > 0
-                      ? properties.map((property) =>
-                          emptyDataEntry(property.name)
-                        )
-                      : action.data,
+                  data: dataForSchema(schema, action.data),
                 })
               }}
             >
@@ -471,7 +499,9 @@ function ActionCard({
             </p>
           )}
           <FieldDescription className="text-xs">
-            The written record will use the fields on this schema.
+            {action.type === "UPDATE_RECORD"
+              ? "The fields below come from this schema."
+              : "The written record will use the fields on this schema."}
           </FieldDescription>
         </Field>
       ) : null}
@@ -486,8 +516,8 @@ function ActionCard({
             id={recordId}
             value={action.recordId}
             onChange={(recordIdValue) => onChange({ recordId: recordIdValue })}
-            fields={triggerFields}
-            placeholder="Record id"
+            groups={templateGroups}
+            placeholder="{{ .Record.id }}"
           />
           <FieldDescription className="text-xs">
             Insert the triggering record id, or type another record id.
@@ -497,15 +527,55 @@ function ActionCard({
       {action.type === "TRIGGER_PIPELINE" ? (
         <Field className="mt-3 gap-1">
           <FieldLabel htmlFor={pipelineId}>Pipeline</FieldLabel>
-          <Input
-            id={pipelineId}
-            value={action.pipeline}
-            onChange={(event) => onChange({ pipeline: event.target.value })}
-            placeholder="noop-pipeline"
-            className="font-mono"
-          />
+          {pipelines.length > 0 ? (
+            <Select
+              value={pipelineValue}
+              modal={false}
+              items={[
+                { value: CHOOSE_PIPELINE, label: "Choose a pipeline" },
+                ...pipelines.map((pipeline) => ({
+                  value: pipelineRef(pipeline),
+                  label: pipeline.name,
+                })),
+                ...(action.pipeline && !selectedPipeline
+                  ? [{ value: action.pipeline, label: action.pipeline }]
+                  : []),
+              ]}
+              onValueChange={(value) => {
+                if (!value || value === CHOOSE_PIPELINE) {
+                  onChange({ pipeline: "" })
+                  return
+                }
+                onChange({ pipeline: value })
+              }}
+            >
+              <SelectTrigger id={pipelineId}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={CHOOSE_PIPELINE}>
+                  Choose a pipeline
+                </SelectItem>
+                {pipelines.map((pipeline) => (
+                  <SelectItem key={pipeline.id} value={pipelineRef(pipeline)}>
+                    {pipeline.name}
+                  </SelectItem>
+                ))}
+                {action.pipeline && !selectedPipeline ? (
+                  <SelectItem value={action.pipeline}>
+                    {action.pipeline}
+                  </SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Create a pipeline in this network before this action can run
+              one.
+            </p>
+          )}
           <FieldDescription className="text-xs">
-            The pipeline slug or id that should run with this input.
+            The selected pipeline runs with the input fields below.
           </FieldDescription>
         </Field>
       ) : null}
@@ -519,7 +589,7 @@ function ActionCard({
         </div>
         <DataEntriesEditor
           entries={action.data}
-          triggerFields={triggerFields}
+          templateGroups={templateGroups}
           targetFields={action.type === "TRIGGER_PIPELINE" ? [] : targetFields}
           onChange={(data) => onChange({ data })}
         />
@@ -531,12 +601,16 @@ function ActionCard({
 export function WorkflowActionsBuilder({
   value,
   schemas,
+  pipelines,
   triggerFields,
+  triggerSchemaId,
   onChange,
 }: {
   value: ActionDraft[]
   schemas: Schema[]
+  pipelines: PipelineDefinition[]
   triggerFields: JsonSchemaProperty[]
+  triggerSchemaId?: string
   onChange: (next: ActionDraft[]) => void
 }) {
   function update(key: string, patch: Partial<ActionDraft>) {
@@ -559,7 +633,15 @@ export function WorkflowActionsBuilder({
   }
 
   function addAction() {
-    onChange([...value, emptyAction()])
+    const schema = schemas.find((item) => item.id === triggerSchemaId)
+    onChange([
+      ...value,
+      {
+        ...emptyAction(),
+        schemaId: triggerSchemaId ?? "",
+        data: dataForSchema(schema, [emptyDataEntry()]),
+      },
+    ])
   }
 
   return (
@@ -624,7 +706,9 @@ export function WorkflowActionsBuilder({
                 index={index}
                 total={value.length}
                 schemas={schemas}
+                pipelines={pipelines}
                 triggerFields={triggerFields}
+                triggerSchemaId={triggerSchemaId}
                 canMoveUp={index > 0}
                 canMoveDown={index < value.length - 1}
                 onChange={(patch) => update(action.key, patch)}

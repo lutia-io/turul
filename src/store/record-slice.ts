@@ -24,6 +24,7 @@ export type ApiRecord = {
 export type CreateRecordRequest = {
   schemaId: string
   data: JsonObject
+  organizationUserId: string
 }
 
 export type CreateRecordResponse = {

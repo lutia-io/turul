@@ -13,6 +13,37 @@ export const nodeTypeLabels: Record<NodeType, string> = {
 
 export const executableNodeTypes = new Set<NodeType>(["NOOP", "HTTP"])
 
+export const nowTemplate = "{{ now }}"
+
+export const pipelineInputTemplate = "{{ .Input }}"
+
+export function pipelineInputFieldTemplate(path = "") {
+  return path ? `{{ .Input.${path} }}` : "{{ .Input. }}"
+}
+
+export function pipelineOutputTemplate(index: number) {
+  return `{{ .Input.${index} }}`
+}
+
+export type PipelineTemplateContext = {
+  levelIndex: number
+  previousOutputs: { index: number; label: string }[]
+}
+
+export function pipelineTemplateContextForLevel(
+  levelIndex: number,
+  previousNodeIds: string[],
+  nodeName: (id: string) => string | undefined
+): PipelineTemplateContext {
+  return {
+    levelIndex,
+    previousOutputs: previousNodeIds.filter(Boolean).map((id, index) => ({
+      index,
+      label: nodeName(id) ?? `Output ${index}`,
+    })),
+  }
+}
+
 export const httpMethods = [
   "GET",
   "POST",
@@ -60,6 +91,30 @@ export function isHttpMethod(value: string): value is HttpMethod {
 
 export function nodeTypeLabel(type: string) {
   return isNodeType(type) ? nodeTypeLabels[type] : type
+}
+
+export function nodeConfigSummary(type: string, definition: JsonObject) {
+  if (type === "HTTP") {
+    const draft = httpDraftFromDefinition(definition)
+    const url = draft.url.trim()
+    return url ? `${draft.method} ${url}` : draft.method
+  }
+  if (type === "NOOP") {
+    const message =
+      typeof definition.message === "string" ? definition.message.trim() : ""
+    return message || "Returns a message"
+  }
+  if (type === "MAPPER") {
+    const mapping = asObject(definition.mapping)
+    const count = mapping ? Object.keys(mapping).length : 0
+    return count === 1 ? "1 mapped field" : `${count} mapped fields`
+  }
+  if (type === "FILE") {
+    return typeof definition.operation === "string"
+      ? definition.operation
+      : "File"
+  }
+  return nodeTypeLabel(type)
 }
 
 export type HttpDefinitionDraft = {

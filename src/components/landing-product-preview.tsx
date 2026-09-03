@@ -151,6 +151,9 @@ function propertyKind(property: JsonSchemaProperty) {
   if (property.format === "file") {
     return "File"
   }
+  if (property.format === "address") {
+    return "Address"
+  }
   if (property.itemsType) {
     return "List"
   }

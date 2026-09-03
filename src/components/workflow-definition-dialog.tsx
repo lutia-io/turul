@@ -51,6 +51,7 @@ import {
 import {
   networkWorkspacePath,
   useWorkspaceNetworkList,
+  useWorkspacePipelines,
   useWorkspaceSchemas,
   workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
@@ -105,6 +106,7 @@ export function WorkflowDefinitionDialog({
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
   const { schemas } = useWorkspaceSchemas({ skip: !open })
+  const { pipelines } = useWorkspacePipelines({ skip: !open })
   const { organizationId } = useParams()
   const [createWorkflow, createState] = useCreateWorkflowDefinitionMutation()
   const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
@@ -137,6 +139,13 @@ export function WorkflowDefinitionDialog({
   const networkSchemas = useMemo(
     () => schemas.filter((schema) => schema.networkId === selectedNetworkId),
     [schemas, selectedNetworkId]
+  )
+  const networkPipelines = useMemo(
+    () =>
+      pipelines
+        .filter((pipeline) => pipeline.networkId === selectedNetworkId)
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    [pipelines, selectedNetworkId]
   )
   const triggerSchema = networkSchemas.find((schema) => schema.id === schemaId)
   const triggerFields = schemaFieldOptions(triggerSchema?.definition)
@@ -392,7 +401,9 @@ export function WorkflowDefinitionDialog({
       <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <DialogTitle>
-            {editing ? "Edit workflow definition" : "Create a workflow definition"}
+            {editing
+              ? "Edit workflow definition"
+              : "Create a workflow definition"}
           </DialogTitle>
           <DialogDescription>
             {triggerSchema
@@ -528,7 +539,9 @@ export function WorkflowDefinitionDialog({
             <WorkflowActionsBuilder
               value={actions}
               schemas={networkSchemas}
+              pipelines={networkPipelines}
               triggerFields={triggerFields}
+              triggerSchemaId={schemaId}
               onChange={(next) => {
                 markBuilderSource()
                 setActions(next)

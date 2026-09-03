@@ -54,6 +54,9 @@ const fieldTypeLabels: Record<string, string> = {
 }
 
 function fieldOptionLabel(field: JsonSchemaProperty) {
+  if (field.format === "address") {
+    return `${field.name} · Address`
+  }
   const type = fieldTypeLabels[field.type] ?? field.type
   return `${field.name} · ${type}`
 }

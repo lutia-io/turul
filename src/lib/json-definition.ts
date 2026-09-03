@@ -227,6 +227,10 @@ export function isEmailProperty(property: JsonSchemaProperty) {
   return property.format === "email"
 }
 
+export function isAddressProperty(property: JsonSchemaProperty) {
+  return property.format === "address"
+}
+
 export function getRecordFileIds(
   data: JsonObject,
   properties: JsonSchemaProperty[]
