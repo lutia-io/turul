@@ -40,6 +40,37 @@ export type TemplateValueOption = {
 
 const CHOOSE_VALUE = "__choose_value__"
 
+function unwrapTemplateToken(token: string) {
+  const trimmed = token.trim()
+  if (!trimmed.startsWith("{{") || !trimmed.endsWith("}}")) {
+    return { token, prefixLength: 0 }
+  }
+  const inner = trimmed.slice(2, -2).trim()
+  const prefixLength = token.indexOf(inner)
+  return {
+    token: inner,
+    prefixLength: prefixLength < 0 ? 0 : prefixLength,
+  }
+}
+
+function isInsideTemplateAction(value: string, start: number, end: number) {
+  const before = value.slice(0, start)
+  const open = before.lastIndexOf("{{")
+  if (open === -1) {
+    return false
+  }
+  if (before.indexOf("}}", open) !== -1) {
+    return false
+  }
+  const after = value.slice(end)
+  const close = after.indexOf("}}")
+  if (close === -1) {
+    return false
+  }
+  const nestedOpen = after.indexOf("{{")
+  return nestedOpen === -1 || nestedOpen > close
+}
+
 function insertTemplateToken(
   value: string,
   token: string,
@@ -117,13 +148,19 @@ export function TemplateValueInput({
       return
     }
     const { start, end } = selectionRef.current
-    const next = insertTemplateToken(
-      value,
-      variable.token,
-      start,
-      end,
-      variable.caretOffset
-    )
+    let token = variable.token
+    let caretOffset = variable.caretOffset
+    if (isInsideTemplateAction(value, start, end)) {
+      const unwrapped = unwrapTemplateToken(token)
+      token = unwrapped.token
+      if (caretOffset != null) {
+        caretOffset = Math.min(
+          Math.max(caretOffset - unwrapped.prefixLength, 0),
+          token.length
+        )
+      }
+    }
+    const next = insertTemplateToken(value, token, start, end, caretOffset)
     pendingCaret.current = next.caret
     selectionRef.current = { start: next.caret, end: next.caret }
     onChange(next.value)
@@ -255,7 +292,7 @@ export function TemplateValueInput({
                 <p className="text-[11px] leading-snug text-muted-foreground">
                   {hasPresets
                     ? "Replaces the selected value with a template from the triggering record."
-                    : `Adds {{ }} next to any text already in the field.`}
+                    : "Adds {{ }} next to any text. Inside an existing {{ }}, inserts the path only so {{ add .Context.data.total .Record.data.amount }} stays valid."}
                 </p>
               </div>
               {visibleGroups.map((group, index) => (

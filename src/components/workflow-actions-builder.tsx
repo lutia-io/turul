@@ -37,8 +37,12 @@ import { cn } from "@/lib/utils"
 import {
   actionTypeDescriptions,
   actionTypeLabels,
+  addContextAndRecordTemplate,
+  addContextFieldTemplate,
   addFieldTemplate,
   addTemplate,
+  contextFieldTemplate,
+  contextIDTemplate,
   emptyAction,
   emptyDataEntry,
   newDraftKey,
@@ -121,6 +125,57 @@ function recordTemplateGroups(fields: JsonSchemaProperty[]) {
   ]
 }
 
+function contextTemplateGroups(fields: JsonSchemaProperty[]) {
+  const numeric = fields.filter(isNumericField)
+  return [
+    {
+      label: "Current record",
+      variables: [
+        { label: "Record ID", token: contextIDTemplate },
+        ...fields.map((field) => ({
+          label: field.name,
+          token: contextFieldTemplate(field.name),
+        })),
+      ],
+    },
+    {
+      label: "Add to current record",
+      variables: numeric.map((field) => {
+        const token = addContextFieldTemplate(field.name)
+        return {
+          label: field.name,
+          token,
+          caretOffset: token.length - "1 }}".length,
+        }
+      }),
+    },
+  ]
+}
+
+function addFromTriggerGroups(
+  entryName: string,
+  targetFields: JsonSchemaProperty[],
+  triggerFields: JsonSchemaProperty[]
+): TemplateVariableGroup[] {
+  const target = targetFields.find((field) => field.name === entryName)
+  if (!target || !isNumericField(target)) {
+    return []
+  }
+  const numericTrigger = triggerFields.filter(isNumericField)
+  if (numericTrigger.length === 0) {
+    return []
+  }
+  return [
+    {
+      label: "Add from triggering record",
+      variables: numericTrigger.map((field) => ({
+        label: field.name,
+        token: addContextAndRecordTemplate(entryName, field.name),
+      })),
+    },
+  ]
+}
+
 function duplicateAction(action: ActionDraft): ActionDraft {
   return {
     ...action,
@@ -175,11 +230,15 @@ function DataEntriesEditor({
   entries,
   templateGroups,
   targetFields,
+  triggerFields,
+  includeContext,
   onChange,
 }: {
   entries: DataEntryDraft[]
   templateGroups: TemplateVariableGroup[]
   targetFields: JsonSchemaProperty[]
+  triggerFields: JsonSchemaProperty[]
+  includeContext: boolean
   onChange: (entries: DataEntryDraft[]) => void
 }) {
   const used = new Set(entries.map((entry) => entry.name).filter(Boolean))
@@ -292,7 +351,16 @@ function DataEntriesEditor({
                   id={valueId}
                   value={entry.value}
                   onChange={(next) => update(entry.key, { value: next })}
-                  groups={templateGroups}
+                  groups={[
+                    ...templateGroups,
+                    ...(includeContext
+                      ? addFromTriggerGroups(
+                          entry.name,
+                          targetFields,
+                          triggerFields
+                        )
+                      : []),
+                  ]}
                   options={enumOptions}
                   placeholder={
                     enumOptions.length > 0
@@ -366,6 +434,9 @@ function ActionCard({
   const needsSchema = writesRecord(action.type)
   const needsRecord =
     action.type === "UPDATE_RECORD" || action.type === "UPSERT_RECORD"
+  const includeContext =
+    action.type === "UPDATE_RECORD" ||
+    (action.type === "UPSERT_RECORD" && action.recordId.trim() !== "")
   const targetSchema = schemas.find((schema) => schema.id === action.schemaId)
   const targetFields = targetSchema
     ? getJsonSchemaProperties(targetSchema.definition)
@@ -376,7 +447,10 @@ function ActionCard({
     : action.pipeline || CHOOSE_PIPELINE
   const dataLabel =
     action.type === "TRIGGER_PIPELINE" ? "Pipeline input" : "Record fields"
-  const templateGroups = recordTemplateGroups(triggerFields)
+  const triggerTemplateGroups = recordTemplateGroups(triggerFields)
+  const dataTemplateGroups = includeContext
+    ? [...triggerTemplateGroups, ...contextTemplateGroups(targetFields)]
+    : triggerTemplateGroups
   const typeId = `${action.key}-type`
   const schemaFieldId = `${action.key}-schema`
   const recordId = `${action.key}-record`
@@ -539,7 +613,7 @@ function ActionCard({
             id={recordId}
             value={action.recordId}
             onChange={(recordIdValue) => onChange({ recordId: recordIdValue })}
-            groups={templateGroups}
+            groups={triggerTemplateGroups}
             placeholder="{{ .Record.id }}"
           />
           <FieldDescription className="text-xs">
@@ -606,14 +680,17 @@ function ActionCard({
         <div>
           <p className="text-sm font-medium">{dataLabel}</p>
           <p className="text-xs text-muted-foreground">
-            Insert values from the triggering record, type text, or use the
-            current time.
+            {includeContext
+              ? "Insert values from the triggering record or the record being updated."
+              : "Insert values from the triggering record, type text, or use the current time."}
           </p>
         </div>
         <DataEntriesEditor
           entries={action.data}
-          templateGroups={templateGroups}
+          templateGroups={dataTemplateGroups}
           targetFields={action.type === "TRIGGER_PIPELINE" ? [] : targetFields}
+          triggerFields={triggerFields}
+          includeContext={includeContext}
           onChange={(data) => onChange({ data })}
         />
       </div>

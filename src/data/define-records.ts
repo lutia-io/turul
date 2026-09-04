@@ -1,5 +1,5 @@
 import type { BadgeColor } from "@/lib/badge"
-import type { JsonObject } from "@/lib/json-definition"
+import type { JsonObject, JsonValue } from "@/lib/json-definition"
 
 export type JsonSchemaPropertySpec = {
   type: "string" | "number" | "integer" | "boolean" | "array" | "object"
@@ -8,6 +8,7 @@ export type JsonSchemaPropertySpec = {
   schemaId?: string
   enum?: string[]
   items?: { type: string }
+  default?: JsonValue
 }
 
 export function defineSchema({

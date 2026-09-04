@@ -153,8 +153,8 @@ export const actionTypeLabels: Record<WorkflowActionType, string> = {
 
 export const actionTypeDescriptions: Record<WorkflowActionType, string> = {
   CREATE_RECORD: "Make a new record when this workflow runs.",
-  UPDATE_RECORD: "Change fields on an existing record.",
-  UPSERT_RECORD: "Update the record if it exists, otherwise create it.",
+  UPDATE_RECORD: "Change fields on an existing record. You can read that record's current values while updating it.",
+  UPSERT_RECORD: "Update the record if it exists, otherwise create it. Updates can read the existing record's current values.",
   TRIGGER_PIPELINE: "Send data into a pipeline.",
 }
 
@@ -520,12 +520,29 @@ export function recordFieldTemplate(field: string) {
 
 export const recordIDTemplate = "{{ .Record.id }}"
 
+export function contextFieldTemplate(field: string) {
+  return `{{ .Context.data.${field} }}`
+}
+
+export const contextIDTemplate = "{{ .Context.id }}"
+
 export const nowTemplate = "{{ now }}"
 
 export const addTemplate = "{{ add 1 1 }}"
 
 export function addFieldTemplate(field: string) {
   return `{{ add .Record.data.${field} 1 }}`
+}
+
+export function addContextFieldTemplate(field: string) {
+  return `{{ add .Context.data.${field} 1 }}`
+}
+
+export function addContextAndRecordTemplate(
+  contextField: string,
+  recordField: string
+) {
+  return `{{ add .Context.data.${contextField} .Record.data.${recordField} }}`
 }
 
 export function schemaFieldOptions(definition: JsonObject | undefined) {

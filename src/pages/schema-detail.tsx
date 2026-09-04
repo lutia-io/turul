@@ -344,6 +344,7 @@ export default function SchemaDetail() {
                         <th className="px-3.5 py-2.5">Field</th>
                         <th className="px-3.5 py-2.5">Type</th>
                         <th className="px-3.5 py-2.5">Required</th>
+                        <th className="px-3.5 py-2.5">Default</th>
                         <th className="px-3.5 py-2.5">Description</th>
                       </tr>
                     </thead>
@@ -396,6 +397,15 @@ function PropertyItem({ property }: { property: JsonSchemaProperty }) {
           "—"
         )}
       </td>
+      <td className="px-3.5 py-3">
+        {property.defaultValue ? (
+          <span className="font-mono text-[13px] text-muted-foreground">
+            {property.defaultValue}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </td>
       <td className="px-3.5 py-3 text-pretty text-muted-foreground">
         {property.description ?? "—"}
       </td>
@@ -408,7 +418,7 @@ function propertyTypeLabel(property: JsonSchemaProperty) {
     return "file"
   }
   if (isForeignProperty(property)) {
-    return "related record"
+    return "foreign"
   }
   if (isAddressProperty(property)) {
     return "address"

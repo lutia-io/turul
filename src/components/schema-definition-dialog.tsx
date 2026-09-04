@@ -25,6 +25,7 @@ import {
   DefinitionJsonPane,
   definitionDialogClassName,
 } from "@/components/definition-dialog-layout"
+import { TemplateValueInput } from "@/components/template-value-input"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -66,6 +67,7 @@ import {
 } from "@/lib/address"
 import {
   getJsonSchemaProperties,
+  parseJsonDefault,
   parseJsonObject,
   stringifyDefinition,
   type JsonObject,
@@ -125,7 +127,7 @@ const formatLabels: Record<
   email: "Email",
   uri: "URL",
   file: "File",
-  foreign: "Related record",
+  foreign: "Foreign",
   address: "Address",
 }
 
@@ -157,6 +159,7 @@ type PropertyDraft = {
   schemaId: string
   enumValues: string[]
   itemsType: (typeof itemTypes)[number]
+  defaultValue: string
 }
 
 function emptyProperty(
@@ -173,6 +176,7 @@ function emptyProperty(
     schemaId: "",
     enumValues: [],
     itemsType: "string",
+    defaultValue: "",
     ...defaults,
   }
 }
@@ -202,6 +206,7 @@ function draftsFromProperties(
     schemaId: property.schemaId ?? "",
     enumValues: property.enumValues ?? [],
     itemsType: asItemsType(property.itemsType),
+    defaultValue: property.defaultValue ?? "",
   }))
 }
 
@@ -209,6 +214,33 @@ function asItemsType(value: string | undefined): PropertyDraft["itemsType"] {
   return value === "number" || value === "integer" || value === "boolean"
     ? value
     : "string"
+}
+
+const schemaDefaultTemplateGroups = [
+  {
+    variables: [
+      { label: "Current time", token: "{{ now }}" },
+      { label: "UUID", token: "{{ uuid }}" },
+    ],
+  },
+]
+
+function defaultTemplateGroups(type: PropertyType) {
+  if (type !== "integer" && type !== "number") {
+    return schemaDefaultTemplateGroups
+  }
+  return [
+    {
+      variables: [
+        ...schemaDefaultTemplateGroups[0]!.variables,
+        {
+          label: "Add numbers",
+          token: "{{ add 1 1 }}",
+          caretOffset: "{{ add ".length,
+        },
+      ],
+    },
+  ]
 }
 
 function asJsonObject(value: unknown): JsonObject | undefined {
@@ -251,6 +283,9 @@ function definitionFromDrafts({
     }
     if (spec.type !== "array") {
       delete merged.items
+    }
+    if (!Object.hasOwn(spec, "default")) {
+      delete merged.default
     }
     if (spec.format === ADDRESS_FORMAT) {
       merged.additionalProperties = false
@@ -354,6 +389,11 @@ function toSchemaInput(properties: PropertyDraft[]) {
       spec.enum = enumValues
     }
 
+    const defaultValue = property.defaultValue.trim()
+    if (defaultValue) {
+      spec.default = parseJsonDefault(defaultValue, property.type)
+    }
+
     specs[name] = spec
     if (property.required) {
       required.push(name)
@@ -403,7 +443,7 @@ export function SchemaDefinitionDialog({
   const [slug, setSlug] = useState("")
   const [slugTouched, setSlugTouched] = useState(false)
   const [description, setDescription] = useState("")
-  const [active, setActive] = useState(false)
+  const [active, setActive] = useState(true)
   const [properties, setProperties] = useState<PropertyDraft[]>(() => [
     emptyProperty("property-1", { name: "id", required: true }),
   ])
@@ -456,7 +496,7 @@ export function SchemaDefinitionDialog({
         ? current.definition.description
         : ""
     )
-    setActive(current?.active ?? false)
+    setActive(current?.active ?? true)
     jsonSourceRef.current = "builder"
     setDefinitionBase(current?.definition)
     setJsonError(null)
@@ -1221,6 +1261,7 @@ function PropertyRow({
   const typeId = `${property.key}-type`
   const requiredId = `${property.key}-required`
   const descriptionId = `${property.key}-description`
+  const defaultId = `${property.key}-default`
   const formatId = `${property.key}-format`
   const relatedSchemaId = `${property.key}-schema`
   const itemsId = `${property.key}-items`
@@ -1357,6 +1398,36 @@ function PropertyRow({
             onChange={(event) => onUpdate({ description: event.target.value })}
             placeholder="What this field stores"
           />
+        </Field>
+        <Field className="gap-1 sm:col-span-2">
+          <FieldLabel htmlFor={defaultId}>Default</FieldLabel>
+          <TemplateValueInput
+            id={defaultId}
+            value={property.defaultValue}
+            onChange={(defaultValue) => onUpdate({ defaultValue })}
+            groups={defaultTemplateGroups(property.type)}
+            options={
+              property.type === "string" &&
+              property.format !== "foreign" &&
+              property.enumValues.length > 0
+                ? property.enumValues.map((value) => ({ value, label: value }))
+                : property.type === "boolean"
+                  ? [
+                      { value: "true", label: "Yes" },
+                      { value: "false", label: "No" },
+                    ]
+                  : undefined
+            }
+            placeholder={
+              property.type === "boolean"
+                ? "Choose a default"
+                : "Optional. Literal or {{ now }} / {{ uuid }}"
+            }
+          />
+          <FieldDescription className="text-xs">
+            Used when the field is omitted on create. Formulas run on the
+            server.
+          </FieldDescription>
         </Field>
         {property.type === "string" || property.type === "object" ? (
           <Field className="gap-1">

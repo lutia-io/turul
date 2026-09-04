@@ -36,9 +36,11 @@ import {
 } from "@/lib/address"
 import {
   getJsonSchemaProperties,
+  hasSchemaDefault,
   isAddressProperty,
   isFileProperty,
   isForeignProperty,
+  isTemplateExpression,
   parseJsonObject,
   type JsonObject,
   type JsonSchemaProperty,
@@ -110,7 +112,7 @@ export function CreateRecordDialog({
   const availableSchemas = useMemo(
     () =>
       schemas.filter((schema) => {
-        if (!schema.active || schema.networkId !== selectedNetworkId) {
+        if (schema.networkId !== selectedNetworkId) {
           return false
         }
         if (!selectedOrganizationId) {
@@ -276,7 +278,7 @@ export function CreateRecordDialog({
           values[property.name] ?? ""
         )
         if (coerced === undefined) {
-          if (property.required) {
+          if (inputRequired(property)) {
             setFormError(`${propertyLabel(property.name)} is required.`)
             return
           }
@@ -350,7 +352,7 @@ export function CreateRecordDialog({
               </Field>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Create an active schema in this network first.
+                Create a schema in this network first.
               </p>
             )}
             {properties.map((property) => (
@@ -409,11 +411,36 @@ export function CreateRecordDialog({
   )
 }
 
+function inputRequired(property: JsonSchemaProperty) {
+  return property.required && !hasSchemaDefault(property)
+}
+
+function staticDefaultValue(property: JsonSchemaProperty) {
+  if (property.defaultValue === undefined) {
+    return undefined
+  }
+  if (isTemplateExpression(property.defaultValue)) {
+    return undefined
+  }
+  return property.defaultValue
+}
+
+function defaultHint(property: JsonSchemaProperty) {
+  if (property.defaultValue === undefined) {
+    return undefined
+  }
+  if (isTemplateExpression(property.defaultValue)) {
+    return `Filled with ${property.defaultValue} if left blank.`
+  }
+  return `Defaults to ${property.defaultValue} if left blank.`
+}
+
 function emptyValues(properties: JsonSchemaProperty[]) {
   const values: Record<string, string> = {}
   for (const property of properties) {
     values[property.name] =
-      property.type === "boolean" && property.required ? "false" : ""
+      staticDefaultValue(property) ??
+      (property.type === "boolean" && inputRequired(property) ? "false" : "")
   }
   return values
 }
@@ -500,13 +527,15 @@ function RecordPropertyField({
 }) {
   const id = `${formId}-${property.name}`
   const label = propertyLabel(property.name)
+  const required = inputRequired(property)
+  const hint = defaultHint(property)
 
   if (isFileProperty(property)) {
     return (
       <RecordFileField
         id={id}
         label={label}
-        required={property.required}
+        required={required}
         description={property.description}
         networkId={networkId}
         organizationId={organizationId}
@@ -525,7 +554,7 @@ function RecordPropertyField({
       <Field>
         <FieldLabel htmlFor={id}>
           {label}
-          {property.required ? "" : " (optional)"}
+          {required ? "" : " (optional)"}
         </FieldLabel>
         <ForeignRecordSelect
           id={id}
@@ -534,13 +563,11 @@ function RecordPropertyField({
           networkId={networkId}
           organizationId={organizationId}
           value={value}
-          required={property.required}
+          required={required}
           disabled={disabled}
           onChange={onChange}
         />
-        {property.description ? (
-          <FieldDescription>{property.description}</FieldDescription>
-        ) : null}
+        <FieldHint description={property.description} hint={hint} />
       </Field>
     )
   }
@@ -552,12 +579,12 @@ function RecordPropertyField({
         <NativeSelect
           id={id}
           value={value}
-          required={property.required}
+          required={required}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
         >
           <NativeSelectOption value="">
-            {property.required ? "Select a value" : "None"}
+            {required ? "Select a value" : "None"}
           </NativeSelectOption>
           {property.enumValues.map((item) => (
             <NativeSelectOption key={item} value={item}>
@@ -565,6 +592,7 @@ function RecordPropertyField({
             </NativeSelectOption>
           ))}
         </NativeSelect>
+        <FieldHint hint={hint} />
       </Field>
     )
   }
@@ -576,16 +604,17 @@ function RecordPropertyField({
         <NativeSelect
           id={id}
           value={value}
-          required={property.required}
+          required={required}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
         >
-          {property.required ? null : (
+          {required ? null : (
             <NativeSelectOption value="">Unset</NativeSelectOption>
           )}
           <NativeSelectOption value="true">Yes</NativeSelectOption>
           <NativeSelectOption value="false">No</NativeSelectOption>
         </NativeSelect>
+        <FieldHint hint={hint} />
       </Field>
     )
   }
@@ -596,7 +625,7 @@ function RecordPropertyField({
         id={id}
         label={label}
         value={value}
-        required={property.required}
+        required={required}
         disabled={disabled}
         description={property.description}
         onChange={onChange}
@@ -611,14 +640,16 @@ function RecordPropertyField({
         <Textarea
           id={id}
           value={value}
-          required={property.required}
+          required={required}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           placeholder={property.type === "array" ? "[ ]" : "{ }"}
         />
-        <FieldDescription>
-          {property.description ?? `JSON ${property.type}.`}
-        </FieldDescription>
+        <FieldHint
+          description={property.description}
+          hint={hint}
+          fallback={`JSON ${property.type}.`}
+        />
       </Field>
     )
   }
@@ -643,16 +674,35 @@ function RecordPropertyField({
         id={id}
         type={inputType}
         value={value}
-        required={property.required}
+        required={required}
         disabled={disabled}
         step={property.type === "integer" ? "1" : undefined}
         onChange={(event) => onChange(event.target.value)}
+        placeholder={
+          property.defaultValue && isTemplateExpression(property.defaultValue)
+            ? property.defaultValue
+            : undefined
+        }
       />
-      {property.description ? (
-        <FieldDescription>{property.description}</FieldDescription>
-      ) : null}
+      <FieldHint description={property.description} hint={hint} />
     </Field>
   )
+}
+
+function FieldHint({
+  description,
+  hint,
+  fallback,
+}: {
+  description?: string
+  hint?: string
+  fallback?: string
+}) {
+  const text = [description, hint].filter(Boolean).join(" ") || fallback
+  if (!text) {
+    return null
+  }
+  return <FieldDescription>{text}</FieldDescription>
 }
 
 function AddressPropertyField({

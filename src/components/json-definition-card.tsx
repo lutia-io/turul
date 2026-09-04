@@ -113,6 +113,7 @@ export function SchemaPropertiesTable({
             <th className="px-3.5 py-2.5 font-medium">Property</th>
             <th className="px-3.5 py-2.5 font-medium">Type</th>
             <th className="px-3.5 py-2.5 font-medium">Required</th>
+            <th className="px-3.5 py-2.5 font-medium">Default</th>
             <th className="px-3.5 py-2.5 font-medium">Description</th>
           </tr>
         </thead>
@@ -131,6 +132,9 @@ export function SchemaPropertiesTable({
               </td>
               <td className="px-3.5 py-2.5 text-muted-foreground">
                 {property.required ? "Yes" : "No"}
+              </td>
+              <td className="px-3.5 py-2.5 font-mono text-[13px] text-muted-foreground">
+                {property.defaultValue ?? "—"}
               </td>
               <td className="px-3.5 py-2.5 text-muted-foreground">
                 {property.description ?? "—"}

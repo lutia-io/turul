@@ -12,6 +12,7 @@ export type JsonSchemaProperty = {
   schemaId?: string
   enumValues?: string[]
   itemsType?: string
+  defaultValue?: string
 }
 
 export type DefinitionStep = {
@@ -30,6 +31,67 @@ function asObject(value: unknown): JsonObject | undefined {
 
 function asString(value: unknown) {
   return typeof value === "string" ? value : undefined
+}
+
+export function isTemplateExpression(value: string) {
+  return value.includes("{{")
+}
+
+export function formatJsonDefault(value: JsonValue): string {
+  if (typeof value === "string") {
+    return value
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value)
+  }
+  if (value === null) {
+    return "null"
+  }
+  return JSON.stringify(value)
+}
+
+export function parseJsonDefault(input: string, type: string): JsonValue {
+  const raw = input.trim()
+  if (isTemplateExpression(raw)) {
+    return raw
+  }
+  if (raw === "null") {
+    return null
+  }
+  if (type === "boolean") {
+    if (raw === "true") {
+      return true
+    }
+    if (raw === "false") {
+      return false
+    }
+    return raw
+  }
+  if (type === "integer") {
+    if (/^-?\d+$/.test(raw)) {
+      return Number.parseInt(raw, 10)
+    }
+    return raw
+  }
+  if (type === "number") {
+    const parsed = Number(raw)
+    if (raw !== "" && Number.isFinite(parsed)) {
+      return parsed
+    }
+    return raw
+  }
+  if (type === "object" || type === "array") {
+    try {
+      return JSON.parse(raw) as JsonValue
+    } catch {
+      return raw
+    }
+  }
+  return raw
+}
+
+export function hasSchemaDefault(property: JsonSchemaProperty) {
+  return property.defaultValue !== undefined
 }
 
 function asStringArray(value: unknown) {
@@ -77,6 +139,7 @@ export function getJsonSchemaProperties(
     const property = asObject(spec)
     const enumValues = asStringArray(property?.enum)
     const items = asObject(property?.items)
+    const hasDefault = property != null && Object.hasOwn(property, "default")
 
     return {
       name,
@@ -87,6 +150,9 @@ export function getJsonSchemaProperties(
       schemaId: asString(property?.schemaId),
       enumValues,
       itemsType: asString(items?.type),
+      defaultValue: hasDefault
+        ? formatJsonDefault(property.default as JsonValue)
+        : undefined,
     }
   })
 }
