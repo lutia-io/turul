@@ -15,6 +15,8 @@ export const executableNodeTypes = new Set<NodeType>(["NOOP", "HTTP"])
 
 export const nowTemplate = "{{ now }}"
 
+export const addTemplate = "{{ add 1 1 }}"
+
 export const pipelineInputTemplate = "{{ .Input }}"
 
 export function pipelineInputFieldTemplate(path = "") {

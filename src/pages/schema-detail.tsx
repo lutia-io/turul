@@ -22,6 +22,7 @@ import {
   PublicationPills,
 } from "@/components/definition-detail"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
+import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
 import { propertyLabel } from "@/components/schema-records-table"
 import { Button } from "@/components/ui/button"
 import { getBadgeColor } from "@/lib/badge"
@@ -57,9 +58,15 @@ export default function SchemaDetail() {
     network: workspaceNetwork,
     organizationId,
     href,
+    refetch: refetchWorkspace,
+    isFetching: isWorkspaceFetching,
   } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
-  const { records } = useWorkspaceRecords()
+  const {
+    records,
+    refetch: refetchRecords,
+    isFetching: isRecordsFetching,
+  } = useWorkspaceRecords()
   const { workflows } = useWorkspaceWorkflows()
   const { openEditSchema } = useCreateEntity()
   const [definitionView, setDefinitionView] =
@@ -100,6 +107,15 @@ export default function SchemaDetail() {
   const createdAt = schemaQuery.data?.createdAt
   const updatedAt = schemaQuery.data?.updatedAt
 
+  function refreshSchema() {
+    void schemaQuery.refetch()
+    void refetchWorkspace()
+    void refetchRecords()
+  }
+
+  const isRefreshing =
+    schemaQuery.isFetching || isWorkspaceFetching || isRecordsFetching
+
   if (schemaQuery.isLoading) {
     return <DefinitionSkeleton />
   }
@@ -112,6 +128,12 @@ export default function SchemaDetail() {
           notFoundMessage:
             "This schema does not exist or is no longer available.",
         })}
+        action={
+          <RefreshButton
+            onRefresh={refreshSchema}
+            isRefreshing={isRefreshing}
+          />
+        }
       />
     )
   }
@@ -121,6 +143,12 @@ export default function SchemaDetail() {
       <DefinitionStatusPage
         title="Schema not found"
         message="This schema does not exist or is no longer available."
+        action={
+          <RefreshButton
+            onRefresh={refreshSchema}
+            isRefreshing={isRefreshing}
+          />
+        }
       />
     )
   }
@@ -153,7 +181,11 @@ export default function SchemaDetail() {
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <RefreshButton
+            onRefresh={refreshSchema}
+            isRefreshing={isRefreshing}
+          />
           <Button
             type="button"
             variant={definitionView === "json" ? "secondary" : "outline"}
@@ -179,152 +211,154 @@ export default function SchemaDetail() {
         </div>
       </div>
 
-      <DefinitionColumns
-        aside={
-          <>
-            <DefinitionAsideCard
-              title="Details"
-              footer={
-                <Link
-                  to={href("schemas")}
-                  className="mt-5 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  View all schemas
-                </Link>
-              }
-            >
-              <dl className="mt-4 space-y-4">
-                <AsideRow label="Slug">
-                  <span className="font-mono text-xs font-normal">
-                    {visibleSchema.slug}
-                  </span>
-                </AsideRow>
-                <AsideRow label="Records">
+      <LoadingFrame isLoading={isRefreshing} className="rounded-2xl">
+        <DefinitionColumns
+          aside={
+            <>
+              <DefinitionAsideCard
+                title="Details"
+                footer={
                   <Link
-                    to={recordsHref}
-                    className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+                    to={href("schemas")}
+                    className="mt-5 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    <TableIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="tabular-nums">
-                      {recordCount} {recordCount === 1 ? "record" : "records"}
-                    </span>
+                    View all schemas
                   </Link>
-                </AsideRow>
-                <AsideRow label="Fields">
-                  <span className="tabular-nums">
-                    {properties.length}
-                    {requiredCount > 0 ? ` · ${requiredCount} required` : ""}
-                  </span>
-                </AsideRow>
-                {organization ? (
-                  <AsideRow label="Organization">
+                }
+              >
+                <dl className="mt-4 space-y-4">
+                  <AsideRow label="Slug">
+                    <span className="font-mono text-xs font-normal">
+                      {visibleSchema.slug}
+                    </span>
+                  </AsideRow>
+                  <AsideRow label="Records">
                     <Link
-                      to={networkWorkspacePath({
-                        networkId: network.id,
-                        organizationId: organization.id,
-                      })}
+                      to={recordsHref}
                       className="inline-flex max-w-full items-center gap-1.5 hover:underline"
                     >
-                      <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{organization.name}</span>
+                      <TableIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="tabular-nums">
+                        {recordCount} {recordCount === 1 ? "record" : "records"}
+                      </span>
                     </Link>
                   </AsideRow>
-                ) : null}
-                <AsideRow label="Network">
-                  <Link
-                    to={href()}
-                    className="inline-flex max-w-full items-center gap-1.5 hover:underline"
-                  >
-                    <GalleryVerticalEndIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{network.name}</span>
-                  </Link>
-                </AsideRow>
-                {createdAt ? (
-                  <AsideRow label="Created">
-                    {formatRelativeTime(createdAt)}
+                  <AsideRow label="Fields">
+                    <span className="tabular-nums">
+                      {properties.length}
+                      {requiredCount > 0 ? ` · ${requiredCount} required` : ""}
+                    </span>
                   </AsideRow>
-                ) : null}
-                {updatedAt && updatedAt !== createdAt ? (
-                  <AsideRow label="Updated">
-                    {formatRelativeTime(updatedAt)}
-                  </AsideRow>
-                ) : null}
-                <AsideRow label="ID">
-                  <CopyIdButton value={visibleSchema.id} />
-                </AsideRow>
-              </dl>
-            </DefinitionAsideCard>
-
-            <DefinitionAsideCard title="Workflows">
-              {relatedWorkflows.length > 0 ? (
-                <div className="mt-3 flex flex-col gap-1">
-                  {relatedWorkflows.map((workflow) => (
+                  {organization ? (
+                    <AsideRow label="Organization">
+                      <Link
+                        to={networkWorkspacePath({
+                          networkId: network.id,
+                          organizationId: organization.id,
+                        })}
+                        className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+                      >
+                        <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{organization.name}</span>
+                      </Link>
+                    </AsideRow>
+                  ) : null}
+                  <AsideRow label="Network">
                     <Link
-                      key={workflow.id}
-                      to={href(`workflow-definitions/${workflow.id}`)}
-                      className="flex min-w-0 items-center gap-3 rounded-xl px-1 py-1.5 transition-colors hover:bg-muted/60"
+                      to={href()}
+                      className="inline-flex max-w-full items-center gap-1.5 hover:underline"
                     >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
-                        <WorkflowIcon className="size-3.5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {workflow.name}
-                        </span>
-                        <span className="block truncate font-mono text-xs text-muted-foreground">
-                          {workflow.slug}
-                        </span>
-                      </span>
+                      <GalleryVerticalEndIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{network.name}</span>
                     </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  No workflows watch this schema yet.
-                </p>
-              )}
-            </DefinitionAsideCard>
-          </>
-        }
-      >
-        {definitionView === "json" ? (
-          <JsonDefinitionCard
-            definition={visibleSchema.definition}
-            label="JSON Schema"
-            description="Stored as JSONB on the definition column."
-          />
-        ) : (
-          <DefinitionCard>
-            <div className="mb-6">
-              <h2 className="text-sm font-medium">Properties</h2>
-              <p className="text-sm text-muted-foreground">
-                {properties.length === 0
-                  ? "This JSON Schema does not declare any properties."
-                  : `${properties.length} ${properties.length === 1 ? "field" : "fields"} declared on this JSON Schema.`}
-              </p>
-            </div>
-            {properties.length > 0 ? (
-              <div className="overflow-x-auto rounded-xl border">
-                <table className="w-full min-w-[36rem] text-left text-sm">
-                  <thead className="border-b bg-muted/40 text-xs font-medium tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-3.5 py-2.5">Field</th>
-                      <th className="px-3.5 py-2.5">Type</th>
-                      <th className="px-3.5 py-2.5">Required</th>
-                      <th className="px-3.5 py-2.5">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {properties.map((property) => (
-                      <PropertyItem key={property.name} property={property} />
+                  </AsideRow>
+                  {createdAt ? (
+                    <AsideRow label="Created">
+                      {formatRelativeTime(createdAt)}
+                    </AsideRow>
+                  ) : null}
+                  {updatedAt && updatedAt !== createdAt ? (
+                    <AsideRow label="Updated">
+                      {formatRelativeTime(updatedAt)}
+                    </AsideRow>
+                  ) : null}
+                  <AsideRow label="ID">
+                    <CopyIdButton value={visibleSchema.id} />
+                  </AsideRow>
+                </dl>
+              </DefinitionAsideCard>
+
+              <DefinitionAsideCard title="Workflows">
+                {relatedWorkflows.length > 0 ? (
+                  <div className="mt-3 flex flex-col gap-1">
+                    {relatedWorkflows.map((workflow) => (
+                      <Link
+                        key={workflow.id}
+                        to={href(`workflow-definitions/${workflow.id}`)}
+                        className="flex min-w-0 items-center gap-3 rounded-xl px-1 py-1.5 transition-colors hover:bg-muted/60"
+                      >
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                          <WorkflowIcon className="size-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">
+                            {workflow.name}
+                          </span>
+                          <span className="block truncate font-mono text-xs text-muted-foreground">
+                            {workflow.slug}
+                          </span>
+                        </span>
+                      </Link>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    No workflows watch this schema yet.
+                  </p>
+                )}
+              </DefinitionAsideCard>
+            </>
+          }
+        >
+          {definitionView === "json" ? (
+            <JsonDefinitionCard
+              definition={visibleSchema.definition}
+              label="JSON Schema"
+              description="Stored as JSONB on the definition column."
+            />
+          ) : (
+            <DefinitionCard>
+              <div className="mb-6">
+                <h2 className="text-sm font-medium">Properties</h2>
+                <p className="text-sm text-muted-foreground">
+                  {properties.length === 0
+                    ? "This JSON Schema does not declare any properties."
+                    : `${properties.length} ${properties.length === 1 ? "field" : "fields"} declared on this JSON Schema.`}
+                </p>
               </div>
-            ) : null}
-          </DefinitionCard>
-        )}
-      </DefinitionColumns>
+              {properties.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border">
+                  <table className="w-full min-w-[36rem] text-left text-sm">
+                    <thead className="border-b bg-muted/40 text-xs font-medium tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-3.5 py-2.5">Field</th>
+                        <th className="px-3.5 py-2.5">Type</th>
+                        <th className="px-3.5 py-2.5">Required</th>
+                        <th className="px-3.5 py-2.5">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {properties.map((property) => (
+                        <PropertyItem key={property.name} property={property} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </DefinitionCard>
+          )}
+        </DefinitionColumns>
+      </LoadingFrame>
     </DefinitionPage>
   )
 }

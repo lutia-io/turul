@@ -37,6 +37,8 @@ import { cn } from "@/lib/utils"
 import {
   actionTypeDescriptions,
   actionTypeLabels,
+  addFieldTemplate,
+  addTemplate,
   emptyAction,
   emptyDataEntry,
   newDraftKey,
@@ -80,12 +82,22 @@ function dataForSchema(schema: Schema | undefined, current: DataEntryDraft[]) {
   return current
 }
 
+function isNumericField(field: JsonSchemaProperty) {
+  return field.type === "integer" || field.type === "number"
+}
+
 function recordTemplateGroups(fields: JsonSchemaProperty[]) {
+  const numeric = fields.filter(isNumericField)
   return [
     {
       variables: [
         { label: "Record ID", token: recordIDTemplate },
         { label: "Current time", token: nowTemplate },
+        {
+          label: "Add numbers",
+          token: addTemplate,
+          caretOffset: addTemplate.indexOf("1"),
+        },
       ],
     },
     {
@@ -94,6 +106,17 @@ function recordTemplateGroups(fields: JsonSchemaProperty[]) {
         label: field.name,
         token: recordFieldTemplate(field.name),
       })),
+    },
+    {
+      label: "Add to a number",
+      variables: numeric.map((field) => {
+        const token = addFieldTemplate(field.name)
+        return {
+          label: field.name,
+          token,
+          caretOffset: token.length - "1 }}".length,
+        }
+      }),
     },
   ]
 }

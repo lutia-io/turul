@@ -42,6 +42,7 @@ import {
 } from "@/lib/json-definition"
 import { useWorkspaceNetworkList } from "@/lib/network-workspace"
 import {
+  addTemplate,
   defaultDefinition,
   executableNodeTypes,
   httpDefinitionFromDraft,
@@ -94,6 +95,11 @@ function pipelineTemplateGroups(
     variables: [
       { label: "Entire input", token: pipelineInputTemplate },
       { label: "Current time", token: nowTemplate },
+      {
+        label: "Add numbers",
+        token: addTemplate,
+        caretOffset: addTemplate.indexOf("1"),
+      },
     ],
   }
   const named: TemplateVariableGroup = {

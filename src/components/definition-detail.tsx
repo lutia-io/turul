@@ -185,23 +185,28 @@ export function DefinitionStatusPage({
   title,
   message,
   destructive,
+  action,
 }: {
   title: string
   message: string
   destructive?: boolean
+  action?: ReactNode
 }) {
   return (
     <DefinitionPage>
-      <div className="min-w-0 space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p
-          className={cn(
-            "text-sm",
-            destructive ? "text-destructive" : "text-muted-foreground"
-          )}
-        >
-          {message}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <p
+            className={cn(
+              "text-sm",
+              destructive ? "text-destructive" : "text-muted-foreground"
+            )}
+          >
+            {message}
+          </p>
+        </div>
+        {action}
       </div>
     </DefinitionPage>
   )
