@@ -1,12 +1,14 @@
 import { useState, type ReactNode } from "react"
 import { Link, useParams } from "react-router"
 import {
+  ClockIcon,
   FileJsonIcon,
   FilterIcon,
   GalleryVerticalEndIcon,
   PencilIcon,
   WorkflowIcon,
   ZapIcon,
+  type LucideIcon,
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
@@ -43,6 +45,7 @@ import {
   logicLabels,
   operatorLabels,
   parseWorkflowDefinition,
+  triggerSummary,
   type CompareOperator,
   type CriteriaLogic,
   type WorkflowAction,
@@ -176,7 +179,10 @@ export default function WorkflowDefinitionDetail() {
             />
           </div>
           <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-            {criteriaSummary(parsed?.criteria)}
+            {triggerSummary(parsed?.trigger)}
+            {conditionCount > 0
+              ? ` · ${criteriaSummary(parsed?.criteria)}.`
+              : "."}
             {actions.length > 0
               ? ` Then ${actions.length} ${actions.length === 1 ? "action" : "actions"} run in order.`
               : ""}
@@ -240,6 +246,9 @@ export default function WorkflowDefinitionDetail() {
                       {visibleWorkflow.schemaId}
                     </span>
                   )}
+                </AsideRow>
+                <AsideRow label="Trigger">
+                  {triggerSummary(parsed?.trigger)}
                 </AsideRow>
                 <AsideRow label="Match">
                   {rootLogic ? (
@@ -332,18 +341,30 @@ export default function WorkflowDefinitionDetail() {
           <JsonDefinitionCard
             definition={visibleWorkflow.definition}
             label="JSONB definition"
-            description="Criteria and actions stored on this workflow."
+            description="Trigger, criteria, and actions stored on this workflow."
           />
         ) : (
           <>
             <DefinitionCard>
               <SectionHeading
+                icon={
+                  parsed?.trigger.on?.includes("schedule")
+                    ? ClockIcon
+                    : WorkflowIcon
+                }
+                title="When"
+                description={triggerSummary(parsed?.trigger)}
+              />
+            </DefinitionCard>
+
+            <DefinitionCard>
+              <SectionHeading
                 icon={FilterIcon}
-                title="Criteria"
+                title="If"
                 description={
                   schema
-                    ? `This workflow runs when a new ${schema.name} record matches the rule below.`
-                    : "This workflow runs when the triggering record matches the rule below."
+                    ? `These conditions are evaluated against the ${schema.name} record after the trigger fires.`
+                    : "These conditions are evaluated against the triggering record after the trigger fires."
                 }
               />
               <div className="mt-6">
@@ -355,7 +376,7 @@ export default function WorkflowDefinitionDetail() {
               <SectionHeading
                 icon={ZapIcon}
                 title="Actions"
-                description="These steps run in order after the criteria match."
+                description="These steps run in order after the trigger and conditions match."
               />
               {actions.length > 0 ? (
                 <ol className="mt-6">
@@ -389,7 +410,7 @@ function SectionHeading({
   title,
   description,
 }: {
-  icon: typeof FilterIcon
+  icon: LucideIcon
   title: string
   description: string
 }) {

@@ -184,7 +184,28 @@ function getNamedSteps(value: unknown): DefinitionStep[] {
 }
 
 export function getWorkflowSteps(definition: JsonObject) {
-  return getNamedSteps(definition.steps)
+  const named = getNamedSteps(definition.steps)
+  if (named.length > 0) {
+    return named
+  }
+  if (!Array.isArray(definition.actions)) {
+    return []
+  }
+  return definition.actions.flatMap((item, index) => {
+    const action = asObject(item)
+    const type = asString(action?.type)
+    if (!type) {
+      return []
+    }
+    return [
+      {
+        id: `${type}-${index}`,
+        type,
+        name: type.replaceAll("_", " ").toLowerCase(),
+        order: index + 1,
+      },
+    ]
+  })
 }
 
 export type PipelineLevelNode = {

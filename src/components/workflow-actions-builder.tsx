@@ -764,8 +764,8 @@ export function WorkflowActionsBuilder({
                   <span className="sr-only">About actions</span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  These steps run in order after the conditions match. Create or
-                  update records, or send data into a pipeline.
+                  These steps run in order after the trigger and conditions
+                  match. Create or update records, or send data into a pipeline.
                 </TooltipContent>
               </Tooltip>
             </div>

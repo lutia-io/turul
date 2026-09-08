@@ -537,10 +537,10 @@ export default function WorkflowDefinitionList() {
       title="Workflow Definitions"
       description={
         organization
-          ? `When a matching record is created in ${organization.name}, these workflows run their actions.`
+          ? `Workflows for ${organization.name} run when their trigger fires.`
           : network
-            ? `When a record is created in ${network.name}, matching workflows run their actions.`
-            : "Workflows that run when a matching record is created."
+            ? `Workflows for ${network.name} run when their trigger fires.`
+            : "Workflows that run when their trigger fires."
       }
       action={
         <Button onClick={() => openCreateWorkflow(network?.id)}>
@@ -581,7 +581,7 @@ export default function WorkflowDefinitionList() {
                 ? "Loading workflows..."
                 : filtersActive
                   ? "No workflows match this view."
-                  : "No workflow definitions yet. Create one to automate what happens when a record is created."
+                  : "No workflow definitions yet. Create one to automate what happens when records are created, updated, or on a schedule."
             }
           />
           <DataTablePagination table={table} />

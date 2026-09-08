@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select"
 import { WorkflowActionsBuilder } from "@/components/workflow-actions-builder"
 import { WorkflowCriteriaBuilder } from "@/components/workflow-criteria-builder"
+import { WorkflowTriggerBuilder } from "@/components/workflow-trigger-builder"
 import { getWorkflowDefinition } from "@/data/networks"
 import {
   parseJsonObject,
@@ -63,10 +64,15 @@ import {
   criteriaToApi,
   emptyAction,
   emptyGroup,
+  emptyTrigger,
   parseWorkflowDefinition,
   schemaFieldOptions,
+  triggerFromApi,
+  triggerSummary,
+  triggerToApi,
   type ActionDraft,
   type CriteriaGroupDraft,
+  type TriggerDraft,
   type WorkflowDefinitionBody,
 } from "@/lib/workflow-definition"
 import { getHumaErrorMessage } from "@/store/api"
@@ -83,7 +89,7 @@ function workflowDefinitionError(text: string) {
       return "JSON must be a workflow definition object"
     }
     if (!parseWorkflowDefinition(parsed as JsonObject)) {
-      return "JSON must include criteria or actions"
+      return "JSON must include actions"
     }
     return null
   } catch {
@@ -129,6 +135,7 @@ export function WorkflowDefinitionDialog({
   const [slugTouched, setSlugTouched] = useState(false)
   const [schemaId, setSchemaId] = useState("")
   const [active, setActive] = useState(true)
+  const [trigger, setTrigger] = useState<TriggerDraft>(emptyTrigger())
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
   const [actions, setActions] = useState<ActionDraft[]>([emptyAction()])
   const [jsonText, setJsonText] = useState("")
@@ -180,6 +187,7 @@ export function WorkflowDefinitionDialog({
     setActive(current?.active ?? true)
     jsonSourceRef.current = "builder"
     setJsonError(null)
+    setTrigger(triggerFromApi(parsed?.trigger))
     setCriteria(criteriaFromApi(parsed?.criteria))
     setActions(actionsFromApi(parsed?.actions))
   }, [apiWorkflowQuery.currentData, open, workflowDefinitionId])
@@ -219,19 +227,19 @@ export function WorkflowDefinitionDialog({
   }, [editing, networkSchemas, open, schemaId])
 
   const definition = useMemo<WorkflowDefinitionBody | undefined>(() => {
-    const nextCriteria = criteriaToApi(criteria, triggerFields)
     const nextActions = actionsToApi(actions)
-    if (!nextCriteria) {
+    if (nextActions.length === 0) {
       return undefined
     }
     return {
-      criteria: nextCriteria,
+      trigger: triggerToApi(trigger),
+      criteria: criteriaToApi(criteria, triggerFields) ?? {},
       actions: nextActions,
     }
-  }, [actions, criteria, triggerFields])
+  }, [actions, criteria, trigger, triggerFields])
 
   const generatedJson = stringifyDefinition(
-    definition ?? { criteria: {}, actions: [] }
+    definition ?? { trigger: triggerToApi(trigger), criteria: {}, actions: [] }
   )
 
   useEffect(() => {
@@ -248,6 +256,7 @@ export function WorkflowDefinitionDialog({
 
   function applyWorkflowDefinition(body: WorkflowDefinitionBody) {
     jsonSourceRef.current = "json"
+    setTrigger(triggerFromApi(body.trigger))
     setCriteria(criteriaFromApi(body.criteria))
     setActions(actionsFromApi(body.actions))
   }
@@ -262,7 +271,7 @@ export function WorkflowDefinitionDialog({
     }
     const body = parseWorkflowDefinition(parsed)
     if (!body) {
-      setJsonError("JSON must include criteria or actions")
+      setJsonError("JSON must include actions")
       return
     }
     setJsonError(null)
@@ -333,8 +342,7 @@ export function WorkflowDefinitionDialog({
         </p>
       )}
       <FieldDescription>
-        The workflow watches new records of this type and uses its fields in
-        conditions.
+        The workflow watches this record type and uses its fields in conditions.
       </FieldDescription>
     </Field>
   )
@@ -407,8 +415,8 @@ export function WorkflowDefinitionDialog({
           </DialogTitle>
           <DialogDescription>
             {triggerSchema
-              ? `When a matching ${triggerSchema.name} record is created, this workflow runs the actions you define.`
-              : "Pick a record type, add conditions for when it should run, then choose what happens next."}
+              ? `${triggerSummary(triggerToApi(trigger))} for ${triggerSchema.name}. Conditions still have to match before actions run.`
+              : "Pick a record type and when this should run, add conditions, then choose what happens next."}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -518,7 +526,7 @@ export function WorkflowDefinitionDialog({
                   label="Published"
                 />
                 <FieldDescription>
-                  Published workflows run when a matching record is created.
+                  Published workflows run when their trigger fires.
                   Drafts are saved but do not run.
                 </FieldDescription>
               </Field>
@@ -526,6 +534,15 @@ export function WorkflowDefinitionDialog({
                 <FieldError>{getHumaErrorMessage(error)}</FieldError>
               ) : null}
             </FieldGroup>
+
+            <WorkflowTriggerBuilder
+              value={trigger}
+              fields={triggerFields}
+              onChange={(next) => {
+                markBuilderSource()
+                setTrigger(next)
+              }}
+            />
 
             <WorkflowCriteriaBuilder
               value={criteria}

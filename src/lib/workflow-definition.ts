@@ -43,9 +43,61 @@ export type WorkflowAction = {
 }
 
 export type WorkflowDefinitionBody = {
+  trigger: WorkflowTrigger
   criteria: WorkflowCriteria
   actions: WorkflowAction[]
 }
+
+export const triggerOnValues = ["created", "updated", "schedule"] as const
+
+export type TriggerOn = (typeof triggerOnValues)[number]
+
+export type WorkflowTrigger = {
+  on?: TriggerOn[]
+  changed?: string[]
+  cron?: string
+  timezone?: string
+}
+
+export type TriggerKind = "created" | "updated" | "created_updated" | "schedule"
+
+export type SchedulePreset = "hourly" | "daily" | "weekly" | "custom"
+
+export type TriggerDraft = {
+  kind: TriggerKind
+  changed: string[]
+  preset: SchedulePreset
+  hour: string
+  minute: string
+  cron: string
+  timezone: string
+}
+
+export const triggerKindLabels: Record<TriggerKind, string> = {
+  created: "Record is created",
+  updated: "Record is updated",
+  created_updated: "Record is created or updated",
+  schedule: "On a schedule",
+}
+
+export const commonTimezones = [
+  "UTC",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "America/Sao_Paulo",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Africa/Johannesburg",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+] as const
 
 export type DataEntryDraft = {
   key: string
@@ -126,6 +178,189 @@ export function emptyAction(
     pipeline: "",
     data: [emptyDataEntry()],
   }
+}
+
+export function browserTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+}
+
+export function timezoneOptions(current?: string) {
+  const values = new Set<string>(commonTimezones)
+  const extra = current?.trim() || browserTimezone()
+  if (extra) {
+    values.add(extra)
+  }
+  return [...values].sort((left, right) => left.localeCompare(right))
+}
+
+export function emptyTrigger(): TriggerDraft {
+  return {
+    kind: "created",
+    changed: [],
+    preset: "daily",
+    hour: "09",
+    minute: "00",
+    cron: "0 9 * * *",
+    timezone: browserTimezone(),
+  }
+}
+
+function padTimePart(value: number) {
+  return String(value).padStart(2, "0")
+}
+
+function cronFromDraft(draft: TriggerDraft) {
+  const hour = Number.parseInt(draft.hour, 10)
+  const minute = Number.parseInt(draft.minute, 10)
+  const safeHour = Number.isFinite(hour) ? hour : 9
+  const safeMinute = Number.isFinite(minute) ? minute : 0
+  switch (draft.preset) {
+    case "hourly":
+      return "0 * * * *"
+    case "daily":
+      return `${safeMinute} ${safeHour} * * *`
+    case "weekly":
+      return `${safeMinute} ${safeHour} * * 1`
+    case "custom":
+      return draft.cron.trim() || "0 9 * * *"
+  }
+}
+
+function draftFromCron(cron: string): Pick<
+  TriggerDraft,
+  "preset" | "hour" | "minute" | "cron"
+> {
+  const parts = cron.trim().split(/\s+/)
+  if (parts.length === 5) {
+    const [minute, hour, dayOfMonth, month, dayOfWeek] = parts
+    if (minute === "0" && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+      return { preset: "hourly", hour: "09", minute: "00", cron }
+    }
+    if (dayOfMonth === "*" && month === "*" && /^\d+$/.test(minute) && /^\d+$/.test(hour)) {
+      if (dayOfWeek === "*") {
+        return {
+          preset: "daily",
+          hour: padTimePart(Number(hour)),
+          minute: padTimePart(Number(minute)),
+          cron,
+        }
+      }
+      if (dayOfWeek === "1") {
+        return {
+          preset: "weekly",
+          hour: padTimePart(Number(hour)),
+          minute: padTimePart(Number(minute)),
+          cron,
+        }
+      }
+    }
+  }
+  return { preset: "custom", hour: "09", minute: "00", cron: cron.trim() || "0 9 * * *" }
+}
+
+function asTriggerOn(value: unknown): TriggerOn | undefined {
+  return triggerOnValues.includes(value as TriggerOn)
+    ? (value as TriggerOn)
+    : undefined
+}
+
+export function triggerFromApi(trigger: WorkflowTrigger | undefined): TriggerDraft {
+  const draft = emptyTrigger()
+  if (!trigger) {
+    return draft
+  }
+  const on = Array.isArray(trigger.on)
+    ? trigger.on.flatMap((item) => {
+        const event = asTriggerOn(item)
+        return event ? [event] : []
+      })
+    : []
+  const hasCreated = on.includes("created") || on.length === 0
+  const hasUpdated = on.includes("updated")
+  const hasSchedule = on.includes("schedule")
+  if (hasSchedule) {
+    const fromCron = draftFromCron(trigger.cron ?? "")
+    return {
+      ...draft,
+      kind: "schedule",
+      ...fromCron,
+      timezone: trigger.timezone?.trim() || draft.timezone,
+    }
+  }
+  return {
+    ...draft,
+    kind: hasCreated && hasUpdated ? "created_updated" : hasUpdated ? "updated" : "created",
+    changed: Array.isArray(trigger.changed)
+      ? trigger.changed.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+      : [],
+  }
+}
+
+export function triggerToApi(draft: TriggerDraft): WorkflowTrigger {
+  if (draft.kind === "schedule") {
+    return {
+      on: ["schedule"],
+      cron: cronFromDraft(draft),
+      timezone: draft.timezone.trim() || browserTimezone(),
+    }
+  }
+  const on: TriggerOn[] =
+    draft.kind === "created_updated"
+      ? ["created", "updated"]
+      : draft.kind === "updated"
+        ? ["updated"]
+        : ["created"]
+  const changed =
+    on.includes("updated")
+      ? draft.changed.map((item) => item.trim()).filter(Boolean)
+      : []
+  return changed.length > 0 ? { on, changed } : { on }
+}
+
+function formatClock(hour: string, minute: string) {
+  const parsedHour = Number.parseInt(hour, 10)
+  const parsedMinute = Number.parseInt(minute, 10)
+  const safeHour = Number.isFinite(parsedHour) ? parsedHour : 9
+  const safeMinute = Number.isFinite(parsedMinute) ? parsedMinute : 0
+  const period = safeHour >= 12 ? "PM" : "AM"
+  const hour12 = safeHour % 12 === 0 ? 12 : safeHour % 12
+  return `${hour12}:${padTimePart(safeMinute)} ${period}`
+}
+
+export function triggerSummary(trigger: WorkflowTrigger | undefined): string {
+  const draft = triggerFromApi(trigger)
+  if (draft.kind === "schedule") {
+    const zone = draft.timezone.split("/").at(-1)?.replaceAll("_", " ") ?? draft.timezone
+    if (draft.preset === "hourly") {
+      return "Every hour"
+    }
+    if (draft.preset === "daily") {
+      return `Every day at ${formatClock(draft.hour, draft.minute)} ${zone}`
+    }
+    if (draft.preset === "weekly") {
+      return `Every Monday at ${formatClock(draft.hour, draft.minute)} ${zone}`
+    }
+    return `Cron ${draft.cron}`
+  }
+  if (draft.kind === "created") {
+    return "When a record is created"
+  }
+  if (draft.kind === "created_updated") {
+    if (draft.changed.length === 1) {
+      return `When a record is created or ${draft.changed[0]} changes`
+    }
+    if (draft.changed.length > 1) {
+      return "When a record is created or selected fields change"
+    }
+    return "When a record is created or updated"
+  }
+  if (draft.changed.length === 1) {
+    return `When ${draft.changed[0]} changes`
+  }
+  if (draft.changed.length > 1) {
+    return "When selected fields change"
+  }
+  return "When a record is updated"
 }
 
 export const operatorLabels: Record<CompareOperator, string> = {
@@ -443,6 +678,37 @@ export function actionsToApi(actions: ActionDraft[]): WorkflowAction[] {
   })
 }
 
+function parseTrigger(value: unknown): WorkflowTrigger {
+  const object = asObject(value)
+  if (!object) {
+    return { on: ["created"] }
+  }
+  const on = Array.isArray(object.on)
+    ? object.on.flatMap((item) => {
+        const event = asTriggerOn(item)
+        return event ? [event] : []
+      })
+    : []
+  const trigger: WorkflowTrigger = {
+    on: on.length > 0 ? on : ["created"],
+  }
+  if (Array.isArray(object.changed)) {
+    const changed = object.changed.filter(
+      (item): item is string => typeof item === "string" && item.trim() !== ""
+    )
+    if (changed.length > 0) {
+      trigger.changed = changed
+    }
+  }
+  if (typeof object.cron === "string" && object.cron.trim()) {
+    trigger.cron = object.cron.trim()
+  }
+  if (typeof object.timezone === "string" && object.timezone.trim()) {
+    trigger.timezone = object.timezone.trim()
+  }
+  return trigger
+}
+
 export function parseWorkflowDefinition(
   definition: JsonObject | WorkflowDefinitionBody | undefined
 ): WorkflowDefinitionBody | undefined {
@@ -470,6 +736,7 @@ export function parseWorkflowDefinition(
     return undefined
   }
   return {
+    trigger: parseTrigger(object.trigger),
     criteria: (criteria ?? {}) as WorkflowCriteria,
     actions,
   }
@@ -479,7 +746,8 @@ export function workflowSummary(definition: JsonObject): string {
   const parsed = parseWorkflowDefinition(definition)
   if (parsed) {
     const actionCount = parsed.actions.length
-    return `${criteriaSummary(parsed.criteria)} · ${actionCount} ${actionCount === 1 ? "action" : "actions"}`
+    const conditions = criteriaSummary(parsed.criteria)
+    return `${triggerSummary(parsed.trigger)} · ${conditions} · ${actionCount} ${actionCount === 1 ? "action" : "actions"}`
   }
   return "Workflow definition"
 }
@@ -494,18 +762,18 @@ export function criteriaSummary(
     const count = criteria.conditions?.length ?? 0
     if (criteria.logic === "AND") {
       return count === 1
-        ? "When 1 condition matches"
-        : `When all ${count} conditions match`
+        ? "All 1 condition matches"
+        : `All ${count} conditions match`
     }
     if (criteria.logic === "OR") {
       return count === 1
-        ? "When 1 condition matches"
-        : `When any of ${count} conditions match`
+        ? "1 condition matches"
+        : `Any of ${count} conditions match`
     }
-    return "When none of the conditions match"
+    return "None of the conditions match"
   }
   if (criteria.field && criteria.operator) {
-    return `When ${criteria.field} ${operatorLabels[asCompareOperator(criteria.operator)]} ${stringifyValue(criteria.value)}`
+    return `${criteria.field} ${operatorLabels[asCompareOperator(criteria.operator)]} ${stringifyValue(criteria.value)}`
   }
   return "No conditions"
 }

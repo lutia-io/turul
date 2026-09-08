@@ -664,7 +664,7 @@ export function WorkflowCriteriaBuilder({
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h3 className="text-sm font-medium">When</h3>
+              <h3 className="text-sm font-medium">If</h3>
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -678,14 +678,15 @@ export function WorkflowCriteriaBuilder({
                   <span className="sr-only">About conditions</span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  The workflow runs when a new record matches these conditions.
-                  Groups let you combine all, any, or none of the nested checks.
+                  The workflow runs when the trigger fires and these conditions
+                  match. Groups let you combine all, any, or none of the nested
+                  checks.
                 </TooltipContent>
               </Tooltip>
             </div>
             <p className="text-xs text-muted-foreground">
               {count === 0
-                ? "Add the conditions that decide when this workflow runs."
+                ? "Add conditions that the record must match. Optional if the trigger is enough."
                 : `${count} ${count === 1 ? "condition" : "conditions"} · ${logicLabels[value.logic]}`}
             </p>
           </div>
