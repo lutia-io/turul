@@ -1,7 +1,7 @@
 import type { JsonObject } from "@/lib/json-definition"
 import type { WorkflowDefinitionBody } from "@/lib/workflow-definition"
 import { setNumberFilterParam, setStringFilterParam } from "@/lib/list-query"
-import { api } from "@/store/api"
+import { api, type ApiUserRef } from "@/store/api"
 
 export type ApiWorkflowDefinition = {
   id: string
@@ -13,6 +13,8 @@ export type ApiWorkflowDefinition = {
   schemaId: string
   networkId: string
   userId: string
+  createdBy: ApiUserRef
+  updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
   deletedAt?: string | null
@@ -209,7 +211,12 @@ function listWorkflowQueryParams(params?: ListWorkflowsParams) {
     query.status = params.status
   }
   setStringFilterParam(query, "network", params.network, params.networkOp)
-  setStringFilterParam(query, "organization", params.organization, params.organizationOp)
+  setStringFilterParam(
+    query,
+    "organization",
+    params.organization,
+    params.organizationOp
+  )
 
   return query
 }

@@ -45,32 +45,33 @@ import {
   useWorkspaceNetworks,
 } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
+import { userDisplayName } from "@/lib/user"
 import { getHumaErrorMessage } from "@/store/api"
 import { useDeleteNetworkMutation } from "@/store/network-slice"
 import type { Network, Organization } from "@/data/networks"
+import type { ApiUserRef } from "@/store/api"
 
-type NetworkDetails = Network & {
-  slug?: string
-  createdAt?: string
-  updatedAt?: string
-}
+type NetworkDetails = Network
 
-type OrganizationDetails = Organization & {
-  slug?: string
-  createdAt?: string
-  updatedAt?: string
-}
+type OrganizationDetails = Organization
 
 function countLabel(count: number, singular: string) {
   return `${count} ${count === 1 ? singular : `${singular}s`}`
 }
 
-function activityLabel(createdAt?: string, updatedAt?: string) {
+function activityLabel(
+  createdAt?: string,
+  updatedAt?: string,
+  createdBy?: ApiUserRef,
+  updatedBy?: ApiUserRef
+) {
   if (updatedAt && updatedAt !== createdAt) {
-    return `Updated ${formatRelativeTime(updatedAt)}`
+    const who = userDisplayName(updatedBy)
+    return `Updated ${formatRelativeTime(updatedAt)}${who ? ` by ${who}` : ""}`
   }
   if (createdAt) {
-    return `Created ${formatRelativeTime(createdAt)}`
+    const who = userDisplayName(createdBy)
+    return `Created ${formatRelativeTime(createdAt)}${who ? ` by ${who}` : ""}`
   }
   return undefined
 }
@@ -87,12 +88,11 @@ function MetaList({ items }: { items: ReactNode[] }) {
   return (
     <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
       {visible.map((item, index) => (
-        <span key={index} className="inline-flex min-w-0 items-center gap-x-1.5">
-          {index > 0 ? (
-            <span aria-hidden="true">
-              ·
-            </span>
-          ) : null}
+        <span
+          key={index}
+          className="inline-flex min-w-0 items-center gap-x-1.5"
+        >
+          {index > 0 ? <span aria-hidden="true">·</span> : null}
           <span className="min-w-0 wrap-break-word">{item}</span>
         </span>
       ))}
@@ -116,7 +116,10 @@ function OrganizationCard({
 
   return (
     <div className="group flex min-w-0 items-center gap-2 rounded-xl border bg-background p-3 shadow-xs transition-colors hover:bg-muted/50">
-      <Link to={workspacePath} className="flex min-w-0 flex-1 items-center gap-3">
+      <Link
+        to={workspacePath}
+        className="flex min-w-0 flex-1 items-center gap-3"
+      >
         <div className="flex size-10 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tracking-tight">
           <Building2Icon className="size-4" />
         </div>
@@ -124,7 +127,16 @@ function OrganizationCard({
           <div className="flex min-w-0 items-center gap-1.5">
             <p className="min-w-0 truncate font-medium">{organization.name}</p>
           </div>
-          <MetaList items={[activityLabel(organization.createdAt, organization.updatedAt)]} />
+          <MetaList
+            items={[
+              activityLabel(
+                organization.createdAt,
+                organization.updatedAt,
+                organization.createdBy,
+                organization.updatedBy
+              ),
+            ]}
+          />
         </div>
         <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </Link>
@@ -140,7 +152,10 @@ function OrganizationCard({
             <PencilIcon />
             Edit organization
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
             <Trash2Icon />
             Delete organization
           </DropdownMenuItem>
@@ -268,14 +283,23 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
               </div>
               <MetaList
                 items={[
-                  network.slug ? <span className="font-mono">{network.slug}</span> : null,
-                  activityLabel(network.createdAt, network.updatedAt),
+                  network.slug ? (
+                    <span className="font-mono">{network.slug}</span>
+                  ) : null,
+                  activityLabel(
+                    network.createdAt,
+                    network.updatedAt,
+                    network.createdBy,
+                    network.updatedBy
+                  ),
                 ]}
               />
             </div>
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" />}>
+            <DropdownMenuTrigger
+              render={<Button variant="outline" size="icon-sm" />}
+            >
               <MoreHorizontalIcon />
               <span className="sr-only">Network actions</span>
             </DropdownMenuTrigger>
@@ -285,7 +309,10 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
                 Edit network
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
                 <Trash2Icon />
                 Delete network
               </DropdownMenuItem>
@@ -296,7 +323,9 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium">
-            {organizationCount > 0 ? countLabel(organizationCount, "organization") : "Organizations"}
+            {organizationCount > 0
+              ? countLabel(organizationCount, "organization")
+              : "Organizations"}
           </p>
           <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {network.organizations.map((organization) => (
@@ -306,17 +335,26 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
                 organization={organization}
               />
             ))}
-            <AddOrganizationCard onClick={() => openCreateOrganization(network.id)} />
+            <AddOrganizationCard
+              onClick={() => openCreateOrganization(network.id)}
+            />
           </div>
         </div>
       </CardContent>
       <CardFooter>
-        <Link to={networkPath} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+        <Link
+          to={networkPath}
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
           View network
           <ArrowRightIcon />
         </Link>
       </CardFooter>
-      <DeleteNetworkDialog network={network} open={deleteOpen} onOpenChange={setDeleteOpen} />
+      <DeleteNetworkDialog
+        network={network}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+      />
     </Card>
   )
 }
@@ -381,7 +419,8 @@ function NetworkListSkeleton() {
 
 export default function NetworkList() {
   const { openCreateNetwork } = useCreateEntity()
-  const { networks, isLoading, isFetching, isError, error, refetch } = useWorkspaceNetworks()
+  const { networks, isLoading, isFetching, isError, error, refetch } =
+    useWorkspaceNetworks()
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/40 p-4 sm:p-6">

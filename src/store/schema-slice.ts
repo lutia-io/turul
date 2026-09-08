@@ -1,6 +1,6 @@
 import type { JsonObject } from "@/lib/json-definition"
 import { setNumberFilterParam, setStringFilterParam } from "@/lib/list-query"
-import { api } from "@/store/api"
+import { api, type ApiUserRef } from "@/store/api"
 
 export type ApiSchema = {
   id: string
@@ -11,6 +11,8 @@ export type ApiSchema = {
   networkId: string
   organizationId?: string | null
   userId: string
+  createdBy: ApiUserRef
+  updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
   deletedAt?: string | null
@@ -40,12 +42,7 @@ export type UpdateSchemaResponse = {
 export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
 export type SchemaListSort =
-  | "name"
-  | "slug"
-  | "scope"
-  | "properties"
-  | "createdAt"
-  | "updatedAt"
+  "name" | "slug" | "scope" | "properties" | "createdAt" | "updatedAt"
 
 export type ListSchemasParams = {
   page?: number
@@ -103,7 +100,12 @@ function listSchemaQueryParams(params?: ListSchemasParams) {
   }
   setStringFilterParam(query, "name", params.name, params.nameOp)
   setStringFilterParam(query, "slug", params.slug, params.slugOp)
-  setNumberFilterParam(query, "properties", params.properties, params.propertiesOp)
+  setNumberFilterParam(
+    query,
+    "properties",
+    params.properties,
+    params.propertiesOp
+  )
 
   return query
 }

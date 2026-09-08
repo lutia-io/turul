@@ -12,6 +12,7 @@ import {
 import { useCreateEntity } from "@/components/create-entity"
 import {
   AsideRow,
+  AuditStamp,
   CopyIdButton,
   DefinitionAsideCard,
   DefinitionCard,
@@ -42,7 +43,6 @@ import {
   useWorkspaceWorkflows,
   workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
-import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
@@ -106,6 +106,8 @@ export default function SchemaDetail() {
     : undefined
   const createdAt = schemaQuery.data?.createdAt
   const updatedAt = schemaQuery.data?.updatedAt
+  const createdBy = schemaQuery.data?.createdBy
+  const updatedBy = schemaQuery.data?.updatedBy
 
   function refreshSchema() {
     void schemaQuery.refetch()
@@ -271,15 +273,13 @@ export default function SchemaDetail() {
                       <span className="truncate">{network.name}</span>
                     </Link>
                   </AsideRow>
-                  {createdAt ? (
-                    <AsideRow label="Created">
-                      {formatRelativeTime(createdAt)}
-                    </AsideRow>
-                  ) : null}
+                  <AuditStamp label="Created" at={createdAt} user={createdBy} />
                   {updatedAt && updatedAt !== createdAt ? (
-                    <AsideRow label="Updated">
-                      {formatRelativeTime(updatedAt)}
-                    </AsideRow>
+                    <AuditStamp
+                      label="Updated"
+                      at={updatedAt}
+                      user={updatedBy}
+                    />
                   ) : null}
                   <AsideRow label="ID">
                     <CopyIdButton value={visibleSchema.id} />

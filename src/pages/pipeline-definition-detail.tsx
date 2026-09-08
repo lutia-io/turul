@@ -14,6 +14,7 @@ import {
 import { useCreateEntity } from "@/components/create-entity"
 import {
   AsideRow,
+  AuditStamp,
   CopyIdButton,
   DefinitionAsideCard,
   DefinitionCard,
@@ -119,6 +120,8 @@ export default function PipelineDefinitionDetail() {
     : []
   const createdAt = pipelineQuery.data?.createdAt
   const updatedAt = pipelineQuery.data?.updatedAt
+  const createdBy = pipelineQuery.data?.createdBy
+  const updatedBy = pipelineQuery.data?.updatedBy
 
   if (pipelineQuery.isLoading) {
     return <DefinitionSkeleton />
@@ -233,15 +236,9 @@ export default function PipelineDefinitionDetail() {
                     <span className="truncate">{network.name}</span>
                   </Link>
                 </AsideRow>
-                {createdAt ? (
-                  <AsideRow label="Created">
-                    {formatRelativeTime(createdAt)}
-                  </AsideRow>
-                ) : null}
+                <AuditStamp label="Created" at={createdAt} user={createdBy} />
                 {updatedAt && updatedAt !== createdAt ? (
-                  <AsideRow label="Updated">
-                    {formatRelativeTime(updatedAt)}
-                  </AsideRow>
+                  <AuditStamp label="Updated" at={updatedAt} user={updatedBy} />
                 ) : null}
                 <AsideRow label="ID">
                   <CopyIdButton value={visiblePipeline.id} />

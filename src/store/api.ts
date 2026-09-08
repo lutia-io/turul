@@ -55,6 +55,13 @@ export type MeResponse = {
   organizationId?: string
 }
 
+export type ApiUserRef = {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+}
+
 export type UpdateUserRequest = {
   id: string
   firstName: string

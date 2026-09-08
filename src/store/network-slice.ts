@@ -1,10 +1,12 @@
-import { api } from "@/store/api"
+import { api, type ApiUserRef } from "@/store/api"
 
 export type ApiNetwork = {
   id: string
   name: string
   slug: string
   userId: string
+  createdBy: ApiUserRef
+  updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
   deletedAt?: string | null

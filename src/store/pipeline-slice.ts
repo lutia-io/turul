@@ -1,7 +1,7 @@
 import type { JsonObject } from "@/lib/json-definition"
 import type { PipelineDefinitionBody } from "@/lib/pipeline-definition"
 import { setNumberFilterParam, setStringFilterParam } from "@/lib/list-query"
-import { api } from "@/store/api"
+import { api, type ApiUserRef } from "@/store/api"
 
 export type ApiPipelineDefinition = {
   id: string
@@ -12,6 +12,8 @@ export type ApiPipelineDefinition = {
   definition: JsonObject
   networkId: string
   userId: string
+  createdBy: ApiUserRef
+  updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
   deletedAt?: string | null

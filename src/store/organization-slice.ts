@@ -1,5 +1,5 @@
 import { setStringFilterParam } from "@/lib/list-query"
-import { api } from "@/store/api"
+import { api, type ApiUserRef } from "@/store/api"
 
 export type ApiOrganization = {
   id: string
@@ -7,6 +7,8 @@ export type ApiOrganization = {
   slug: string
   networkId: string
   userId: string
+  createdBy: ApiUserRef
+  updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
   deletedAt?: string | null
@@ -32,11 +34,7 @@ export type UpdateOrganizationResponse = {
 
 export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 export type OrganizationListSort =
-  | "name"
-  | "slug"
-  | "network"
-  | "createdAt"
-  | "updatedAt"
+  "name" | "slug" | "network" | "createdAt" | "updatedAt"
 
 export type ListOrganizationsParams = {
   page?: number

@@ -7,6 +7,7 @@ import {
   defineWorkflow,
   type JsonSchemaPropertySpec,
 } from "@/data/define-records"
+import type { UserRef } from "@/lib/user"
 
 export type Organization = {
   id: string
@@ -18,6 +19,11 @@ export type Organization = {
   status: string
   color: BadgeColor
   networkId?: string
+  slug?: string
+  createdAt?: string
+  updatedAt?: string
+  createdBy?: UserRef
+  updatedBy?: UserRef
 }
 
 export type Schema = {
@@ -78,6 +84,11 @@ export type Network = {
   workflowDefinitions: WorkflowDefinition[]
   pipelineDefinitions: PipelineDefinition[]
   nodeDefinitions?: NodeDefinition[]
+  slug?: string
+  createdAt?: string
+  updatedAt?: string
+  createdBy?: UserRef
+  updatedBy?: UserRef
 }
 
 export const networks: Record<string, Network> = {

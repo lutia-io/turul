@@ -48,6 +48,7 @@ import {
   useWorkspaceRecords,
   useWorkspaceWorkflowRuns,
 } from "@/lib/network-workspace"
+import { userDisplayName } from "@/lib/user"
 import { cn } from "@/lib/utils"
 
 function countByStatus<T>(items: T[], statusOf: (item: T) => string) {
@@ -228,11 +229,8 @@ export default function NetworkDetail() {
     isFetching: isFilesFetching,
   } = useWorkspaceFiles()
   const { isFetching: isOrganizationsFetching } = useWorkspaceOrganizations()
-  const {
-    openCreateOrganization,
-    openEditNetwork,
-    openEditOrganization,
-  } = useCreateEntity()
+  const { openCreateOrganization, openEditNetwork, openEditOrganization } =
+    useCreateEntity()
 
   function refreshNetwork() {
     void refetchWorkspace()
@@ -408,6 +406,9 @@ export default function NetworkDetail() {
   const scopeLabel = organization
     ? ` in ${organization.name}`
     : ` across ${network.name}`
+  const attributionSubject = organization ?? network
+  const createdByName = userDisplayName(attributionSubject.createdBy)
+  const updatedByName = userDisplayName(attributionSubject.updatedBy)
 
   return (
     <div className="flex flex-1 flex-col gap-6 bg-muted/40 p-4 sm:p-6">
@@ -466,6 +467,21 @@ export default function NetworkDetail() {
                 ) : null}
               </div>
             )}
+            {attributionSubject.createdAt ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Created {formatRelativeTime(attributionSubject.createdAt)}
+                {createdByName ? ` by ${createdByName}` : ""}
+                {attributionSubject.updatedAt &&
+                attributionSubject.updatedAt !==
+                  attributionSubject.createdAt ? (
+                  <>
+                    {" "}
+                    · Updated {formatRelativeTime(attributionSubject.updatedAt)}
+                    {updatedByName ? ` by ${updatedByName}` : ""}
+                  </>
+                ) : null}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2">

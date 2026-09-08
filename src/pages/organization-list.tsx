@@ -34,7 +34,8 @@ import {
   networkWorkspacePath,
   useNetworkWorkspace,
 } from "@/lib/network-workspace"
-import { getHumaErrorMessage } from "@/store/api"
+import { userDisplayName } from "@/lib/user"
+import { getHumaErrorMessage, type ApiUserRef } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
@@ -51,6 +52,8 @@ type OrganizationRow = {
   networkId: string
   createdAt: string
   updatedAt: string
+  createdBy?: ApiUserRef
+  updatedBy?: ApiUserRef
 }
 
 const helper = createManagedColumnHelper<OrganizationRow>()
@@ -91,6 +94,8 @@ function organizationFromApi(organization: ApiOrganization): OrganizationRow {
     networkId: organization.networkId,
     createdAt: organization.createdAt,
     updatedAt: organization.updatedAt,
+    createdBy: organization.createdBy,
+    updatedBy: organization.updatedBy,
   }
 }
 
@@ -246,7 +251,14 @@ export default function OrganizationList() {
               to={hrefFor(row.original)}
               className="whitespace-nowrap text-muted-foreground"
             >
-              {formatCreatedAt(row.original.createdAt)}
+              <span className="block">
+                {formatCreatedAt(row.original.createdAt)}
+              </span>
+              {userDisplayName(row.original.createdBy) ? (
+                <span className="block text-xs">
+                  {userDisplayName(row.original.createdBy)}
+                </span>
+              ) : null}
             </DataTableCellLink>
           ),
           size: 140,
@@ -336,7 +348,10 @@ export default function OrganizationList() {
       chips.push({
         id: "name",
         label: "Name",
-        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
+        value: stringFilterChipValue(
+          columnFilters.name.op,
+          columnFilters.name.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -345,7 +360,10 @@ export default function OrganizationList() {
       chips.push({
         id: "slug",
         label: "Slug",
-        value: stringFilterChipValue(columnFilters.slug.op, columnFilters.slug.value),
+        value: stringFilterChipValue(
+          columnFilters.slug.op,
+          columnFilters.slug.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
@@ -416,4 +434,3 @@ export default function OrganizationList() {
     </DataTablePage>
   )
 }
-

@@ -7,6 +7,14 @@ import {
 } from "lucide-react"
 
 import { Skeleton } from "@/components/ui/skeleton"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
+import { formatRelativeTime } from "@/lib/runs"
+import { userDisplayName, userInitials, type UserRef } from "@/lib/user"
 import { cn } from "@/lib/utils"
 
 export function DefinitionPage({ children }: { children: ReactNode }) {
@@ -118,8 +126,77 @@ export function AsideRow({
   return (
     <div className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 truncate text-sm font-medium">{children}</dd>
+      <dd className="mt-1 min-w-0 text-sm font-medium">{children}</dd>
     </div>
+  )
+}
+
+export function AuditStamp({
+  label,
+  at,
+  user,
+}: {
+  label: string
+  at?: string | null
+  user?: UserRef | null
+}) {
+  if (!at && !user) {
+    return null
+  }
+
+  const name = userDisplayName(user)
+  const initials = userInitials(user)
+
+  return (
+    <AsideRow label={label}>
+      <div className="flex min-w-0 items-center gap-2">
+        {user ? (
+          <HoverCard>
+            <HoverCardTrigger
+              render={
+                <button
+                  type="button"
+                  className="inline-flex min-w-0 items-center gap-2 text-left"
+                />
+              }
+            >
+              <Avatar size="sm">
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
+              <span className="min-w-0">
+                {name ? <span className="block truncate">{name}</span> : null}
+                {at ? (
+                  <span
+                    className={
+                      name
+                        ? "block truncate text-xs font-normal text-muted-foreground"
+                        : undefined
+                    }
+                  >
+                    {formatRelativeTime(at)}
+                  </span>
+                ) : null}
+              </span>
+            </HoverCardTrigger>
+            <HoverCardContent align="start" className="w-64">
+              <div className="flex items-center gap-2.5">
+                <Avatar size="sm">
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{name || "User"}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {user.email}
+                  </p>
+                </div>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        ) : at ? (
+          formatRelativeTime(at)
+        ) : null}
+      </div>
+    </AsideRow>
   )
 }
 

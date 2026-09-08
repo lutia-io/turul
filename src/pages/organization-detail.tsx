@@ -6,6 +6,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 
+import { AuditStamp } from "@/components/definition-detail"
 import {
   Card,
   CardDescription,
@@ -155,6 +156,28 @@ export default function OrganizationDetail() {
               </Card>
             </Link>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardDescription>Activity</CardDescription>
+              <dl className="mt-3 space-y-4">
+                <AuditStamp
+                  label="Created"
+                  at={organizationQuery.data?.createdAt}
+                  user={organizationQuery.data?.createdBy}
+                />
+                {organizationQuery.data?.updatedAt &&
+                organizationQuery.data.updatedAt !==
+                  organizationQuery.data.createdAt ? (
+                  <AuditStamp
+                    label="Updated"
+                    at={organizationQuery.data.updatedAt}
+                    user={organizationQuery.data.updatedBy}
+                  />
+                ) : null}
+              </dl>
+            </CardHeader>
+          </Card>
         </>
       ) : (
         <div>

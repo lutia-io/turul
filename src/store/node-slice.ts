@@ -1,6 +1,6 @@
 import type { JsonObject } from "@/lib/json-definition"
 import { setStringFilterParam } from "@/lib/list-query"
-import { api } from "@/store/api"
+import { api, type ApiUserRef } from "@/store/api"
 
 export type ApiNodeDefinition = {
   id: string
@@ -12,6 +12,8 @@ export type ApiNodeDefinition = {
   definition: JsonObject
   networkId: string
   userId: string
+  createdBy: ApiUserRef
+  updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
   deletedAt?: string | null
@@ -36,13 +38,7 @@ export type UpdateNodeDefinitionRequest = {
 export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 
 export type NodeDefinitionListSort =
-  | "name"
-  | "slug"
-  | "status"
-  | "type"
-  | "network"
-  | "createdAt"
-  | "updatedAt"
+  "name" | "slug" | "status" | "type" | "network" | "createdAt" | "updatedAt"
 
 export type ListNodeDefinitionsParams = {
   page?: number

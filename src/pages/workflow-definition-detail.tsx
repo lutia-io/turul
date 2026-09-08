@@ -12,6 +12,7 @@ import {
 import { useCreateEntity } from "@/components/create-entity"
 import {
   AsideRow,
+  AuditStamp,
   CopyIdButton,
   DefinitionAsideCard,
   DefinitionCard,
@@ -127,6 +128,8 @@ export default function WorkflowDefinitionDetail() {
     : []
   const createdAt = workflowQuery.data?.createdAt
   const updatedAt = workflowQuery.data?.updatedAt
+  const createdBy = workflowQuery.data?.createdBy
+  const updatedBy = workflowQuery.data?.updatedBy
 
   if (workflowQuery.isLoading) {
     return <DefinitionSkeleton />
@@ -271,15 +274,9 @@ export default function WorkflowDefinitionDetail() {
                     <span className="truncate">{network.name}</span>
                   </Link>
                 </AsideRow>
-                {createdAt ? (
-                  <AsideRow label="Created">
-                    {formatRelativeTime(createdAt)}
-                  </AsideRow>
-                ) : null}
+                <AuditStamp label="Created" at={createdAt} user={createdBy} />
                 {updatedAt && updatedAt !== createdAt ? (
-                  <AsideRow label="Updated">
-                    {formatRelativeTime(updatedAt)}
-                  </AsideRow>
+                  <AuditStamp label="Updated" at={updatedAt} user={updatedBy} />
                 ) : null}
                 <AsideRow label="ID">
                   <CopyIdButton value={visibleWorkflow.id} />

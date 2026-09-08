@@ -158,6 +158,8 @@ export function workspaceNetworkFromApi(network: ApiNetwork): Network {
     color: "purple",
     createdAt: network.createdAt,
     updatedAt: network.updatedAt,
+    createdBy: network.createdBy,
+    updatedBy: network.updatedBy,
     organizations: [],
     schemas: [],
     workflowDefinitions: [],
@@ -182,6 +184,8 @@ export function workspaceOrganizationFromApi(
     networkId: organization.networkId,
     createdAt: organization.createdAt,
     updatedAt: organization.updatedAt,
+    createdBy: organization.createdBy,
+    updatedBy: organization.updatedBy,
   }
 }
 
