@@ -24,7 +24,6 @@ export type Schema = {
   id: string
   name: string
   slug: string
-  active: boolean
   internal: boolean
   definition: JsonObject
   color: BadgeColor
@@ -516,7 +515,6 @@ export const networks: Record<string, Network> = {
         name: "Inventory Count",
         slug: "inventory-count",
         color: "gray",
-        active: false,
         internal: true,
         description:
           "Daily bean, milk, and pastry counts used to trigger restock from the roastery.",
@@ -1231,7 +1229,6 @@ export const networks: Record<string, Network> = {
         name: "Subscription",
         slug: "subscription",
         color: "gray",
-        active: false,
         internal: true,
         description:
           "Recurring charges watched so renewals can be cancelled or paid on time.",
@@ -1838,7 +1835,6 @@ export type CreateSchemaInput = {
   slug?: string
   description?: string
   color?: BadgeColor
-  active?: boolean
   internal?: boolean
   properties: Record<string, JsonSchemaPropertySpec>
   required?: string[]
@@ -1865,7 +1861,6 @@ export function createSchema(
     description: input.description?.trim() || `${name} schema.`,
     properties: input.properties,
     required: input.required,
-    active: input.active ?? false,
     internal: input.internal ?? false,
   })
 
@@ -1895,7 +1890,6 @@ export function updateSchema(
         : `${input.name.trim()} schema.`),
     properties: input.properties,
     required: input.required,
-    active: input.active ?? result.schema.active,
     internal: input.internal ?? result.schema.internal,
   })
 

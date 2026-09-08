@@ -443,7 +443,6 @@ export function SchemaDefinitionDialog({
   const [slug, setSlug] = useState("")
   const [slugTouched, setSlugTouched] = useState(false)
   const [description, setDescription] = useState("")
-  const [active, setActive] = useState(true)
   const [properties, setProperties] = useState<PropertyDraft[]>(() => [
     emptyProperty("property-1", { name: "id", required: true }),
   ])
@@ -496,7 +495,6 @@ export function SchemaDefinitionDialog({
         ? current.definition.description
         : ""
     )
-    setActive(current?.active ?? true)
     jsonSourceRef.current = "builder"
     setDefinitionBase(current?.definition)
     setJsonError(null)
@@ -745,7 +743,6 @@ export function SchemaDefinitionDialog({
         await updateSchema({
           id: schemaId!,
           name: name.trim(),
-          active,
           definition,
         }).unwrap()
         onOpenChange(false)
@@ -754,7 +751,6 @@ export function SchemaDefinitionDialog({
 
       const schema = await createSchema({
         name: name.trim(),
-        active,
         definition,
         networkId: selectedNetworkId,
         organizationId: selectedOrganizationId || undefined,
@@ -923,31 +919,21 @@ export function SchemaDefinitionDialog({
                   />
                 </Field>
               </div>
-              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-description`}>
-                    Description
-                  </FieldLabel>
-                  <Textarea
-                    id={`${formId}-description`}
-                    value={description}
-                    onChange={(event) => {
-                      markBuilderSource()
-                      setDescription(event.target.value)
-                    }}
-                    placeholder="What this schema represents for partner records."
-                    className="min-h-16"
-                  />
-                </Field>
-                <div className="pb-2">
-                  <CheckboxField
-                    id={`${formId}-active`}
-                    checked={active}
-                    onChange={setActive}
-                    label="Published"
-                  />
-                </div>
-              </div>
+              <Field>
+                <FieldLabel htmlFor={`${formId}-description`}>
+                  Description
+                </FieldLabel>
+                <Textarea
+                  id={`${formId}-description`}
+                  value={description}
+                  onChange={(event) => {
+                    markBuilderSource()
+                    setDescription(event.target.value)
+                  }}
+                  placeholder="What this schema represents for partner records."
+                  className="min-h-16"
+                />
+              </Field>
               {error ? (
                 <FieldError>{getHumaErrorMessage(error)}</FieldError>
               ) : null}

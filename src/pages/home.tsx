@@ -602,18 +602,6 @@ export default function Home() {
       })
 
     const drafts = networks.flatMap((network) => [
-      ...network.schemas
-        .filter((schema) => !schema.active)
-        .map((schema) => ({
-          id: schema.id,
-          name: schema.name,
-          kind: "Schema",
-          networkName: network.name,
-          to: `/app/networks/${network.id}/schemas/${schema.id}`,
-          color: schema.color,
-          icon: FileJsonIcon,
-          status: "Draft",
-        })),
       ...network.workflowDefinitions
         .filter((workflowDefinition) => !workflowDefinition.active)
         .map((workflowDefinition) => ({

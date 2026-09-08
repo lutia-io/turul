@@ -27,16 +27,12 @@ import {
   type SortingState,
   type StringFilterOp,
 } from "@/components/data-table-view"
-import { StatusBadge } from "@/components/json-definition-card"
 import { useCreateEntity } from "@/components/create-entity"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import type { Schema } from "@/data/networks"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
-import {
-  jsonSchemaPropertyCount,
-  publicationStatus,
-} from "@/lib/json-definition"
+import { jsonSchemaPropertyCount } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
   schemaScopeLabel,
@@ -60,14 +56,12 @@ type SchemaColumnFilters = {
   name?: { op: StringFilterOp; value: string }
   slug?: { op: StringFilterOp; value: string }
   scope?: "network" | "organization"
-  status?: "published" | "draft"
   properties?: { op: NumberFilterOp; value: number }
 }
 
 const sortFields: SchemaListSort[] = [
   "name",
   "slug",
-  "status",
   "scope",
   "properties",
 ]
@@ -123,12 +117,6 @@ export default function SchemaList() {
       networkId: network?.id,
       organizationId,
       scope: columnFilters.scope,
-      active:
-        columnFilters.status === "published"
-          ? true
-          : columnFilters.status === "draft"
-            ? false
-            : undefined,
       name: columnFilters.name?.value,
       nameOp: columnFilters.name?.op,
       slug: columnFilters.slug?.value,
@@ -295,43 +283,6 @@ export default function SchemaList() {
             size: 120,
           }
         ),
-        helper.accessor((schema) => publicationStatus(schema.active), {
-          id: "status",
-          header: ({ column }) => (
-            <DataTableColumnHeader
-              title="Status"
-              sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
-              pin={headerPin(column)}
-              filter={{
-                type: "enum",
-                value: columnFilters.status,
-                options: [
-                  { value: "published", label: "Published" },
-                  { value: "draft", label: "Draft" },
-                ],
-                onChange: (value) =>
-                  setColumnFilters((current) => ({
-                    ...current,
-                    status: value as SchemaColumnFilters["status"],
-                  })),
-              }}
-            />
-          ),
-          cell: ({ row }) => {
-            const status = publicationStatus(row.original.active)
-            return (
-              <DataTableCellLink
-                to={hrefFor(row.original)}
-                className="inline-flex items-center gap-1.5"
-              >
-                <StatusBadge status={status} />
-                <span className="text-muted-foreground">{status}</span>
-              </DataTableCellLink>
-            )
-          },
-          size: 140,
-        }),
         helper.display({
           id: "actions",
           enableSorting: false,
@@ -446,15 +397,6 @@ export default function SchemaList() {
             ...current,
             properties: undefined,
           })),
-      })
-    }
-    if (columnFilters.status) {
-      chips.push({
-        id: "status",
-        label: "Status",
-        value: columnFilters.status === "published" ? "Published" : "Draft",
-        onRemove: () =>
-          setColumnFilters((current) => ({ ...current, status: undefined })),
       })
     }
     return chips

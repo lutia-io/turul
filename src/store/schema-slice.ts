@@ -6,7 +6,6 @@ export type ApiSchema = {
   id: string
   name: string
   slug: string
-  active: boolean
   internal: boolean
   definition: JsonObject
   networkId: string
@@ -19,7 +18,6 @@ export type ApiSchema = {
 
 export type CreateSchemaRequest = {
   name: string
-  active: boolean
   definition: JsonObject
   networkId: string
   organizationId?: string
@@ -32,7 +30,6 @@ export type CreateSchemaResponse = {
 export type UpdateSchemaRequest = {
   id: string
   name: string
-  active: boolean
   definition: JsonObject
 }
 
@@ -45,7 +42,6 @@ export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
 export type SchemaListSort =
   | "name"
   | "slug"
-  | "status"
   | "scope"
   | "properties"
   | "createdAt"
@@ -60,7 +56,6 @@ export type ListSchemasParams = {
   networkId?: string
   organizationId?: string
   scope?: "network" | "organization"
-  active?: boolean
   name?: string
   nameOp?: StringFilterOp
   slug?: string
@@ -105,9 +100,6 @@ function listSchemaQueryParams(params?: ListSchemasParams) {
   }
   if (params.scope) {
     query.scope = params.scope
-  }
-  if (params.active != null) {
-    query.active = String(params.active)
   }
   setStringFilterParam(query, "name", params.name, params.nameOp)
   setStringFilterParam(query, "slug", params.slug, params.slugOp)

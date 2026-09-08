@@ -831,8 +831,6 @@ function SchemaPane({
   selected: SchemaPreview
   onOpen: (view: PreviewView, ids?: { schemaId?: string }) => void
 }) {
-  const published = example.schemas.filter((item) => item.schema.active).length
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
@@ -841,7 +839,7 @@ function SchemaPane({
           <div>
             <h3 className="text-sm font-semibold">Schemas</h3>
             <p className="text-xs text-muted-foreground">
-              {example.schemas.length} shared forms · {published} in use
+              {example.schemas.length} shared forms
             </p>
           </div>
         </div>
@@ -867,9 +865,6 @@ function SchemaPane({
                 <p className="min-w-0 truncate text-sm font-medium">
                   {item.schema.name}
                 </p>
-                <Pill tone={item.schema.active ? "live" : "warn"}>
-                  {item.schema.active ? "In use" : "Draft"}
-                </Pill>
               </div>
               <p className="text-[11px] text-muted-foreground tabular-nums">
                 {jsonSchemaPropertyCount(item.schema.definition)} fields ·{" "}

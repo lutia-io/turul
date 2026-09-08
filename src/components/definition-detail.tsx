@@ -77,26 +77,28 @@ export function PublicationPills({
   active,
   internal,
 }: {
-  active: boolean
+  active?: boolean
   internal: boolean
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
-          active
-            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-            : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-        )}
-      >
-        {active ? (
-          <BadgeCheckIcon className="size-3.5" />
-        ) : (
-          <CircleDashedIcon className="size-3.5" />
-        )}
-        {active ? "Published" : "Draft"}
-      </span>
+      {active != null ? (
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+            active
+              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+          )}
+        >
+          {active ? (
+            <BadgeCheckIcon className="size-3.5" />
+          ) : (
+            <CircleDashedIcon className="size-3.5" />
+          )}
+          {active ? "Published" : "Draft"}
+        </span>
+      ) : null}
       {internal ? (
         <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
           Internal

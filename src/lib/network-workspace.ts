@@ -229,7 +229,6 @@ export function workspaceSchemaFromApi(schema: ApiSchema): Schema {
     id: schema.id,
     name: schema.name,
     slug: schema.slug,
-    active: schema.active,
     internal: schema.internal,
     definition: schema.definition,
     color: "purple",

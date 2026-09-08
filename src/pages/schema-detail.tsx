@@ -170,10 +170,9 @@ export default function SchemaDetail() {
             <h1 className="text-2xl font-semibold tracking-tight text-pretty">
               {visibleSchema.name}
             </h1>
-            <PublicationPills
-              active={visibleSchema.active}
-              internal={visibleSchema.internal}
-            />
+            {visibleSchema.internal ? (
+              <PublicationPills internal={visibleSchema.internal} />
+            ) : null}
           </div>
           {description ? (
             <p className="max-w-2xl text-sm text-pretty text-muted-foreground">

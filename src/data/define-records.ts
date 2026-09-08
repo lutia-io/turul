@@ -19,7 +19,6 @@ export function defineSchema({
   description,
   properties,
   required,
-  active = true,
   internal = false,
 }: {
   id: string
@@ -29,7 +28,6 @@ export function defineSchema({
   description: string
   properties: Record<string, JsonSchemaPropertySpec>
   required?: string[]
-  active?: boolean
   internal?: boolean
 }) {
   const propertyNames = Object.keys(properties)
@@ -38,7 +36,6 @@ export function defineSchema({
     id,
     name,
     slug,
-    active,
     internal,
     color,
     definition: {

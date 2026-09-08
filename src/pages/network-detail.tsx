@@ -27,7 +27,6 @@ import {
   summarizeActivity,
 } from "@/lib/activity"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
-import { publicationStatus } from "@/lib/json-definition"
 import {
   apiPipelineCurrentLevel,
   apiPipelineLevelSteps,
@@ -357,9 +356,6 @@ export default function NetworkDetail() {
     network.organizations,
     (item) => item.status
   )
-  const schemaCounts = countByStatus(network.schemas, (schema) =>
-    publicationStatus(schema.active)
-  )
   const activeRuns = [
     ...scopedWorkflows
       .filter((run) => run.status === "pending" || run.status === "running")
@@ -513,9 +509,9 @@ export default function NetworkDetail() {
               to={href("schemas")}
               label="Schemas"
               value={network.schemas.length}
-              live={schemaCounts.live}
-              draft={schemaCounts.draft}
-              liveLabel="published"
+              live={network.schemas.length}
+              draft={0}
+              liveLabel="defined"
               color={accentColor}
               icon={FileJsonIcon}
             />
