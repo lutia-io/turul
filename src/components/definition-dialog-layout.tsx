@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 
 import { FieldError } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 
 export const definitionDialogClassName = "sm:inset-x-[6vw] lg:inset-x-10"
 
@@ -17,7 +18,9 @@ export function DefinitionDialogBody({
       <div className="min-h-0 space-y-5 overflow-y-auto px-6 py-5">
         {children}
       </div>
-      {json}
+      <div className="flex min-h-0 flex-col border-t lg:border-t-0 lg:border-l">
+        {json}
+      </div>
     </div>
   )
 }
@@ -31,6 +34,7 @@ export function DefinitionJsonPane({
   onBlur,
   error,
   readOnly = false,
+  className,
 }: {
   id?: string
   title?: string
@@ -40,15 +44,21 @@ export function DefinitionJsonPane({
   onBlur?: () => void
   error?: string | null
   readOnly?: boolean
+  className?: string
 }) {
   return (
-    <div className="flex min-h-0 flex-col border-t bg-muted/20 lg:border-t-0 lg:border-l">
+    <div
+      className={cn(
+        "flex h-full min-h-0 flex-1 flex-col bg-muted/20",
+        className
+      )}
+    >
       <div className="shrink-0 border-b px-4 py-3">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       {readOnly ? (
-        <pre className="min-h-48 flex-1 overflow-auto p-4 font-mono text-[12px] leading-relaxed lg:min-h-0">
+        <pre className="min-h-0 flex-1 overflow-auto p-4 font-mono text-[12px] leading-relaxed">
           {value}
         </pre>
       ) : (
@@ -60,7 +70,8 @@ export function DefinitionJsonPane({
           spellCheck={false}
           readOnly={!onChange}
           aria-invalid={error ? true : undefined}
-          className="field-sizing-fixed min-h-48 flex-1 resize-none rounded-none border-0 bg-transparent font-mono text-[12px] leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0 lg:min-h-0 dark:bg-transparent"
+          style={{ fieldSizing: "fixed" }}
+          className="h-full min-h-0 flex-1 resize-none rounded-none border-0 bg-transparent font-mono text-[12px] leading-relaxed shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
         />
       )}
       {error ? (

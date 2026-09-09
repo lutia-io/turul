@@ -80,6 +80,13 @@ export const triggerKindLabels: Record<TriggerKind, string> = {
   schedule: "On a schedule",
 }
 
+export const triggerKindShortLabels: Record<TriggerKind, string> = {
+  created: "Created",
+  updated: "Updated",
+  created_updated: "Created or updated",
+  schedule: "On a schedule",
+}
+
 export const commonTimezones = [
   "UTC",
   "America/Los_Angeles",
@@ -155,7 +162,7 @@ export function emptyGroup(logic: CriteriaLogic = "AND"): CriteriaGroupDraft {
     kind: "group",
     key: newDraftKey("group"),
     logic,
-    conditions: [emptyLeaf()],
+    conditions: [],
   }
 }
 
@@ -471,15 +478,62 @@ function coerceScalar(raw: string, field?: JsonSchemaProperty): unknown {
   return raw
 }
 
+export function hasCriteria(criteria?: WorkflowCriteria) {
+  if (!criteria) {
+    return false
+  }
+  if (criteria.logic) {
+    return true
+  }
+  return Boolean(criteria.field && criteria.operator)
+}
+
+export function countCriteriaLeaves(criteria?: WorkflowCriteria): number {
+  if (!criteria) {
+    return 0
+  }
+  if (criteria.logic) {
+    return (criteria.conditions ?? []).reduce(
+      (total, child) => total + countCriteriaLeaves(child),
+      0
+    )
+  }
+  return criteria.field ? 1 : 0
+}
+
+export function stringifyWorkflowValue(value: unknown) {
+  if (value == null) {
+    return "empty"
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join(", ")
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false"
+  }
+  return String(value)
+}
+
+export function actionDataEntries(action: WorkflowAction): [string, unknown][] {
+  const source =
+    action.type === "TRIGGER_PIPELINE"
+      ? action.context.input
+      : action.context.data
+  if (source && typeof source === "object" && !Array.isArray(source)) {
+    return Object.entries(source as Record<string, unknown>)
+  }
+  return []
+}
+
 export function criteriaFromApi(
   criteria: WorkflowCriteria | undefined
 ): CriteriaGroupDraft {
-  if (!criteria) {
+  if (!hasCriteria(criteria)) {
     return emptyGroup()
   }
   const node = criteriaNodeFromApi(criteria)
   if (node.kind === "group") {
-    return node.conditions.length > 0 ? node : emptyGroup(node.logic)
+    return node
   }
   return {
     kind: "group",
@@ -501,17 +555,14 @@ function criteriaNodeFromApi(criteria: WorkflowCriteria): CriteriaNodeDraft {
         kind: "group",
         key: newDraftKey("group"),
         logic: "NOT",
-        conditions:
-          children[0].conditions.length > 0
-            ? children[0].conditions
-            : [emptyLeaf()],
+        conditions: children[0].conditions,
       }
     }
     return {
       kind: "group",
       key: newDraftKey("group"),
       logic: asLogic(criteria.logic),
-      conditions: children.length > 0 ? children : [emptyLeaf()],
+      conditions: children,
     }
   }
 
@@ -602,7 +653,7 @@ export function actionsFromApi(
   actions: WorkflowAction[] | undefined
 ): ActionDraft[] {
   if (!actions || actions.length === 0) {
-    return [emptyAction()]
+    return []
   }
 
   return actions.map((action) => {
@@ -740,6 +791,34 @@ export function parseWorkflowDefinition(
     criteria: (criteria ?? {}) as WorkflowCriteria,
     actions,
   }
+}
+
+export function workflowRuleSentence(
+  trigger: WorkflowTrigger | undefined,
+  criteria: WorkflowCriteria | undefined,
+  actionCount: number
+) {
+  const conditionCount = countCriteriaLeaves(criteria)
+  return `${triggerSummary(trigger)}${
+    conditionCount > 0 ? ` · ${criteriaSummary(criteria)}.` : "."
+  }${
+    actionCount > 0
+      ? ` Then ${actionCount} ${actionCount === 1 ? "action" : "actions"} run in order.`
+      : ""
+  }`
+}
+
+export function workflowDraftSentence(
+  trigger: TriggerDraft,
+  criteria: CriteriaGroupDraft,
+  actions: ActionDraft[],
+  fields: JsonSchemaProperty[]
+) {
+  return workflowRuleSentence(
+    triggerToApi(trigger),
+    criteriaToApi(criteria, fields),
+    actions.length
+  )
 }
 
 export function workflowSummary(definition: JsonObject): string {

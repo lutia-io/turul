@@ -7,15 +7,11 @@ import {
   type FormEvent,
 } from "react"
 import { useNavigate, useParams } from "react-router"
-import { Loader } from "lucide-react"
+import { FileJsonIcon, Loader } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
 import { Button } from "@/components/ui/button"
-import {
-  DefinitionDialogBody,
-  DefinitionJsonPane,
-  definitionDialogClassName,
-} from "@/components/definition-dialog-layout"
+import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import {
   Dialog,
   DialogClose,
@@ -27,7 +23,6 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -40,10 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { WorkflowActionsBuilder } from "@/components/workflow-actions-builder"
-import { WorkflowCriteriaBuilder } from "@/components/workflow-criteria-builder"
-import { WorkflowTriggerBuilder } from "@/components/workflow-trigger-builder"
-import { getWorkflowDefinition } from "@/data/networks"
+import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
 import {
   parseJsonObject,
   stringifyDefinition,
@@ -54,33 +46,26 @@ import {
   useWorkspaceNetworkList,
   useWorkspacePipelines,
   useWorkspaceSchemas,
-  workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
-import { slugifyId } from "@/lib/slug"
 import {
   actionsFromApi,
   actionsToApi,
   criteriaFromApi,
   criteriaToApi,
-  emptyAction,
   emptyGroup,
   emptyTrigger,
   parseWorkflowDefinition,
   schemaFieldOptions,
   triggerFromApi,
-  triggerSummary,
   triggerToApi,
+  workflowDraftSentence,
   type ActionDraft,
   type CriteriaGroupDraft,
   type TriggerDraft,
   type WorkflowDefinitionBody,
 } from "@/lib/workflow-definition"
 import { getHumaErrorMessage } from "@/store/api"
-import {
-  useCreateWorkflowDefinitionMutation,
-  useGetWorkflowDefinitionQuery,
-  useUpdateWorkflowDefinitionMutation,
-} from "@/store/workflow-slice"
+import { useCreateWorkflowDefinitionMutation } from "@/store/workflow-slice"
 
 function workflowDefinitionError(text: string) {
   try {
@@ -101,12 +86,10 @@ export function WorkflowDefinitionDialog({
   open,
   onOpenChange,
   networkId,
-  workflowDefinitionId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
-  workflowDefinitionId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
@@ -115,29 +98,19 @@ export function WorkflowDefinitionDialog({
   const { pipelines } = useWorkspacePipelines({ skip: !open })
   const { organizationId } = useParams()
   const [createWorkflow, createState] = useCreateWorkflowDefinitionMutation()
-  const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
-  const isLoading = createState.isLoading || updateState.isLoading
-  const error = createState.error ?? updateState.error
-  const apiWorkflowQuery = useGetWorkflowDefinitionQuery(
-    workflowDefinitionId ?? "",
-    { skip: !open || !workflowDefinitionId }
-  )
-  const existing = workflowDefinitionId
-    ? getWorkflowDefinition(workflowDefinitionId)
-    : undefined
-  const editing = Boolean(workflowDefinitionId)
+  const isLoading = createState.isLoading
+  const error = createState.error
   const lockNetwork = Boolean(networkId)
+  const [definitionView, setDefinitionView] = useState<"rule" | "json">("rule")
   const [selectedNetworkId, setSelectedNetworkId] = useState(
-    networkId ?? existing?.network.id ?? networks[0]?.id ?? ""
+    networkId ?? networks[0]?.id ?? ""
   )
   const [name, setName] = useState("")
-  const [slug, setSlug] = useState("")
-  const [slugTouched, setSlugTouched] = useState(false)
   const [schemaId, setSchemaId] = useState("")
   const [active, setActive] = useState(true)
   const [trigger, setTrigger] = useState<TriggerDraft>(emptyTrigger())
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
-  const [actions, setActions] = useState<ActionDraft[]>([emptyAction()])
+  const [actions, setActions] = useState<ActionDraft[]>([])
   const [jsonText, setJsonText] = useState("")
   const [jsonError, setJsonError] = useState<string | null>(null)
   const jsonSourceRef = useRef<"builder" | "json">("builder")
@@ -159,7 +132,6 @@ export function WorkflowDefinitionDialog({
 
   useEffect(() => {
     createState.reset()
-    updateState.reset()
     // Reset only when the dialog opens or closes. `reset` changes after each
     // mutation (it closes over requestId) and would clear a 409 before render.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open only
@@ -170,61 +142,35 @@ export function WorkflowDefinitionDialog({
       return
     }
 
-    const mockCurrent = workflowDefinitionId
-      ? getWorkflowDefinition(workflowDefinitionId)?.workflowDefinition
-      : undefined
-    const current =
-      mockCurrent ??
-      (workflowDefinitionId && apiWorkflowQuery.currentData
-        ? workspaceWorkflowFromApi(apiWorkflowQuery.currentData)
-        : undefined)
-    const parsed = parseWorkflowDefinition(current?.definition)
-
-    setName(current?.name ?? "")
-    setSlug(current?.slug ?? "")
-    setSlugTouched(Boolean(current))
-    setSchemaId(current?.schemaId ?? "")
-    setActive(current?.active ?? true)
+    setName("")
+    setSchemaId("")
+    setActive(true)
+    setDefinitionView("rule")
     jsonSourceRef.current = "builder"
     setJsonError(null)
-    setTrigger(triggerFromApi(parsed?.trigger))
-    setCriteria(criteriaFromApi(parsed?.criteria))
-    setActions(actionsFromApi(parsed?.actions))
-  }, [apiWorkflowQuery.currentData, open, workflowDefinitionId])
+    setTrigger(emptyTrigger())
+    setCriteria(emptyGroup())
+    setActions([])
+  }, [open])
 
   useEffect(() => {
     if (!open) {
       return
     }
-    const mockCurrent = workflowDefinitionId
-      ? getWorkflowDefinition(workflowDefinitionId)
-      : undefined
-    const apiCurrent = workflowDefinitionId
-      ? apiWorkflowQuery.currentData
-      : undefined
     setSelectedNetworkId((current) => {
       if (networkId) {
         return networkId
       }
-      return (
-        (mockCurrent?.network.id ?? apiCurrent?.networkId ?? current) ||
-        firstNetworkId
-      )
+      return current || firstNetworkId
     })
-  }, [
-    apiWorkflowQuery.currentData,
-    firstNetworkId,
-    networkId,
-    open,
-    workflowDefinitionId,
-  ])
+  }, [firstNetworkId, networkId, open])
 
   useEffect(() => {
-    if (!open || editing || schemaId) {
+    if (!open || schemaId) {
       return
     }
     setSchemaId(networkSchemas[0]?.id ?? "")
-  }, [editing, networkSchemas, open, schemaId])
+  }, [networkSchemas, open, schemaId])
 
   const definition = useMemo<WorkflowDefinitionBody | undefined>(() => {
     const nextActions = actionsToApi(actions)
@@ -297,54 +243,12 @@ export function WorkflowDefinitionDialog({
     setJsonText(stringifyDefinition(parsed))
   }
 
-  const chooseSchemaValue = "__choose_schema__"
-  const schemaField = (
-    <Field>
-      <FieldLabel htmlFor={`${formId}-schema`}>Record type</FieldLabel>
-      {networkSchemas.length > 0 ? (
-        <Select
-          value={schemaId || chooseSchemaValue}
-          disabled={isLoading}
-          required
-          modal={false}
-          items={[
-            { value: chooseSchemaValue, label: "Choose a record type" },
-            ...networkSchemas.map((schema) => ({
-              value: schema.id,
-              label: schema.name,
-            })),
-          ]}
-          onValueChange={(value) => {
-            if (!value || value === chooseSchemaValue) {
-              setSchemaId("")
-              return
-            }
-            setSchemaId(value)
-          }}
-        >
-          <SelectTrigger id={`${formId}-schema`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={chooseSchemaValue}>
-              Choose a record type
-            </SelectItem>
-            {networkSchemas.map((schema) => (
-              <SelectItem key={schema.id} value={schema.id}>
-                {schema.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          Create a schema in this network before adding a workflow.
-        </p>
-      )}
-      <FieldDescription>
-        The workflow watches this record type and uses its fields in conditions.
-      </FieldDescription>
-    </Field>
+  const showNetwork = networks.length > 0 && !lockNetwork
+  const sentence = workflowDraftSentence(
+    trigger,
+    criteria,
+    actions,
+    triggerFields
   )
 
   const canSubmit =
@@ -372,18 +276,6 @@ export function WorkflowDefinitionDialog({
 
   async function submitDefinition(body: WorkflowDefinitionBody) {
     try {
-      if (editing) {
-        await updateWorkflow({
-          id: workflowDefinitionId!,
-          name: name.trim(),
-          active,
-          definition: body,
-          schemaId,
-        }).unwrap()
-        onOpenChange(false)
-        return
-      }
-
       const workflow = await createWorkflow({
         name: name.trim(),
         active,
@@ -406,18 +298,28 @@ export function WorkflowDefinitionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="full" className={definitionDialogClassName}>
+      <DialogContent
+        size="full"
+        className="sm:inset-x-[8vw] lg:inset-x-16 xl:inset-x-[12vw]"
+      >
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-          <DialogTitle>
-            {editing
-              ? "Edit workflow definition"
-              : "Create a workflow definition"}
-          </DialogTitle>
-          <DialogDescription>
-            {triggerSchema
-              ? `${triggerSummary(triggerToApi(trigger))} for ${triggerSchema.name}. Conditions still have to match before actions run.`
-              : "Pick a record type and when this should run, add conditions, then choose what happens next."}
-          </DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1.5">
+              <DialogTitle>Create a workflow</DialogTitle>
+              <DialogDescription>{sentence}</DialogDescription>
+            </div>
+            <Button
+              type="button"
+              variant={definitionView === "json" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() =>
+                setDefinitionView((view) => (view === "rule" ? "json" : "rule"))
+              }
+            >
+              <FileJsonIcon />
+              {definitionView === "json" ? "Rule" : "JSON"}
+            </Button>
+          </div>
         </DialogHeader>
         <form
           id={formId}
@@ -425,146 +327,130 @@ export function WorkflowDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <DefinitionDialogBody
-            json={
-              <DefinitionJsonPane
-                id={`${formId}-json`}
-                title="JSON definition"
-                description="Updates as you edit conditions and actions. Paste a definition to fill the builder."
-                value={jsonText}
-                onChange={handleJsonChange}
-                onBlur={handleJsonBlur}
-                error={jsonError}
-              />
-            }
-          >
-            <FieldGroup className="gap-4">
-              {networks.length > 0 && !editing ? (
-                <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
+              <FieldGroup className="shrink-0 gap-4 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
+                {showNetwork ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor={`${formId}-network`}>
+                        Network
+                      </FieldLabel>
+                      <Select
+                        value={selectedNetworkId}
+                        disabled={isLoading}
+                        required
+                        modal={false}
+                        items={networks.map((network) => ({
+                          value: network.id,
+                          label: network.name,
+                        }))}
+                        onValueChange={(value) => {
+                          if (!value) {
+                            return
+                          }
+                          setSelectedNetworkId(value)
+                          const nextSchema = schemas.find(
+                            (schema) => schema.networkId === value
+                          )
+                          setSchemaId(nextSchema?.id ?? "")
+                        }}
+                      >
+                        <SelectTrigger id={`${formId}-network`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {networks.map((network) => (
+                            <SelectItem key={network.id} value={network.id}>
+                              {network.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <SchemaSelect
+                      formId={formId}
+                      schemaId={schemaId}
+                      schemas={networkSchemas}
+                      isLoading={isLoading}
+                      onChange={setSchemaId}
+                    />
+                  </div>
+                ) : (
+                  <SchemaSelect
+                    formId={formId}
+                    schemaId={schemaId}
+                    schemas={networkSchemas}
+                    isLoading={isLoading}
+                    onChange={setSchemaId}
+                  />
+                )}
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                   <Field>
-                    <FieldLabel htmlFor={`${formId}-network`}>
-                      Network
-                    </FieldLabel>
-                    <Select
-                      value={selectedNetworkId}
-                      disabled={lockNetwork || isLoading}
+                    <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
+                    <Input
+                      id={`${formId}-name`}
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Shipment overweight"
+                      autoFocus
                       required
-                      modal={false}
-                      items={networks.map((network) => ({
-                        value: network.id,
-                        label: network.name,
-                      }))}
-                      onValueChange={(value) => {
-                        if (!value) {
-                          return
-                        }
-                        setSelectedNetworkId(value)
-                        const nextSchema = schemas.find(
-                          (schema) => schema.networkId === value
-                        )
-                        setSchemaId(nextSchema?.id ?? "")
-                      }}
-                    >
-                      <SelectTrigger id={`${formId}-network`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {networks.map((network) => (
-                          <SelectItem key={network.id} value={network.id}>
-                            {network.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      disabled={isLoading}
+                      aria-invalid={error ? true : undefined}
+                    />
                   </Field>
-                  {schemaField}
+                  <Field className="sm:pb-1">
+                    <CheckboxField
+                      id={`${formId}-active`}
+                      checked={active}
+                      onChange={setActive}
+                      label="Published"
+                    />
+                  </Field>
+                </div>
+                {error ? (
+                  <FieldError>{getHumaErrorMessage(error)}</FieldError>
+                ) : null}
+              </FieldGroup>
+
+              {definitionView === "json" ? (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
+                  <DefinitionJsonPane
+                    id={`${formId}-json`}
+                    title="JSON definition"
+                    description="Updates as you edit. Paste a definition to fill the builder."
+                    value={jsonText}
+                    onChange={handleJsonChange}
+                    onBlur={handleJsonBlur}
+                    error={jsonError}
+                  />
                 </div>
               ) : (
-                schemaField
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+                  <WorkflowRuleEditor
+                    trigger={trigger}
+                    criteria={criteria}
+                    actions={actions}
+                    fields={triggerFields}
+                    schemas={networkSchemas}
+                    pipelines={networkPipelines}
+                    triggerSchemaId={schemaId}
+                    schemaName={triggerSchema?.name}
+                    onTriggerChange={(next) => {
+                      markBuilderSource()
+                      setTrigger(next)
+                    }}
+                    onCriteriaChange={(next) => {
+                      markBuilderSource()
+                      setCriteria(next)
+                    }}
+                    onActionsChange={(next) => {
+                      markBuilderSource()
+                      setActions(next)
+                    }}
+                  />
+                </div>
               )}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
-                  <Input
-                    id={`${formId}-name`}
-                    value={name}
-                    onChange={(event) => {
-                      const next = event.target.value
-                      setName(next)
-                      if (!slugTouched) {
-                        setSlug(slugifyId(next))
-                      }
-                    }}
-                    placeholder="Shipment overweight"
-                    autoFocus
-                    required
-                    disabled={isLoading}
-                    aria-invalid={error ? true : undefined}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-slug`}>Slug</FieldLabel>
-                  <Input
-                    id={`${formId}-slug`}
-                    value={slug}
-                    onChange={(event) => {
-                      setSlugTouched(true)
-                      setSlug(event.target.value)
-                    }}
-                    placeholder="shipment-overweight"
-                    className="font-mono"
-                    disabled={editing}
-                    required
-                  />
-                </Field>
-              </div>
-              <Field>
-                <CheckboxField
-                  id={`${formId}-active`}
-                  checked={active}
-                  onChange={setActive}
-                  label="Published"
-                />
-                <FieldDescription>
-                  Published workflows run when their trigger fires.
-                  Drafts are saved but do not run.
-                </FieldDescription>
-              </Field>
-              {error ? (
-                <FieldError>{getHumaErrorMessage(error)}</FieldError>
-              ) : null}
-            </FieldGroup>
-
-            <WorkflowTriggerBuilder
-              value={trigger}
-              fields={triggerFields}
-              onChange={(next) => {
-                markBuilderSource()
-                setTrigger(next)
-              }}
-            />
-
-            <WorkflowCriteriaBuilder
-              value={criteria}
-              fields={triggerFields}
-              onChange={(next) => {
-                markBuilderSource()
-                setCriteria(next)
-              }}
-            />
-
-            <WorkflowActionsBuilder
-              value={actions}
-              schemas={networkSchemas}
-              pipelines={networkPipelines}
-              triggerFields={triggerFields}
-              triggerSchemaId={schemaId}
-              onChange={(next) => {
-                markBuilderSource()
-                setActions(next)
-              }}
-            />
-          </DefinitionDialogBody>
+            </div>
           <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={isLoading} />}
@@ -580,19 +466,76 @@ export function WorkflowDefinitionDialog({
               {isLoading ? (
                 <>
                   <Loader className="animate-spin" />
-                  <span className="sr-only">
-                    {editing ? "Saving" : "Creating"}
-                  </span>
+                  <span className="sr-only">Creating</span>
                 </>
-              ) : editing ? (
-                "Save workflow definition"
               ) : (
-                "Create workflow definition"
+                "Create workflow"
               )}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function SchemaSelect({
+  formId,
+  schemaId,
+  schemas,
+  isLoading,
+  onChange,
+}: {
+  formId: string
+  schemaId: string
+  schemas: { id: string; name: string }[]
+  isLoading: boolean
+  onChange: (schemaId: string) => void
+}) {
+  const chooseSchemaValue = "__choose_schema__"
+  return (
+    <Field>
+      <FieldLabel htmlFor={`${formId}-schema`}>Record type</FieldLabel>
+      {schemas.length > 0 ? (
+        <Select
+          value={schemaId || chooseSchemaValue}
+          disabled={isLoading}
+          required
+          modal={false}
+          items={[
+            { value: chooseSchemaValue, label: "Choose a record type" },
+            ...schemas.map((schema) => ({
+              value: schema.id,
+              label: schema.name,
+            })),
+          ]}
+          onValueChange={(value) => {
+            if (!value || value === chooseSchemaValue) {
+              onChange("")
+              return
+            }
+            onChange(value)
+          }}
+        >
+          <SelectTrigger id={`${formId}-schema`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={chooseSchemaValue}>
+              Choose a record type
+            </SelectItem>
+            {schemas.map((schema) => (
+              <SelectItem key={schema.id} value={schema.id}>
+                {schema.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Create a record type in this network before adding a workflow.
+        </p>
+      )}
+    </Field>
   )
 }

@@ -2,12 +2,13 @@ import { type ReactNode } from "react"
 import {
   ChevronDownIcon,
   ChevronUpIcon,
-  CircleHelpIcon,
   CopyPlusIcon,
+  FilterIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
 
+import { propertyLabel } from "@/components/schema-records-table"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -24,6 +25,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  WorkflowEmptyAdd,
+  WorkflowLogicJoiner,
+  WorkflowSectionHeading,
+  workflowLogicExplanations,
+  workflowLogicTone,
+} from "@/components/workflow-rule"
 import type { JsonSchemaProperty } from "@/lib/json-definition"
 import { cn } from "@/lib/utils"
 import {
@@ -43,41 +51,6 @@ import {
 const CUSTOM_FIELD = "__custom"
 const CHOOSE_FIELD = "__choose_field__"
 const CHOOSE_VALUE = "__choose_value__"
-
-const fieldTypeLabels: Record<string, string> = {
-  string: "Text",
-  number: "Number",
-  integer: "Integer",
-  boolean: "Yes / No",
-  array: "List",
-  object: "Object",
-}
-
-function fieldOptionLabel(field: JsonSchemaProperty) {
-  if (field.format === "address") {
-    return `${field.name} · Address`
-  }
-  const type = fieldTypeLabels[field.type] ?? field.type
-  return `${field.name} · ${type}`
-}
-
-function countLeaves(node: CriteriaNodeDraft): number {
-  if (node.kind === "leaf") {
-    return 1
-  }
-  return node.conditions.reduce((total, child) => total + countLeaves(child), 0)
-}
-
-function leafSummary(leaf: CriteriaLeafDraft) {
-  if (!leaf.field.trim()) {
-    return "Choose a field"
-  }
-  const operator = operatorLabels[leaf.operator]
-  if (!leaf.value.trim()) {
-    return `${leaf.field} ${operator} …`
-  }
-  return `${leaf.field} ${operator} ${leaf.value}`
-}
 
 function updateNode(
   node: CriteriaNodeDraft,
@@ -266,8 +239,6 @@ function IconTooltipButton({
 function LeafEditor({
   leaf,
   fields,
-  index,
-  total,
   canMoveUp,
   canMoveDown,
   onChange,
@@ -277,8 +248,6 @@ function LeafEditor({
 }: {
   leaf: CriteriaLeafDraft
   fields: JsonSchemaProperty[]
-  index: number
-  total: number
   canMoveUp: boolean
   canMoveDown: boolean
   onChange: (patch: Partial<CriteriaLeafDraft>) => void
@@ -297,21 +266,8 @@ function LeafEditor({
   const customId = `${leaf.key}-custom`
 
   return (
-    <div className="rounded-xl border bg-background p-3 shadow-xs">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">
-            Condition {index + 1}
-            <span className="font-normal text-muted-foreground">
-              {" "}
-              of {total}
-            </span>
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {leafSummary(leaf)}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-0.5">
+    <div className="group/row relative rounded-xl border bg-background p-4 shadow-xs">
+      <div className="absolute top-2 right-2 flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
           <IconTooltipButton
             label="Move up"
             disabled={!canMoveUp}
@@ -337,9 +293,7 @@ function LeafEditor({
             <Trash2Icon />
           </IconTooltipButton>
         </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-start">
+      <div className="grid gap-3 sm:grid-cols-3 sm:items-start sm:pr-20">
         <Field className="gap-1">
           <FieldLabel htmlFor={fieldId}>Field</FieldLabel>
           {fields.length > 0 ? (
@@ -350,9 +304,9 @@ function LeafEditor({
                 { value: CHOOSE_FIELD, label: "Choose a field" },
                 ...fields.map((item) => ({
                   value: item.name,
-                  label: fieldOptionLabel(item),
+                  label: propertyLabel(item.name),
                 })),
-                { value: CUSTOM_FIELD, label: "Custom field…" },
+                { value: CUSTOM_FIELD, label: "Field not listed" },
               ]}
               onValueChange={(value) => {
                 if (!value || value === CHOOSE_FIELD) {
@@ -376,10 +330,10 @@ function LeafEditor({
                 <SelectItem value={CHOOSE_FIELD}>Choose a field</SelectItem>
                 {fields.map((item) => (
                   <SelectItem key={item.name} value={item.name}>
-                    {fieldOptionLabel(item)}
+                    {propertyLabel(item.name)}
                   </SelectItem>
                 ))}
-                <SelectItem value={CUSTOM_FIELD}>Custom field…</SelectItem>
+                <SelectItem value={CUSTOM_FIELD}>Field not listed</SelectItem>
               </SelectContent>
             </Select>
           ) : (
@@ -389,8 +343,7 @@ function LeafEditor({
               onChange={(event) =>
                 onChange({ field: event.target.value, customField: true })
               }
-              placeholder="age"
-              className="font-mono"
+              placeholder="status"
             />
           )}
         </Field>
@@ -440,7 +393,7 @@ function LeafEditor({
       </div>
       {isCustom && fields.length > 0 ? (
         <Field className="mt-3 gap-1">
-          <FieldLabel htmlFor={customId}>Custom field name</FieldLabel>
+          <FieldLabel htmlFor={customId}>Field path</FieldLabel>
           <Input
             id={customId}
             value={leaf.field}
@@ -450,9 +403,6 @@ function LeafEditor({
             placeholder="address.city"
             className="font-mono"
           />
-          <FieldDescription className="text-xs">
-            Use a nested path if the field is not on this schema.
-          </FieldDescription>
         </Field>
       ) : null}
     </div>
@@ -476,6 +426,7 @@ function GroupEditor({
 }) {
   const logicId = `${group.key}-logic`
   const childCount = group.conditions.length
+  const tone = workflowLogicTone[group.logic]
 
   function patchNode(
     key: string,
@@ -515,134 +466,139 @@ function GroupEditor({
 
   return (
     <div
-      className={
-        depth === 0
-          ? "flex flex-col gap-3"
-          : "flex flex-col gap-3 rounded-xl border border-dashed bg-muted/20 p-3"
-      }
-    >
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <Field className="w-full max-w-xs gap-1">
-          <FieldLabel htmlFor={logicId}>Match if</FieldLabel>
-          <Select
-            value={group.logic}
-            modal={false}
-            items={(Object.keys(logicLabels) as CriteriaLogic[]).map(
-              (logic) => ({
-                value: logic,
-                label: logicLabels[logic],
-              })
-            )}
-            onValueChange={(value) => {
-              if (value) {
-                onChange({ ...group, logic: value as CriteriaLogic })
-              }
-            }}
-          >
-            <SelectTrigger id={logicId}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(logicLabels) as CriteriaLogic[]).map((logic) => (
-                <SelectItem key={logic} value={logic}>
-                  {logicLabels[logic]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        {canRemove && onRemove ? (
-          <IconTooltipButton
-            label="Remove group"
-            destructive
-            onClick={onRemove}
-          >
-            <Trash2Icon />
-          </IconTooltipButton>
-        ) : null}
-      </div>
-      {childCount === 0 ? (
-        <button
-          type="button"
-          onClick={addCondition}
-          className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-        >
-          <span className="flex size-8 items-center justify-center rounded-full border border-dashed">
-            <PlusIcon className="size-4" />
-          </span>
-          <span className="font-medium text-foreground">
-            Add your first condition
-          </span>
-          <span>
-            Choose a field from the record, how to compare it, and the value it
-            should match.
-          </span>
-        </button>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {group.conditions.map((child, index) =>
-            child.kind === "leaf" ? (
-              <LeafEditor
-                key={child.key}
-                leaf={child}
-                fields={fields}
-                index={
-                  group.conditions
-                    .slice(0, index)
-                    .filter((item) => item.kind === "leaf").length
-                }
-                total={
-                  group.conditions.filter((item) => item.kind === "leaf").length
-                }
-                canMoveUp={index > 0}
-                canMoveDown={index < childCount - 1}
-                onChange={(patch) =>
-                  patchNode(child.key, (current) =>
-                    current.kind === "leaf" ? { ...current, ...patch } : current
-                  )
-                }
-                onMove={(offset) => moveChild(index, offset)}
-                onDuplicate={() => duplicateChild(index)}
-                onRemove={() => onChange(removeFromGroup(group, child.key))}
-              />
-            ) : (
-              <GroupEditor
-                key={child.key}
-                group={child}
-                fields={fields}
-                depth={depth + 1}
-                canRemove
-                onChange={(next) => patchNode(child.key, () => next)}
-                onRemove={() => onChange(removeFromGroup(group, child.key))}
-              />
-            )
-          )}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={addCondition}
-              className="flex min-w-40 flex-1 items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-            >
-              <PlusIcon className="size-3.5" />
-              Add condition
-            </button>
-            {depth < 2 ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-auto rounded-xl px-3 py-3"
-                onClick={() =>
-                  onChange(addToGroup(group, group.key, emptyGroup("AND")))
-                }
-              >
-                <PlusIcon />
-                Add group
-              </Button>
-            ) : null}
-          </div>
-        </div>
+      className={cn(
+        "overflow-hidden rounded-xl border border-l-4 bg-muted/20",
+        tone.accent,
+        depth > 0 && "border-dashed bg-background"
       )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-md px-2 py-0.5 font-mono text-xs font-semibold tracking-wider",
+                tone.badge
+              )}
+            >
+              {group.logic}
+            </span>
+            <Select
+              value={group.logic}
+              modal={false}
+              items={(Object.keys(logicLabels) as CriteriaLogic[]).map(
+                (logic) => ({
+                  value: logic,
+                  label: logicLabels[logic],
+                })
+              )}
+              onValueChange={(value) => {
+                if (value) {
+                  onChange({ ...group, logic: value as CriteriaLogic })
+                }
+              }}
+            >
+              <SelectTrigger
+                id={logicId}
+                className="h-7 w-auto min-w-44 border-0 bg-transparent px-1 shadow-none dark:bg-transparent"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(logicLabels) as CriteriaLogic[]).map((logic) => (
+                  <SelectItem key={logic} value={logic}>
+                    {logicLabels[logic]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {workflowLogicExplanations[group.logic]}
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {childCount} {childCount === 1 ? "item" : "items"} in this group
+          </p>
+          {canRemove && onRemove ? (
+            <IconTooltipButton
+              label="Remove group"
+              destructive
+              onClick={onRemove}
+            >
+              <Trash2Icon />
+            </IconTooltipButton>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex flex-col p-3">
+        {childCount === 0 ? (
+          <WorkflowEmptyAdd
+            title="Add a condition"
+            description="Choose a field, how to compare it, and the value it should match."
+            onClick={addCondition}
+          />
+        ) : (
+          <>
+            {group.conditions.map((child, index) => (
+              <div key={child.key}>
+                {index > 0 ? <WorkflowLogicJoiner logic={group.logic} /> : null}
+                {child.kind === "leaf" ? (
+                  <LeafEditor
+                    leaf={child}
+                    fields={fields}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < childCount - 1}
+                    onChange={(patch) =>
+                      patchNode(child.key, (current) =>
+                        current.kind === "leaf"
+                          ? { ...current, ...patch }
+                          : current
+                      )
+                    }
+                    onMove={(offset) => moveChild(index, offset)}
+                    onDuplicate={() => duplicateChild(index)}
+                    onRemove={() =>
+                      onChange(removeFromGroup(group, child.key))
+                    }
+                  />
+                ) : (
+                  <GroupEditor
+                    group={child}
+                    fields={fields}
+                    depth={depth + 1}
+                    canRemove
+                    onChange={(next) => patchNode(child.key, () => next)}
+                    onRemove={() =>
+                      onChange(removeFromGroup(group, child.key))
+                    }
+                  />
+                )}
+              </div>
+            ))}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={addCondition}>
+                <PlusIcon />
+                Add condition
+              </Button>
+              {depth < 2 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    onChange(addToGroup(group, group.key, emptyGroup("AND")))
+                  }
+                >
+                  <PlusIcon />
+                  Add a group
+                </Button>
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -650,63 +606,45 @@ function GroupEditor({
 export function WorkflowCriteriaBuilder({
   value,
   fields,
+  schemaName,
   onChange,
 }: {
   value: CriteriaGroupDraft
   fields: JsonSchemaProperty[]
+  schemaName?: string
   onChange: (next: CriteriaGroupDraft) => void
 }) {
-  const count = countLeaves(value)
+  const empty = value.conditions.length === 0
 
   return (
     <TooltipProvider delay={400}>
-      <div className="flex flex-col gap-3">
-        <div className="flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-sm font-medium">If</h3>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      type="button"
-                      className="inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                    />
-                  }
-                >
-                  <CircleHelpIcon className="size-3.5" />
-                  <span className="sr-only">About conditions</span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  The workflow runs when the trigger fires and these conditions
-                  match. Groups let you combine all, any, or none of the nested
-                  checks.
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {count === 0
-                ? "Add conditions that the record must match. Optional if the trigger is enough."
-                : `${count} ${count === 1 ? "condition" : "conditions"} · ${logicLabels[value.logic]}`}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onChange(addToGroup(value, value.key, emptyLeaf()))}
-          >
-            <PlusIcon />
-            Add condition
-          </Button>
-        </div>
-        <GroupEditor
-          group={value}
-          fields={fields}
-          depth={0}
-          canRemove={false}
-          onChange={onChange}
-        />
+      <WorkflowSectionHeading
+        icon={FilterIcon}
+        title="If"
+        description={
+          schemaName
+            ? `These conditions are evaluated against the ${schemaName} record after the trigger fires.`
+            : "These conditions are evaluated against the triggering record after the trigger fires."
+        }
+      />
+      <div className="mt-6">
+        {empty ? (
+          <WorkflowEmptyAdd
+            title="No extra conditions"
+            description="The workflow runs whenever the trigger fires. Add a condition to narrow it down."
+            onClick={() =>
+              onChange(addToGroup(value, value.key, emptyLeaf()))
+            }
+          />
+        ) : (
+          <GroupEditor
+            group={value}
+            fields={fields}
+            depth={0}
+            canRemove={false}
+            onChange={onChange}
+          />
+        )}
       </div>
     </TooltipProvider>
   )

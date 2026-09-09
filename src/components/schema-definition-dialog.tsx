@@ -12,19 +12,15 @@ import { useNavigate } from "react-router"
 import {
   ChevronDownIcon,
   ChevronUpIcon,
-  CircleHelpIcon,
   CopyPlusIcon,
+  FileJsonIcon,
   PlusIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
 
-import { CheckboxField } from "@/components/checkbox-field"
-import {
-  DefinitionDialogBody,
-  DefinitionJsonPane,
-  definitionDialogClassName,
-} from "@/components/definition-dialog-layout"
+import { DefinitionCard } from "@/components/definition-detail"
+import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { TemplateValueInput } from "@/components/template-value-input"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,11 +34,11 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -51,7 +47,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Tooltip,
   TooltipContent,
@@ -98,15 +93,6 @@ const propertyTypes = [
   "object",
 ] as const
 
-const propertyTypeLabels: Record<(typeof propertyTypes)[number], string> = {
-  string: "Text",
-  number: "Number",
-  integer: "Integer",
-  boolean: "Yes / No",
-  array: "List",
-  object: "Object",
-}
-
 const formatOptions = [
   "",
   "date",
@@ -118,33 +104,122 @@ const formatOptions = [
   "address",
 ] as const
 
-const formatLabels: Record<
-  Exclude<(typeof formatOptions)[number], "">,
-  string
-> = {
-  date: "Date",
-  "date-time": "Date & time",
-  email: "Email",
-  uri: "URL",
-  file: "File",
-  foreign: "Foreign",
-  address: "Address",
+const fieldKinds = [
+  { value: "text", label: "Text" },
+  { value: "choices", label: "Choices" },
+  { value: "number", label: "Number" },
+  { value: "integer", label: "Whole number" },
+  { value: "boolean", label: "Yes / No" },
+  { value: "date", label: "Date" },
+  { value: "datetime", label: "Date & time" },
+  { value: "email", label: "Email" },
+  { value: "url", label: "URL" },
+  { value: "file", label: "File" },
+  { value: "address", label: "Address" },
+  { value: "foreign", label: "Related record" },
+  { value: "list", label: "List" },
+  { value: "object", label: "Object" },
+] as const
+
+type FieldKind = (typeof fieldKinds)[number]["value"]
+
+function kindFromDraft(property: {
+  type: PropertyType
+  format: PropertyFormat
+  enumValues?: string[]
+}): FieldKind {
+  if (property.format === "address") {
+    return "address"
+  }
+  if (property.format === "foreign") {
+    return "foreign"
+  }
+  if (property.format === "file") {
+    return "file"
+  }
+  if (property.format === "email") {
+    return "email"
+  }
+  if (property.format === "uri") {
+    return "url"
+  }
+  if (property.format === "date") {
+    return "date"
+  }
+  if (property.format === "date-time") {
+    return "datetime"
+  }
+  if (property.type === "boolean") {
+    return "boolean"
+  }
+  if (property.type === "integer") {
+    return "integer"
+  }
+  if (property.type === "number") {
+    return "number"
+  }
+  if (property.type === "array") {
+    return "list"
+  }
+  if (property.type === "object") {
+    return "object"
+  }
+  if ((property.enumValues?.length ?? 0) > 0) {
+    return "choices"
+  }
+  return "text"
 }
 
-const stringFormats = [
-  "date",
-  "date-time",
-  "email",
-  "uri",
-  "file",
-  "foreign",
-  "address",
-] as const
+function draftFromKind(
+  kind: FieldKind
+): Pick<PropertyDraft, "type" | "format" | "schemaId" | "enumValues"> {
+  switch (kind) {
+    case "number":
+      return { type: "number", format: "", schemaId: "", enumValues: [] }
+    case "integer":
+      return { type: "integer", format: "", schemaId: "", enumValues: [] }
+    case "boolean":
+      return { type: "boolean", format: "", schemaId: "", enumValues: [] }
+    case "date":
+      return { type: "string", format: "date", schemaId: "", enumValues: [] }
+    case "datetime":
+      return {
+        type: "string",
+        format: "date-time",
+        schemaId: "",
+        enumValues: [],
+      }
+    case "email":
+      return { type: "string", format: "email", schemaId: "", enumValues: [] }
+    case "url":
+      return { type: "string", format: "uri", schemaId: "", enumValues: [] }
+    case "file":
+      return { type: "string", format: "file", schemaId: "", enumValues: [] }
+    case "address":
+      return { type: "object", format: "address", schemaId: "", enumValues: [] }
+    case "foreign":
+      return { type: "string", format: "foreign", schemaId: "", enumValues: [] }
+    case "choices":
+      return { type: "string", format: "", schemaId: "", enumValues: [] }
+    case "list":
+      return { type: "array", format: "", schemaId: "", enumValues: [] }
+    case "object":
+      return { type: "object", format: "", schemaId: "", enumValues: [] }
+    default:
+      return { type: "string", format: "", schemaId: "", enumValues: [] }
+  }
+}
 
 const itemTypes = ["string", "number", "integer", "boolean"] as const
 
+const itemTypeLabels: Record<(typeof itemTypes)[number], string> = {
+  string: "Text",
+  number: "Number",
+  integer: "Whole number",
+  boolean: "Yes / No",
+}
+
 const entireNetworkValue = "__network__"
-const anyFormatValue = "__any__"
 
 type PropertyType = (typeof propertyTypes)[number]
 type PropertyFormat = (typeof formatOptions)[number]
@@ -443,13 +518,14 @@ export function SchemaDefinitionDialog({
   const [slug, setSlug] = useState("")
   const [slugTouched, setSlugTouched] = useState(false)
   const [description, setDescription] = useState("")
-  const [properties, setProperties] = useState<PropertyDraft[]>(() => [
-    emptyProperty("property-1", { name: "id", required: true }),
-  ])
+  const [properties, setProperties] = useState<PropertyDraft[]>([])
   const [focusKey, setFocusKey] = useState<string | null>(null)
   const [definitionBase, setDefinitionBase] = useState<JsonObject | undefined>()
   const [jsonText, setJsonText] = useState("")
   const [jsonError, setJsonError] = useState<string | null>(null)
+  const [definitionView, setDefinitionView] = useState<"properties" | "json">(
+    "properties"
+  )
   const jsonSourceRef = useRef<"builder" | "json">("builder")
 
   const firstNetworkId = networks[0]?.id ?? ""
@@ -470,6 +546,7 @@ export function SchemaDefinitionDialog({
     createState.reset()
     updateState.reset()
     setSelectedOrganizationId(organizationId ?? "")
+    setDefinitionView("properties")
     // Reset only when the dialog opens or its org scope changes. `reset`
     // changes after each mutation (it closes over requestId) and would clear
     // a 409 before render.
@@ -503,7 +580,7 @@ export function SchemaDefinitionDialog({
     setProperties(
       current
         ? draftsFromProperties(getJsonSchemaProperties(current.definition))
-        : [emptyProperty("property-1", { name: "id", required: true })]
+        : []
     )
   }, [apiSchemaQuery.currentData, open, schemaId])
 
@@ -768,42 +845,109 @@ export function SchemaDefinitionDialog({
     }
   }
 
+  const showNetwork = networks.length > 0 && !editing && !lockNetwork
+  const showOrganization = !editing
+  const sentence = description.trim()
+    ? description.trim()
+    : `${properties.length} ${properties.length === 1 ? "field" : "fields"} on this record type.`
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="full" className={definitionDialogClassName}>
+      <DialogContent
+        size="full"
+        className="sm:inset-x-[8vw] lg:inset-x-16 xl:inset-x-[12vw]"
+      >
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-          <DialogTitle>
-            {editing ? "Edit schema" : "Create a schema"}
-          </DialogTitle>
-          <DialogDescription>
-            {selectedOrganizationId
-              ? "This schema will belong to the selected organization. Network schemas stay available to every organization."
-              : "This schema will be shared across every organization in the network."}
-          </DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1.5">
+              <DialogTitle>
+                {editing ? "Edit schema" : "Create a schema"}
+              </DialogTitle>
+              <DialogDescription>{sentence}</DialogDescription>
+            </div>
+            <Button
+              type="button"
+              variant={definitionView === "json" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() =>
+                setDefinitionView((view) =>
+                  view === "properties" ? "json" : "properties"
+                )
+              }
+            >
+              <FileJsonIcon />
+              {definitionView === "json" ? "Properties" : "JSON"}
+            </Button>
+          </div>
         </DialogHeader>
         <form
           id={formId}
           onSubmit={handleSubmit}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") {
+              return
+            }
+            const target = event.target
+            if (
+              target instanceof HTMLInputElement &&
+              target.type !== "submit" &&
+              target.type !== "checkbox"
+            ) {
+              event.preventDefault()
+            }
+          }}
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <DefinitionDialogBody
-            json={
-              <DefinitionJsonPane
-                id={`${formId}-json`}
-                title="JSON Schema"
-                description="Updates as you edit fields. Paste a schema to fill the builder."
-                value={jsonText}
-                onChange={handleJsonChange}
-                onBlur={handleJsonBlur}
-                error={jsonError}
-              />
-            }
-          >
-            <FieldGroup className="gap-4">
-              {networks.length > 0 && !editing ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field>
+          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
+            <FieldGroup className="shrink-0 gap-3 rounded-2xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
+              <div
+                className={cn(
+                  "grid gap-3",
+                  showNetwork && showOrganization
+                    ? "sm:grid-cols-2"
+                    : showNetwork || showOrganization
+                      ? "sm:grid-cols-3"
+                      : "sm:grid-cols-2"
+                )}
+              >
+                <Field className="gap-1">
+                  <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
+                  <Input
+                    id={`${formId}-name`}
+                    value={name}
+                    onChange={(event) => {
+                      const next = event.target.value
+                      markBuilderSource()
+                      setName(next)
+                      if (!slugTouched) {
+                        setSlug(slugifyId(next))
+                      }
+                    }}
+                    placeholder="Shipment"
+                    autoFocus
+                    required
+                    disabled={isLoading}
+                    aria-invalid={error ? true : undefined}
+                  />
+                </Field>
+                <Field className="gap-1">
+                  <FieldLabel htmlFor={`${formId}-description`}>
+                    Description
+                  </FieldLabel>
+                  <Input
+                    id={`${formId}-description`}
+                    value={description}
+                    onChange={(event) => {
+                      markBuilderSource()
+                      setDescription(event.target.value)
+                    }}
+                    placeholder="Optional"
+                    disabled={isLoading}
+                  />
+                </Field>
+                {showNetwork ? (
+                  <Field className="gap-1">
                     <FieldLabel htmlFor={`${formId}-network`}>
                       Network
                     </FieldLabel>
@@ -836,7 +980,9 @@ export function SchemaDefinitionDialog({
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field>
+                ) : null}
+                {showOrganization ? (
+                  <Field className="gap-1">
                     <FieldLabel htmlFor={`${formId}-organization`}>
                       Organization
                     </FieldLabel>
@@ -880,171 +1026,140 @@ export function SchemaDefinitionDialog({
                       </SelectContent>
                     </Select>
                   </Field>
-                </div>
-              ) : null}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
-                  <Input
-                    id={`${formId}-name`}
-                    value={name}
-                    onChange={(event) => {
-                      const next = event.target.value
-                      markBuilderSource()
-                      setName(next)
-                      if (!slugTouched) {
-                        setSlug(slugifyId(next))
-                      }
-                    }}
-                    placeholder="Shipment Manifest"
-                    autoFocus
-                    required
-                    disabled={isLoading}
-                    aria-invalid={error ? true : undefined}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-slug`}>Slug</FieldLabel>
-                  <Input
-                    id={`${formId}-slug`}
-                    value={slug}
-                    onChange={(event) => {
-                      setSlugTouched(true)
-                      setSlug(event.target.value)
-                    }}
-                    placeholder="shipment-manifest"
-                    className="font-mono"
-                    disabled={editing}
-                    required
-                  />
-                </Field>
+                ) : null}
               </div>
-              <Field>
-                <FieldLabel htmlFor={`${formId}-description`}>
-                  Description
-                </FieldLabel>
-                <Textarea
-                  id={`${formId}-description`}
-                  value={description}
-                  onChange={(event) => {
-                    markBuilderSource()
-                    setDescription(event.target.value)
-                  }}
-                  placeholder="What this schema represents for partner records."
-                  className="min-h-16"
-                />
-              </Field>
               {error ? (
                 <FieldError>{getHumaErrorMessage(error)}</FieldError>
               ) : null}
             </FieldGroup>
 
-            <TooltipProvider delay={400}>
-              <div className="flex flex-col gap-3">
-                <div className="flex items-end justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="text-sm font-medium">Properties</h3>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              type="button"
-                              className="inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                            />
-                          }
-                        >
-                          <CircleHelpIcon className="size-3.5" />
-                          <span className="sr-only">About properties</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Each property is a field on records that use this
-                          schema. The name becomes the JSON key and column.
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {properties.length === 0
-                        ? "Add the fields you want on each record."
-                        : `${properties.length} ${properties.length === 1 ? "field" : "fields"}${
-                            requiredCount > 0
-                              ? ` · ${requiredCount} required`
-                              : ""
-                          }`}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addProperty}
-                  >
-                    <PlusIcon />
-                    Add field
-                  </Button>
-                </div>
-
-                {properties.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={addProperty}
-                    className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-                  >
-                    <span className="flex size-8 items-center justify-center rounded-full border border-dashed">
-                      <PlusIcon className="size-4" />
-                    </span>
-                    <span className="font-medium text-foreground">
-                      Add your first field
-                    </span>
-                    <span>
-                      Name it, pick a type, and mark it required if every record
-                      needs a value. You can also paste a JSON Schema on the
-                      right.
-                    </span>
-                  </button>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {properties.map((property, index) => (
-                      <PropertyRow
-                        key={property.key}
-                        property={property}
-                        index={index}
-                        total={properties.length}
-                        jsonKey={propertyKeys[index]!}
-                        isDuplicate={duplicateKeys.has(propertyKeys[index]!)}
-                        focus={property.key === focusKey}
-                        relatedSchemas={relatedSchemas}
-                        onUpdate={(patch) =>
-                          updateProperty(property.key, patch)
-                        }
-                        onMove={(offset) => moveProperty(index, offset)}
-                        onDuplicate={() => duplicateProperty(index)}
-                        onRemove={() => {
-                          markBuilderSource()
-                          setProperties((current) =>
-                            current.filter((item) => item.key !== property.key)
-                          )
-                        }}
-                        onNameEnter={() => {
-                          if (index === properties.length - 1) {
-                            addProperty()
-                          }
-                        }}
-                      />
-                    ))}
-                    <button
-                      type="button"
-                      onClick={addProperty}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
-                    >
-                      <PlusIcon className="size-3.5" />
-                      Add field
-                    </button>
-                  </div>
-                )}
+            {definitionView === "json" ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
+                <DefinitionJsonPane
+                  id={`${formId}-json`}
+                  title="JSON Schema"
+                  description="Updates as you edit fields. Paste a schema to fill the builder."
+                  value={jsonText}
+                  onChange={handleJsonChange}
+                  onBlur={handleJsonBlur}
+                  error={jsonError}
+                />
               </div>
-            </TooltipProvider>
-          </DefinitionDialogBody>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <DefinitionCard className="flex h-full min-h-0 flex-col overflow-hidden p-5 sm:p-6">
+                  <TooltipProvider delay={400}>
+                    <div className="mb-4 flex shrink-0 items-end justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-medium">Fields</h2>
+                        <p className="text-sm text-muted-foreground">
+                          {properties.length === 0
+                            ? "Add the columns each record should have."
+                            : `${properties.length} ${properties.length === 1 ? "field" : "fields"}${
+                                requiredCount > 0
+                                  ? ` · ${requiredCount} required`
+                                  : ""
+                              }`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {properties.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={addProperty}
+                        className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-16 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground"
+                      >
+                        <span className="flex size-8 items-center justify-center rounded-full border border-dashed">
+                          <PlusIcon className="size-4" />
+                        </span>
+                        <span className="font-medium text-foreground">
+                          Add a field
+                        </span>
+                        <span>
+                          Name it, pick a type, and check Required if every
+                          record needs a value.
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="min-h-0 flex-1 overflow-auto rounded-xl border">
+                        <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
+                          <thead className="sticky top-0 z-10 border-b bg-muted/90 text-xs font-medium tracking-wide text-muted-foreground backdrop-blur-sm">
+                            <tr>
+                              <th className="px-3.5 py-2.5 font-medium">
+                                Field
+                              </th>
+                              <th className="w-[11.5rem] px-3.5 py-2.5 font-medium">
+                                Type
+                              </th>
+                              <th className="w-20 px-3.5 py-2.5 text-center font-medium">
+                                Required
+                              </th>
+                              <th className="px-3.5 py-2.5 font-medium">
+                                Default
+                              </th>
+                              <th className="px-3.5 py-2.5 font-medium">
+                                Description
+                              </th>
+                              <th className="w-px px-2 py-2.5">
+                                <span className="sr-only">Actions</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          {properties.map((property, index) => (
+                            <PropertyRow
+                              key={property.key}
+                              property={property}
+                              index={index}
+                              total={properties.length}
+                              jsonKey={propertyKeys[index]!}
+                              isDuplicate={duplicateKeys.has(
+                                propertyKeys[index]!
+                              )}
+                              focus={property.key === focusKey}
+                              relatedSchemas={relatedSchemas}
+                              onUpdate={(patch) =>
+                                updateProperty(property.key, patch)
+                              }
+                              onMove={(offset) => moveProperty(index, offset)}
+                              onDuplicate={() => duplicateProperty(index)}
+                              onRemove={() => {
+                                markBuilderSource()
+                                setProperties((current) =>
+                                  current.filter(
+                                    (item) => item.key !== property.key
+                                  )
+                                )
+                              }}
+                              onNameEnter={() => {
+                                if (index === properties.length - 1) {
+                                  addProperty()
+                                }
+                              }}
+                            />
+                          ))}
+                          <tfoot>
+                            <tr>
+                              <td colSpan={6} className="p-0">
+                                <button
+                                  type="button"
+                                  onClick={addProperty}
+                                  className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                                >
+                                  <PlusIcon className="size-3.5" />
+                                  Add field
+                                </button>
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
+                  </TooltipProvider>
+                </DefinitionCard>
+              </div>
+            )}
+          </div>
           <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={isLoading} />}
@@ -1248,12 +1363,34 @@ function PropertyRow({
   const requiredId = `${property.key}-required`
   const descriptionId = `${property.key}-description`
   const defaultId = `${property.key}-default`
-  const formatId = `${property.key}-format`
   const relatedSchemaId = `${property.key}-schema`
   const itemsId = `${property.key}-items`
   const enumId = `${property.key}-enum`
-  const emptyFormatLabel =
-    property.type === "object" ? "Any object" : "Any text"
+  const derivedKind = kindFromDraft(property)
+  const [kind, setKind] = useState<FieldKind>(derivedKind)
+  const showJsonKey =
+    Boolean(property.name.trim()) && property.name.trim() !== jsonKey
+
+  useEffect(() => {
+    const next = kindFromDraft(property)
+    setKind((current) =>
+      current === "choices" && next === "text" ? "choices" : next
+    )
+  }, [property.type, property.format, property.enumValues])
+
+  function applyKind(next: FieldKind) {
+    setKind(next)
+    if (next === "choices") {
+      onUpdate({
+        type: "string",
+        format: "",
+        schemaId: "",
+        enumValues: property.enumValues,
+      })
+      return
+    }
+    onUpdate(draftFromKind(next))
+  }
 
   function handleNameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") {
@@ -1263,283 +1400,225 @@ function PropertyRow({
     onNameEnter()
   }
 
-  return (
-    <div
-      className={cn(
-        "rounded-xl border bg-background p-3 shadow-xs",
-        focus && "ring-3 ring-ring/40"
-      )}
-    >
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">
-            Field {index + 1}
-            <span className="font-normal text-muted-foreground">
-              {" "}
-              of {total}
-            </span>
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {property.format
-              ? formatLabels[property.format]
-              : propertyTypeLabels[property.type]}
-            {property.required ? " · Required" : " · Optional"}
-            {property.name.trim() ? ` · ${jsonKey}` : ""}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          <IconTooltipButton
-            label="Move up"
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-          >
-            <ChevronUpIcon />
-          </IconTooltipButton>
-          <IconTooltipButton
-            label="Move down"
-            disabled={index === total - 1}
-            onClick={() => onMove(1)}
-          >
-            <ChevronDownIcon />
-          </IconTooltipButton>
-          <IconTooltipButton label="Duplicate field" onClick={onDuplicate}>
-            <CopyPlusIcon />
-          </IconTooltipButton>
-          <IconTooltipButton
-            label="Remove field"
-            destructive
-            onClick={onRemove}
-          >
-            <Trash2Icon />
-          </IconTooltipButton>
-        </div>
-      </div>
+  const extra =
+    kind === "foreign" ||
+    kind === "list" ||
+    kind === "choices" ||
+    kind === "address" ||
+    kind === "object"
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_10rem_auto] sm:items-start">
-        <Field className="gap-1">
-          <FieldLabel htmlFor={nameId}>Name</FieldLabel>
+  return (
+    <tbody className={cn("group", focus && "bg-muted/30")}>
+      <tr className={cn("align-top", !extra && "border-b")}>
+        <td className="px-3.5 py-2">
           <Input
             id={nameId}
             value={property.name}
             onChange={(event) => onUpdate({ name: event.target.value })}
             onKeyDown={handleNameKeyDown}
-            placeholder="shipmentId"
-            className="font-mono"
+            placeholder="Status"
             autoFocus={focus}
             required
+            aria-label="Field name"
             aria-invalid={isDuplicate || undefined}
           />
           {isDuplicate ? (
-            <FieldError>Another field already uses this name.</FieldError>
-          ) : (
-            <FieldDescription className="text-xs">
-              Becomes the JSON key{" "}
-              <span className="font-mono text-foreground">{jsonKey}</span>
-            </FieldDescription>
-          )}
-        </Field>
-        <Field className="gap-1">
-          <FieldLabel htmlFor={typeId}>Type</FieldLabel>
+            <FieldError className="mt-1">
+              Another field already uses this name.
+            </FieldError>
+          ) : showJsonKey ? (
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+              {jsonKey}
+            </p>
+          ) : null}
+        </td>
+        <td className="px-3.5 py-2">
           <Select
-            value={property.type}
+            value={kind}
             modal={false}
-            items={propertyTypes.map((type) => ({
-              value: type,
-              label: propertyTypeLabels[type],
+            items={fieldKinds.map((item) => ({
+              value: item.value,
+              label: item.label,
             }))}
             onValueChange={(value) => {
               if (value) {
-                onUpdate({ type: asPropertyType(value) })
+                applyKind(value as FieldKind)
               }
             }}
           >
-            <SelectTrigger id={typeId}>
+            <SelectTrigger id={typeId} aria-label="Field type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {propertyTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {propertyTypeLabels[type]}
+              {fieldKinds.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </Field>
-        <Field className="gap-1 sm:pt-6">
-          <CheckboxField
+        </td>
+        <td className="px-3.5 py-2 text-center">
+          <Checkbox
             id={requiredId}
             checked={property.required}
-            onChange={(checked) => onUpdate({ required: checked })}
-            label="Required"
+            onCheckedChange={(checked) =>
+              onUpdate({ required: checked === true })
+            }
+            aria-label="Required"
+            className="mx-auto"
           />
-        </Field>
-      </div>
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field className="gap-1 sm:col-span-2">
-          <FieldLabel htmlFor={descriptionId}>Description</FieldLabel>
-          <Input
-            id={descriptionId}
-            value={property.description}
-            onChange={(event) => onUpdate({ description: event.target.value })}
-            placeholder="What this field stores"
-          />
-        </Field>
-        <Field className="gap-1 sm:col-span-2">
-          <FieldLabel htmlFor={defaultId}>Default</FieldLabel>
+        </td>
+        <td className="px-3.5 py-2">
           <TemplateValueInput
             id={defaultId}
             value={property.defaultValue}
             onChange={(defaultValue) => onUpdate({ defaultValue })}
             groups={defaultTemplateGroups(property.type)}
             options={
-              property.type === "string" &&
-              property.format !== "foreign" &&
-              property.enumValues.length > 0
+              kind === "choices" && property.enumValues.length > 0
                 ? property.enumValues.map((value) => ({ value, label: value }))
-                : property.type === "boolean"
+                : kind === "boolean"
                   ? [
                       { value: "true", label: "Yes" },
                       { value: "false", label: "No" },
                     ]
                   : undefined
             }
-            placeholder={
-              property.type === "boolean"
-                ? "Choose a default"
-                : "Optional. Literal or {{ now }} / {{ uuid }}"
-            }
+            placeholder={kind === "boolean" ? "None" : "Optional"}
           />
-          <FieldDescription className="text-xs">
-            Used when the field is omitted on create. Formulas run on the
-            server.
-          </FieldDescription>
-        </Field>
-        {property.type === "string" || property.type === "object" ? (
-          <Field className="gap-1">
-            <FieldLabel htmlFor={formatId}>Format</FieldLabel>
-            <Select
-              value={property.format || anyFormatValue}
-              modal={false}
-              items={[
-                { value: anyFormatValue, label: emptyFormatLabel },
-                ...stringFormats.map((format) => ({
-                  value: format,
-                  label: formatLabels[format],
-                })),
-              ]}
-              onValueChange={(value) => {
-                if (!value || value === anyFormatValue) {
-                  onUpdate({ format: "" })
-                  return
-                }
-                onUpdate({ format: asFormat(value) })
-              }}
+        </td>
+        <td className="px-3.5 py-2">
+          <Input
+            id={descriptionId}
+            value={property.description}
+            onChange={(event) => onUpdate({ description: event.target.value })}
+            placeholder="Optional"
+            aria-label="Description"
+          />
+        </td>
+        <td className="px-2 py-2 whitespace-nowrap">
+          <div className="flex items-center justify-end gap-0.5 opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+            <IconTooltipButton
+              label="Move up"
+              disabled={index === 0}
+              onClick={() => onMove(-1)}
             >
-              <SelectTrigger id={formatId}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={anyFormatValue}>
-                  {emptyFormatLabel}
-                </SelectItem>
-                {stringFormats.map((format) => (
-                  <SelectItem key={format} value={format}>
-                    {formatLabels[format]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        ) : null}
-        {property.type === "string" && property.format === "foreign" ? (
-          <Field className="gap-1">
-            <FieldLabel htmlFor={relatedSchemaId}>Related schema</FieldLabel>
-            <Select
-              value={property.schemaId || undefined}
-              modal={false}
-              items={relatedSchemas.map((schema) => ({
-                value: schema.id,
-                label: schema.name,
-              }))}
-              onValueChange={(value) => {
-                if (value) {
-                  onUpdate({ schemaId: value })
-                }
-              }}
+              <ChevronUpIcon />
+            </IconTooltipButton>
+            <IconTooltipButton
+              label="Move down"
+              disabled={index === total - 1}
+              onClick={() => onMove(1)}
             >
-              <SelectTrigger id={relatedSchemaId}>
-                <SelectValue placeholder="Select a schema" />
-              </SelectTrigger>
-              <SelectContent>
-                {relatedSchemas.map((schema) => (
-                  <SelectItem key={schema.id} value={schema.id}>
-                    {schema.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldDescription className="text-xs">
-              The record ID stored in this field must belong to that schema.
-            </FieldDescription>
-          </Field>
-        ) : null}
-        {property.type === "string" && property.format !== "foreign" ? (
-          <Field className="gap-1">
-            <FieldLabel htmlFor={enumId}>Allowed values</FieldLabel>
-            <TagInput
-              id={enumId}
-              values={property.enumValues}
-              onChange={(enumValues) => onUpdate({ enumValues })}
-              placeholder="Type a value and press Enter"
-            />
-            <FieldDescription className="text-xs">
-              Optional. Leave empty to allow any text.
-            </FieldDescription>
-          </Field>
-        ) : null}
-        {property.type === "array" ? (
-          <Field className="gap-1">
-            <FieldLabel htmlFor={itemsId}>List item type</FieldLabel>
-            <Select
-              value={property.itemsType}
-              modal={false}
-              items={itemTypes.map((type) => ({
-                value: type,
-                label: propertyTypeLabels[type],
-              }))}
-              onValueChange={(value) => {
-                if (value) {
-                  onUpdate({
-                    itemsType: value as PropertyDraft["itemsType"],
-                  })
-                }
-              }}
+              <ChevronDownIcon />
+            </IconTooltipButton>
+            <IconTooltipButton label="Duplicate field" onClick={onDuplicate}>
+              <CopyPlusIcon />
+            </IconTooltipButton>
+            <IconTooltipButton
+              label="Remove field"
+              destructive
+              onClick={onRemove}
             >
-              <SelectTrigger id={itemsId}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {itemTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {propertyTypeLabels[type]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        ) : null}
-        {property.format === ADDRESS_FORMAT ? (
-          <FieldDescription className="sm:col-span-2">
-            Stores a postal address with street, city, region, postal code, and
-            country.
-          </FieldDescription>
-        ) : property.type === "object" ? (
-          <FieldDescription className="sm:col-span-2">
-            Object fields store nested JSON on the record.
-          </FieldDescription>
-        ) : null}
-      </div>
-    </div>
+              <Trash2Icon />
+            </IconTooltipButton>
+          </div>
+        </td>
+      </tr>
+      {extra ? (
+        <tr className="border-b">
+          <td colSpan={6} className="px-3.5 pb-3">
+            {kind === "foreign" ? (
+              <div className="max-w-sm">
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  Related schema
+                </p>
+                <Select
+                  value={property.schemaId || undefined}
+                  modal={false}
+                  items={relatedSchemas.map((schema) => ({
+                    value: schema.id,
+                    label: schema.name,
+                  }))}
+                  onValueChange={(value) => {
+                    if (value) {
+                      onUpdate({ schemaId: value })
+                    }
+                  }}
+                >
+                  <SelectTrigger id={relatedSchemaId}>
+                    <SelectValue placeholder="Select a schema" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {relatedSchemas.map((schema) => (
+                      <SelectItem key={schema.id} value={schema.id}>
+                        {schema.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            {kind === "list" ? (
+              <div className="max-w-xs">
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  List of
+                </p>
+                <Select
+                  value={property.itemsType}
+                  modal={false}
+                  items={itemTypes.map((type) => ({
+                    value: type,
+                    label: itemTypeLabels[type],
+                  }))}
+                  onValueChange={(value) => {
+                    if (value) {
+                      onUpdate({
+                        itemsType: value as PropertyDraft["itemsType"],
+                      })
+                    }
+                  }}
+                >
+                  <SelectTrigger id={itemsId}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {itemTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {itemTypeLabels[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            {kind === "choices" ? (
+              <div className="max-w-lg">
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  Allowed values
+                </p>
+                <TagInput
+                  id={enumId}
+                  values={property.enumValues}
+                  onChange={(enumValues) => onUpdate({ enumValues })}
+                  placeholder="Type a value and press Enter"
+                />
+              </div>
+            ) : null}
+            {kind === "address" ? (
+              <p className="text-xs text-muted-foreground">
+                Stores street, city, region, postal code, and country.
+              </p>
+            ) : null}
+            {kind === "object" ? (
+              <p className="text-xs text-muted-foreground">
+                Stores nested JSON on the record.
+              </p>
+            ) : null}
+          </td>
+        </tr>
+      ) : null}
+    </tbody>
   )
 }

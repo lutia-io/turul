@@ -96,7 +96,7 @@ function workflowActionCount(workflow: WorkflowDefinition) {
 export default function WorkflowDefinitionList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
-  const { openCreateWorkflow, openEditWorkflow } = useCreateEntity()
+  const { openCreateWorkflow } = useCreateEntity()
   const { schemas } = useWorkspaceSchemas()
   const { data: networks } = useListNetworksQuery(undefined, {
     skip: !isAuthenticated || Boolean(network),
@@ -409,12 +409,16 @@ export default function WorkflowDefinitionList() {
                     <ViewIcon />
                     View
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => openEditWorkflow(row.original.id)}
-                  >
-                    <PencilIcon />
-                    Edit
-                  </DropdownMenuItem>
+                  {row.original.internal ? null : (
+                    <DropdownMenuItem
+                      render={
+                        <Link to={`${hrefFor(row.original)}?edit=1`} />
+                      }
+                    >
+                      <PencilIcon />
+                      Edit
+                    </DropdownMenuItem>
+                  )}
                 </>
               }
             />
@@ -426,7 +430,7 @@ export default function WorkflowDefinitionList() {
       hrefFor,
       network,
       networksById,
-      openEditWorkflow,
+      schemasById,
       schemasById,
     ]
   )

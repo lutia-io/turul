@@ -1,6 +1,5 @@
-import { CircleHelpIcon } from "lucide-react"
+import { ClockIcon, WorkflowIcon } from "lucide-react"
 
-import { CheckboxField } from "@/components/checkbox-field"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -10,33 +9,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { WorkflowSectionHeading } from "@/components/workflow-rule"
+import { propertyLabel } from "@/components/schema-records-table"
 import type { JsonSchemaProperty } from "@/lib/json-definition"
+import { cn } from "@/lib/utils"
 import {
   timezoneOptions,
-  triggerKindLabels,
+  triggerKindShortLabels,
+  triggerSummary,
+  triggerToApi,
   type SchedulePreset,
   type TriggerDraft,
   type TriggerKind,
 } from "@/lib/workflow-definition"
 
 const kindItems: { value: TriggerKind; label: string }[] = [
-  { value: "created", label: triggerKindLabels.created },
-  { value: "updated", label: triggerKindLabels.updated },
-  { value: "created_updated", label: triggerKindLabels.created_updated },
-  { value: "schedule", label: triggerKindLabels.schedule },
+  { value: "created", label: triggerKindShortLabels.created },
+  { value: "updated", label: triggerKindShortLabels.updated },
+  { value: "created_updated", label: triggerKindShortLabels.created_updated },
+  { value: "schedule", label: triggerKindShortLabels.schedule },
 ]
 
 const presetItems: { value: SchedulePreset; label: string }[] = [
   { value: "hourly", label: "Every hour" },
   { value: "daily", label: "Every day" },
   { value: "weekly", label: "Every Monday" },
-  { value: "custom", label: "Custom cron" },
+  { value: "custom", label: "Custom" },
 ]
 
 const hours = Array.from({ length: 24 }, (_, hour) =>
@@ -66,87 +64,70 @@ export function WorkflowTriggerBuilder({
   const minuteChoices = minutes.includes(value.minute)
     ? minutes
     : [...minutes, value.minute].sort()
-  const hourChoices = hours.includes(value.hour) ? hours : [...hours, value.hour].sort()
+  const hourChoices = hours.includes(value.hour)
+    ? hours
+    : [...hours, value.hour].sort()
 
   return (
-    <TooltipProvider delay={400}>
-      <div className="flex flex-col gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <h3 className="text-sm font-medium">When</h3>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    className="inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                  />
-                }
+    <>
+      <WorkflowSectionHeading
+        icon={value.kind === "schedule" ? ClockIcon : WorkflowIcon}
+        title="When"
+        description={triggerSummary(triggerToApi(value))}
+      />
+      <div className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-wrap gap-1.5">
+          {kindItems.map((item) => {
+            const selected = value.kind === item.value
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => onChange({ ...value, kind: item.value })}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                  selected
+                    ? "border-foreground/15 bg-muted font-medium"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                )}
               >
-                <CircleHelpIcon className="size-3.5" />
-                <span className="sr-only">About the trigger</span>
-              </TooltipTrigger>
-              <TooltipContent>
-                Choose the event that starts this workflow. Conditions below
-                still have to match before actions run.
-              </TooltipContent>
-            </Tooltip>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {triggerKindLabels[value.kind]}
-          </p>
+                {item.label}
+              </button>
+            )
+          })}
         </div>
-
-        <Field>
-          <FieldLabel>Trigger</FieldLabel>
-          <Select
-            value={value.kind}
-            modal={false}
-            items={kindItems}
-            onValueChange={(next) => {
-              if (!next) {
-                return
-              }
-              onChange({ ...value, kind: next as TriggerKind })
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {kindItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
 
         {includesUpdate ? (
           <Field>
             <FieldLabel>Only if these fields change</FieldLabel>
             <FieldDescription>
-              Leave empty to run on any update. To run when status becomes
-              shipped, include Status here and add a condition{" "}
-              <span className="font-medium">status is shipped</span> below.
+              Leave empty to run on any update.
             </FieldDescription>
             {fields.length > 0 ? (
-              <div className="mt-2 flex flex-col gap-2">
-                {fields.map((field) => (
-                  <CheckboxField
-                    key={field.name}
-                    id={`trigger-changed-${field.name}`}
-                    checked={value.changed.includes(field.name)}
-                    label={field.name}
-                    onChange={(checked) => {
-                      const next = checked
-                        ? [...value.changed, field.name]
-                        : value.changed.filter((item) => item !== field.name)
-                      onChange({ ...value, changed: next })
-                    }}
-                  />
-                ))}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {fields.map((field) => {
+                  const selected = value.changed.includes(field.name)
+                  return (
+                    <button
+                      key={field.name}
+                      type="button"
+                      onClick={() => {
+                        const next = selected
+                          ? value.changed.filter((item) => item !== field.name)
+                          : [...value.changed, field.name]
+                        onChange({ ...value, changed: next })
+                      }}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                        selected
+                          ? "border-foreground/15 bg-muted font-medium"
+                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                      )}
+                    >
+                      {propertyLabel(field.name)}
+                    </button>
+                  )
+                })}
               </div>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
@@ -188,7 +169,10 @@ export function WorkflowTriggerBuilder({
               <Select
                 value={value.timezone}
                 modal={false}
-                items={zones.map((zone) => ({ value: zone, label: zone }))}
+                items={zones.map((zone) => ({
+                  value: zone,
+                  label: zone.split("/").at(-1)?.replaceAll("_", " ") ?? zone,
+                }))}
                 onValueChange={(next) => {
                   if (!next) {
                     return
@@ -202,7 +186,7 @@ export function WorkflowTriggerBuilder({
                 <SelectContent>
                   {zones.map((zone) => (
                     <SelectItem key={zone} value={zone}>
-                      {zone}
+                      {zone.split("/").at(-1)?.replaceAll("_", " ") ?? zone}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -270,7 +254,7 @@ export function WorkflowTriggerBuilder({
             ) : null}
             {value.preset === "custom" ? (
               <Field className="sm:col-span-2">
-                <FieldLabel>Cron</FieldLabel>
+                <FieldLabel>Custom schedule</FieldLabel>
                 <Input
                   value={value.cron}
                   onChange={(event) =>
@@ -287,6 +271,6 @@ export function WorkflowTriggerBuilder({
           </div>
         ) : null}
       </div>
-    </TooltipProvider>
+    </>
   )
 }

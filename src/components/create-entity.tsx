@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { useLocation, useNavigate } from "react-router"
 
 import { CreateFileDialog } from "@/components/create-file-dialog"
 import { CreateNetworkDialog } from "@/components/create-network-dialog"
@@ -16,6 +17,10 @@ import { PipelineDefinitionDialog } from "@/components/pipeline-definition-dialo
 import { SchemaDefinitionDialog } from "@/components/schema-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
 import type { PipelineTemplateContext } from "@/lib/node-definition"
+import {
+  networkWorkspacePath,
+  parseNetworkPath,
+} from "@/lib/network-workspace"
 
 type CreateState =
   | { kind: "network"; networkId?: string }
@@ -32,7 +37,7 @@ type CreateState =
       organizationId?: string
       schemaId?: string
     }
-  | { kind: "workflow"; networkId?: string; workflowDefinitionId?: string }
+  | { kind: "workflow"; networkId?: string }
   | { kind: "pipeline"; networkId?: string; pipelineDefinitionId?: string }
   | {
       kind: "node"
@@ -104,6 +109,8 @@ type CreateEntityContextValue = {
 const CreateEntityContext = createContext<CreateEntityContextValue | null>(null)
 
 export function CreateEntityProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [state, setState] = useState<CreateState>(null)
   const [dialogKeys, setDialogKeys] = useState(initialDialogKeys)
 
@@ -145,7 +152,17 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         open({ kind: "workflow", networkId })
       },
       openEditWorkflow(workflowDefinitionId) {
-        open({ kind: "workflow", workflowDefinitionId })
+        const parsed = parseNetworkPath(location.pathname)
+        if (!parsed) {
+          return
+        }
+        navigate(
+          `${networkWorkspacePath({
+            networkId: parsed.networkId,
+            organizationId: parsed.organizationId,
+            rest: `workflow-definitions/${workflowDefinitionId}`,
+          })}?edit=1`
+        )
       },
       openCreatePipeline(networkId) {
         open({ kind: "pipeline", networkId })
@@ -166,7 +183,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         open({ kind: "file", ...scope })
       },
     }
-  }, [])
+  }, [location.pathname, navigate])
 
   function close() {
     setState(null)
@@ -241,9 +258,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           }
         }}
         networkId={state?.kind === "workflow" ? state.networkId : undefined}
-        workflowDefinitionId={
-          state?.kind === "workflow" ? state.workflowDefinitionId : undefined
-        }
       />
       <PipelineDefinitionDialog
         key={`pipeline-${dialogKeys.pipeline}`}
