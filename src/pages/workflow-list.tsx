@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { ViewIcon } from "lucide-react"
+import { RotateCcwIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import {
@@ -50,6 +50,7 @@ import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
   useListWorkflowsQuery,
+  useRetryWorkflowMutation,
   type ApiWorkflowStatus,
   type ListWorkflowsParams,
   type WorkflowListSort,
@@ -166,6 +167,14 @@ export default function WorkflowList() {
     useListWorkflowsQuery(listParams, {
       skip: !isAuthenticated,
     })
+  const hasLiveRuns = (data?.items ?? []).some(
+    (run) => run.status === "pending" || run.status === "running"
+  )
+  useListWorkflowsQuery(listParams, {
+    skip: !isAuthenticated || !hasLiveRuns,
+    pollingInterval: 2000,
+  })
+  const [retryWorkflow, retryState] = useRetryWorkflowMutation()
   const dataRef = useRef(data)
   if (data) {
     dataRef.current = data
@@ -435,16 +444,34 @@ export default function WorkflowList() {
           cell: ({ row }) => (
             <DataTableRowActions
               items={
-                <DropdownMenuItem render={<Link to={hrefFor(row.original)} />}>
-                  <ViewIcon />
-                  View
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    render={<Link to={hrefFor(row.original)} />}
+                  >
+                    <ViewIcon />
+                    View
+                  </DropdownMenuItem>
+                  {row.original.apiStatus === "failed" ? (
+                    <DropdownMenuItem
+                      disabled={
+                        retryState.isLoading &&
+                        retryState.originalArgs === row.original.id
+                      }
+                      onClick={() => {
+                        void retryWorkflow(row.original.id)
+                      }}
+                    >
+                      <RotateCcwIcon />
+                      Retry
+                    </DropdownMenuItem>
+                  ) : null}
+                </>
               }
             />
           ),
         }),
       ]),
-    [columnFilters, hrefFor, organizationId]
+    [columnFilters, hrefFor, organizationId, retryState, retryWorkflow]
   )
 
   const table = useTable({
@@ -489,7 +516,10 @@ export default function WorkflowList() {
       chips.push({
         id: "name",
         label: "Workflow",
-        value: stringFilterChipValue(columnFilters.name.op, columnFilters.name.value),
+        value: stringFilterChipValue(
+          columnFilters.name.op,
+          columnFilters.name.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, name: undefined })),
       })
@@ -509,7 +539,10 @@ export default function WorkflowList() {
       chips.push({
         id: "organization",
         label: "Organization",
-        value: stringFilterChipValue(columnFilters.organization.op, columnFilters.organization.value),
+        value: stringFilterChipValue(
+          columnFilters.organization.op,
+          columnFilters.organization.value
+        ),
         onRemove: () =>
           setColumnFilters((current) => ({
             ...current,
@@ -553,6 +586,14 @@ export default function WorkflowList() {
         </p>
       ) : (
         <>
+          {retryState.isError ? (
+            <p className="text-sm text-destructive">
+              {getHumaErrorMessage(
+                retryState.error,
+                "Failed to retry workflow"
+              )}
+            </p>
+          ) : null}
           <DataTableView
             table={table}
             isRefreshing={isFetching}
@@ -570,4 +611,3 @@ export default function WorkflowList() {
     </DataTablePage>
   )
 }
-

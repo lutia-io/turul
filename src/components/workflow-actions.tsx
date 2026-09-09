@@ -40,13 +40,16 @@ function asJsonObject(value: unknown): JsonObject | undefined {
 export function WorkflowActionsJournal({
   workflowId,
   steps,
+  pollingInterval = 0,
 }: {
   workflowId: string
   steps: DefinitionStep[]
+  pollingInterval?: number
 }) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const query = useListWorkflowActionsQuery(workflowId, {
     skip: !isAuthenticated || !workflowId,
+    pollingInterval,
   })
   const actions = query.data ?? []
   const [expandedId, setExpandedId] = useState<string>()

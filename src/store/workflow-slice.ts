@@ -341,6 +341,20 @@ const workflowApi = api.injectEndpoints({
       query: (id) => `/workflow/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Workflow", id }],
     }),
+    retryWorkflow: build.mutation<{ id: string }, string>({
+      query: (id) => ({
+        url: `/workflow/${id}/retry`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, error, id) =>
+        error
+          ? []
+          : [
+              { type: "Workflow", id },
+              { type: "Workflow", id: "LIST" },
+              { type: "WorkflowAction", id: `LIST-${id}` },
+            ],
+    }),
     listWorkflowActions: build.query<ApiWorkflowAction[], string>({
       query: (workflowId) => `/workflow/${workflowId}/action`,
       providesTags: (result, _error, workflowId) =>
@@ -380,6 +394,7 @@ export const {
   useUpdateWorkflowDefinitionMutation,
   useListWorkflowsQuery,
   useGetWorkflowQuery,
+  useRetryWorkflowMutation,
   useListWorkflowActionsQuery,
   useGetWorkflowActionQuery,
 } = workflowApi

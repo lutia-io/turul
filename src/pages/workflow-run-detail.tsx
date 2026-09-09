@@ -6,6 +6,7 @@ import {
   CopyIcon,
   FileJsonIcon,
   GalleryVerticalEndIcon,
+  RotateCcwIcon,
   WorkflowIcon,
 } from "lucide-react"
 
@@ -32,10 +33,13 @@ import {
 } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { parseWorkflowDefinition } from "@/lib/workflow-definition"
-import { getHumaLoadErrorCopy } from "@/store/api"
+import { getHumaErrorMessage, getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
-import { useGetWorkflowQuery } from "@/store/workflow-slice"
+import {
+  useGetWorkflowQuery,
+  useRetryWorkflowMutation,
+} from "@/store/workflow-slice"
 
 type DataView = "steps" | "json"
 
@@ -49,9 +53,18 @@ export default function WorkflowRunDetail() {
   } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
   const { workflows } = useWorkspaceWorkflows()
+  const skipWorkflow = !isAuthenticated || !workflowRunId
   const workflowQuery = useGetWorkflowQuery(workflowRunId ?? "", {
-    skip: !isAuthenticated || !workflowRunId,
+    skip: skipWorkflow,
   })
+  const live =
+    workflowQuery.data?.status === "pending" ||
+    workflowQuery.data?.status === "running"
+  useGetWorkflowQuery(workflowRunId ?? "", {
+    skip: skipWorkflow || !live,
+    pollingInterval: 2000,
+  })
+  const [retryWorkflow, retryState] = useRetryWorkflowMutation()
   const workflow = workflowQuery.data
   const belongsToWorkspace =
     !workspaceNetwork ||
@@ -122,20 +135,46 @@ export default function WorkflowRunDetail() {
               {resolved.error}
             </p>
           ) : null}
+          {retryState.isError ? (
+            <p className="max-w-2xl text-sm text-destructive">
+              {getHumaErrorMessage(
+                retryState.error,
+                "Failed to retry workflow"
+              )}
+            </p>
+          ) : null}
         </div>
-        {resolved.data ? (
-          <Button
-            type="button"
-            variant={dataView === "json" ? "secondary" : "outline"}
-            size="sm"
-            onClick={() =>
-              setDataView((view) => (view === "steps" ? "json" : "steps"))
-            }
-          >
-            <FileJsonIcon />
-            {dataView === "json" ? "Steps" : "JSON"}
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {resolved.status === "failed" ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                void retryWorkflow(resolved.id)
+              }}
+              disabled={retryState.isLoading}
+              aria-busy={retryState.isLoading}
+            >
+              <RotateCcwIcon
+                className={retryState.isLoading ? "animate-spin" : undefined}
+              />
+              {retryState.isLoading ? "Retrying..." : "Retry"}
+            </Button>
+          ) : null}
+          {resolved.data ? (
+            <Button
+              type="button"
+              variant={dataView === "json" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() =>
+                setDataView((view) => (view === "steps" ? "json" : "steps"))
+              }
+            >
+              <FileJsonIcon />
+              {dataView === "json" ? "Steps" : "JSON"}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
@@ -187,7 +226,11 @@ export default function WorkflowRunDetail() {
           )}
 
           {dataView === "steps" ? (
-            <WorkflowActionsJournal workflowId={resolved.id} steps={steps} />
+            <WorkflowActionsJournal
+              workflowId={resolved.id}
+              steps={steps}
+              pollingInterval={live ? 2000 : 0}
+            />
           ) : null}
         </div>
 
