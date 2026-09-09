@@ -1,3 +1,5 @@
+import { useState } from "react"
+
 import type { JsonSchemaProperty } from "@/lib/json-definition"
 import {
   nowTemplate,
@@ -23,6 +25,12 @@ const CHOOSE_VALUE = "__choose_value__"
 const RECORD_FIELD_RE = /^\{\{\s*\.Record\.data\.([A-Za-z0-9_]+)\s*\}\}$/
 
 type ValueSource = "literal" | "record-field" | "record-id" | "now" | "advanced"
+type ValuePurpose = "value" | "record"
+
+function namedSchema(name?: string) {
+  const trimmed = name?.trim()
+  return trimmed || undefined
+}
 
 function parseValueSource(value: string): {
   source: ValueSource
@@ -49,22 +57,73 @@ function sourceItems({
   fields,
   includeRecordId,
   includeNow,
+  purpose,
+  schemaName,
 }: {
   fields: JsonSchemaProperty[]
   includeRecordId: boolean
   includeNow: boolean
+  purpose: ValuePurpose
+  schemaName?: string
 }) {
+  const named = namedSchema(schemaName)
+  const started = named
+    ? `The ${named} that started this`
+    : "The record that started this"
+  const startedId = named
+    ? `ID of the ${named} that started this`
+    : "ID of the record that started this"
+  const fromStarted = named
+    ? `From the ${named} that started this`
+    : "From the record that started this"
+  const fromField = named
+    ? `A field from that ${named}`
+    : "A field from the record that started this"
+
+  if (purpose === "record") {
+    return [
+      ...(includeRecordId ? [{ value: "record-id", label: started }] : []),
+      ...(fields.length > 0
+        ? [{ value: "record-field", label: fromField }]
+        : []),
+      { value: "literal", label: "A specific record ID" },
+      { value: "advanced", label: "Advanced" },
+    ]
+  }
+
   return [
-    { value: "literal", label: "Specific value" },
+    { value: "literal", label: "A specific value" },
     ...(fields.length > 0
-      ? [{ value: "record-field", label: "From this record" }]
+      ? [{ value: "record-field", label: fromStarted }]
       : []),
-    ...(includeRecordId
-      ? [{ value: "record-id", label: "This record’s ID" }]
-      : []),
+    ...(includeRecordId ? [{ value: "record-id", label: startedId }] : []),
     ...(includeNow ? [{ value: "now", label: "Current time" }] : []),
     { value: "advanced", label: "Advanced" },
   ]
+}
+
+function sourceHelp({
+  source,
+  purpose,
+  schemaName,
+}: {
+  source: ValueSource
+  purpose: ValuePurpose
+  schemaName?: string
+}) {
+  const named = namedSchema(schemaName) ?? "record"
+  if (source === "record-id") {
+    return purpose === "record"
+      ? `This step will change the same ${named} that started this workflow.`
+      : `Uses the ID of the ${named} that started this workflow.`
+  }
+  if (source === "now") {
+    return "Uses the time the workflow runs."
+  }
+  if (source === "record-field" && purpose === "record") {
+    return `Uses a field on the ${named} that started this to find which record to update.`
+  }
+  return undefined
 }
 
 export function FriendlyValueInput({
@@ -77,6 +136,8 @@ export function FriendlyValueInput({
   includeNow = true,
   advancedGroups,
   placeholder,
+  purpose = "value",
+  triggerSchemaName,
 }: {
   id?: string
   value: string
@@ -87,18 +148,36 @@ export function FriendlyValueInput({
   includeNow?: boolean
   advancedGroups?: TemplateVariableGroup[]
   placeholder?: string
+  purpose?: ValuePurpose
+  triggerSchemaName?: string
 }) {
   const parsed = parseValueSource(value)
   const sources = sourceItems({
     fields: triggerFields,
     includeRecordId,
     includeNow,
+    purpose,
+    schemaName: triggerSchemaName,
   })
-  const selectedSource = sources.some((item) => item.value === parsed.source)
+  const inferredSource = sources.some((item) => item.value === parsed.source)
     ? parsed.source
     : "advanced"
+  const [forceAdvanced, setForceAdvanced] = useState(false)
+  const selectedSource = forceAdvanced ? "advanced" : inferredSource
+  const help = sourceHelp({
+    source: selectedSource,
+    purpose,
+    schemaName: triggerSchemaName,
+  })
+  const chooseFieldLabel =
+    purpose === "record" ? "Choose the field with the ID" : "Choose a field"
 
   function setSource(next: ValueSource) {
+    if (next === "advanced") {
+      setForceAdvanced(true)
+      return
+    }
+    setForceAdvanced(false)
     if (next === "literal") {
       onChange(selectedSource === "literal" ? value : "")
       return
@@ -117,13 +196,17 @@ export function FriendlyValueInput({
           ? parsed.field
           : (triggerFields[0]?.name ?? "")
       onChange(field ? recordFieldTemplate(field) : "")
-      return
     }
-    onChange(value)
   }
 
   return (
-    <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(8.5rem,0.85fr)_minmax(0,1.15fr)]">
+    <div
+      className={
+        purpose === "record"
+          ? "grid min-w-0 gap-2"
+          : "grid min-w-0 gap-2 sm:grid-cols-[minmax(11rem,1fr)_minmax(0,1.15fr)]"
+      }
+    >
       <Select
         value={selectedSource}
         modal={false}
@@ -134,7 +217,9 @@ export function FriendlyValueInput({
           }
         }}
       >
-        <SelectTrigger aria-label="Value source">
+        <SelectTrigger
+          aria-label={purpose === "record" ? "Which record" : "Value source"}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -150,7 +235,7 @@ export function FriendlyValueInput({
           value={parsed.field || CHOOSE_FIELD}
           modal={false}
           items={[
-            { value: CHOOSE_FIELD, label: "Choose a field" },
+            { value: CHOOSE_FIELD, label: chooseFieldLabel },
             ...triggerFields.map((field) => ({
               value: field.name,
               label: propertyLabel(field.name),
@@ -164,11 +249,16 @@ export function FriendlyValueInput({
             onChange(recordFieldTemplate(next))
           }}
         >
-          <SelectTrigger id={id} aria-label="Record field">
+          <SelectTrigger
+            id={id}
+            aria-label={
+              purpose === "record" ? "Field with the record ID" : "Record field"
+            }
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={CHOOSE_FIELD}>Choose a field</SelectItem>
+            <SelectItem value={CHOOSE_FIELD}>{chooseFieldLabel}</SelectItem>
             {triggerFields.map((field) => (
               <SelectItem key={field.name} value={field.name}>
                 {propertyLabel(field.name)}
@@ -182,26 +272,34 @@ export function FriendlyValueInput({
           id={id}
           value={value}
           field={targetField}
-          placeholder={placeholder}
+          placeholder={
+            placeholder ??
+            (purpose === "record" ? "Record ID" : undefined)
+          }
           onChange={onChange}
         />
       ) : null}
       {selectedSource === "advanced" ? (
-        <div className="sm:col-span-1">
-          <TemplateValueInput
-            id={id}
-            value={value}
-            onChange={onChange}
-            groups={advancedGroups ?? []}
-            placeholder={placeholder ?? "{{ .Record.data.name }}"}
-          />
-        </div>
+        <TemplateValueInput
+          id={id}
+          value={value}
+          onChange={onChange}
+          groups={advancedGroups ?? []}
+          placeholder={
+            placeholder ??
+            (purpose === "record" ? "Record ID" : "Value")
+          }
+        />
       ) : null}
-      {selectedSource === "record-id" || selectedSource === "now" ? (
-        <p className="flex h-8 items-center text-sm text-muted-foreground">
-          {selectedSource === "record-id"
-            ? "Uses the record that triggered this workflow."
-            : "Uses the time the workflow runs."}
+      {help ? (
+        <p
+          className={
+            selectedSource === "record-id" || selectedSource === "now"
+              ? "flex min-h-8 items-center text-sm text-muted-foreground"
+              : "text-sm text-muted-foreground sm:col-span-2"
+          }
+        >
+          {help}
         </p>
       ) : null}
     </div>

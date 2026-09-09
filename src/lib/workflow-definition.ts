@@ -875,8 +875,6 @@ export const contextIDTemplate = "{{ .Context.id }}"
 
 export const nowTemplate = "{{ now }}"
 
-export const addTemplate = "{{ add 1 1 }}"
-
 export function addFieldTemplate(field: string) {
   return `{{ add .Record.data.${field} 1 }}`
 }

@@ -33,6 +33,7 @@ import {
   getJsonSchemaProperties,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
+import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
 import { cn } from "@/lib/utils"
 import {
   actionTypeDescriptions,
@@ -40,7 +41,6 @@ import {
   addContextAndRecordTemplate,
   addContextFieldTemplate,
   addFieldTemplate,
-  addTemplate,
   contextFieldTemplate,
   contextIDTemplate,
   emptyAction,
@@ -90,62 +90,104 @@ function isNumericField(field: JsonSchemaProperty) {
   return field.type === "integer" || field.type === "number"
 }
 
-function recordTemplateGroups(fields: JsonSchemaProperty[]) {
+function namedSchema(name?: string) {
+  const trimmed = name?.trim()
+  return trimmed || undefined
+}
+
+function withMathHint(
+  variables: { label: string; token: string; caretOffset?: number }[]
+) {
+  return variables.map((item) => ({ ...item, hint: "math" }))
+}
+
+function recordTemplateGroups(
+  fields: JsonSchemaProperty[],
+  schemaName?: string
+): TemplateVariableGroup[] {
+  const named = namedSchema(schemaName)
+  const hint = named ?? "started this"
   const numeric = fields.filter(isNumericField)
   return [
     {
+      label: named ? `The ${named} that started this` : "The record that started this",
+      description: "Values from the record that triggered this workflow.",
       variables: [
-        { label: "Record ID", token: recordIDTemplate },
-        { label: "Current time", token: nowTemplate },
         {
-          label: "Add numbers",
-          token: addTemplate,
-          caretOffset: addTemplate.indexOf("1"),
+          label: named ? `${named} ID` : "Record ID",
+          token: recordIDTemplate,
+          hint,
         },
+        ...fields.map((field) => ({
+          label: propertyLabel(field.name),
+          token: recordFieldTemplate(field.name),
+          hint,
+        })),
       ],
     },
     {
-      label: "Record fields",
-      variables: fields.map((field) => ({
-        label: propertyLabel(field.name),
-        token: recordFieldTemplate(field.name),
-      })),
-    },
-    {
-      label: "Add to a number",
+      label: named ? `Add to a number on that ${named}` : "Add to a number",
+      description: "Starts with that number so you can add more to it.",
       variables: numeric.map((field) => {
         const token = addFieldTemplate(field.name)
         return {
           label: propertyLabel(field.name),
           token,
           caretOffset: token.length - "1 }}".length,
+          hint,
         }
       }),
+    },
+    {
+      label: "Other",
+      variables: [
+        { label: "Current time", token: nowTemplate, hint: "now" },
+        ...withMathHint(arithmeticTemplateVariables),
+      ],
     },
   ]
 }
 
-function contextTemplateGroups(fields: JsonSchemaProperty[]) {
+function contextTemplateGroups(
+  fields: JsonSchemaProperty[],
+  schemaName?: string
+): TemplateVariableGroup[] {
+  const named = namedSchema(schemaName)
+  const hint = named ? `this ${named}` : "you're updating"
   const numeric = fields.filter(isNumericField)
   return [
     {
-      label: "Current record",
+      label: named
+        ? `This ${named} you're updating`
+        : "The record you're updating",
+      description: named
+        ? `Current values already saved on this ${named}.`
+        : "Current values already saved on the record this step is changing.",
       variables: [
-        { label: "Record ID", token: contextIDTemplate },
+        {
+          label: named ? `${named} ID` : "Record ID",
+          token: contextIDTemplate,
+          hint,
+        },
         ...fields.map((field) => ({
           label: propertyLabel(field.name),
           token: contextFieldTemplate(field.name),
+          hint,
         })),
       ],
     },
     {
-      label: "Add to current record",
+      label: named
+        ? `Add to this ${named}`
+        : "Add to the record you're updating",
+      description: "Starts with the current value so you can add more to it.",
       variables: numeric.map((field) => {
         const token = addContextFieldTemplate(field.name)
         return {
           label: propertyLabel(field.name),
           token,
           caretOffset: token.length - "1 }}".length,
+          hint,
         }
       }),
     },
@@ -155,7 +197,9 @@ function contextTemplateGroups(fields: JsonSchemaProperty[]) {
 function addFromTriggerGroups(
   entryName: string,
   targetFields: JsonSchemaProperty[],
-  triggerFields: JsonSchemaProperty[]
+  triggerFields: JsonSchemaProperty[],
+  triggerSchemaName?: string,
+  targetSchemaName?: string
 ): TemplateVariableGroup[] {
   const target = targetFields.find((field) => field.name === entryName)
   if (!target || !isNumericField(target)) {
@@ -165,12 +209,20 @@ function addFromTriggerGroups(
   if (numericTrigger.length === 0) {
     return []
   }
+  const named = namedSchema(triggerSchemaName)
+  const targetNamed = namedSchema(targetSchemaName)
   return [
     {
-      label: "Add from triggering record",
+      label: named
+        ? `Add from the ${named} that started this`
+        : "Add from the record that started this",
+      description: targetNamed
+        ? `Adds that number to this ${targetNamed} field.`
+        : "Adds that number to this field.",
       variables: numericTrigger.map((field) => ({
         label: propertyLabel(field.name),
         token: addContextAndRecordTemplate(entryName, field.name),
+        hint: named ?? "started this",
       })),
     },
   ]
@@ -232,6 +284,8 @@ function DataEntriesEditor({
   targetFields,
   triggerFields,
   includeContext,
+  triggerSchemaName,
+  targetSchemaName,
   onChange,
 }: {
   entries: DataEntryDraft[]
@@ -239,6 +293,8 @@ function DataEntriesEditor({
   targetFields: JsonSchemaProperty[]
   triggerFields: JsonSchemaProperty[]
   includeContext: boolean
+  triggerSchemaName?: string
+  targetSchemaName?: string
   onChange: (entries: DataEntryDraft[]) => void
 }) {
   const used = new Set(entries.map((entry) => entry.name).filter(Boolean))
@@ -352,13 +408,16 @@ function DataEntriesEditor({
                 targetField={selectedField}
                 includeRecordId
                 includeNow
+                triggerSchemaName={triggerSchemaName}
                 advancedGroups={[
                   ...templateGroups,
                   ...(includeContext
                     ? addFromTriggerGroups(
                         entry.name,
                         targetFields,
-                        triggerFields
+                        triggerFields,
+                        triggerSchemaName,
+                        targetSchemaName
                       )
                     : []),
                 ]}
@@ -410,6 +469,7 @@ function ActionEditor({
   pipelines,
   triggerFields,
   triggerSchemaId,
+  triggerSchemaName,
   canMoveUp,
   canMoveDown,
   onChange,
@@ -424,6 +484,7 @@ function ActionEditor({
   pipelines: PipelineDefinition[]
   triggerFields: JsonSchemaProperty[]
   triggerSchemaId?: string
+  triggerSchemaName?: string
   canMoveUp: boolean
   canMoveDown: boolean
   onChange: (patch: Partial<ActionDraft>) => void
@@ -447,9 +508,16 @@ function ActionEditor({
     : action.pipeline || CHOOSE_PIPELINE
   const dataLabel =
     action.type === "TRIGGER_PIPELINE" ? "Input" : "Fields"
-  const triggerTemplateGroups = recordTemplateGroups(triggerFields)
+  const targetSchemaName = targetSchema?.name
+  const triggerTemplateGroups = recordTemplateGroups(
+    triggerFields,
+    triggerSchemaName
+  )
   const dataTemplateGroups = includeContext
-    ? [...triggerTemplateGroups, ...contextTemplateGroups(targetFields)]
+    ? [
+        ...triggerTemplateGroups,
+        ...contextTemplateGroups(targetFields, targetSchemaName),
+      ]
     : triggerTemplateGroups
   const typeId = `${action.key}-type`
   const schemaFieldId = `${action.key}-schema`
@@ -596,9 +664,16 @@ function ActionEditor({
             <Field className="mt-3 gap-1">
               <FieldLabel htmlFor={recordId}>
                 {action.type === "UPSERT_RECORD"
-                  ? "Existing record (optional)"
-                  : "Which record"}
+                  ? "Update an existing record?"
+                  : "Which record should be updated?"}
               </FieldLabel>
+              {action.type === "UPSERT_RECORD" ? (
+                <FieldDescription className="text-xs">
+                  {targetSchemaName
+                    ? `If you pick a record, we'll update it when it exists. Otherwise a new ${targetSchemaName} is created.`
+                    : "If you pick a record, we'll update it when it exists. Otherwise a new one is created."}
+                </FieldDescription>
+              ) : null}
               <FriendlyValueInput
                 id={recordId}
                 value={action.recordId}
@@ -608,8 +683,10 @@ function ActionEditor({
                 triggerFields={triggerFields}
                 includeRecordId
                 includeNow={false}
+                purpose="record"
+                triggerSchemaName={triggerSchemaName}
                 advancedGroups={triggerTemplateGroups}
-                placeholder="This record"
+                placeholder="Record ID"
               />
             </Field>
           ) : null}
@@ -714,6 +791,7 @@ function ActionEditor({
                         triggerFields={triggerFields}
                         includeRecordId
                         includeNow
+                        triggerSchemaName={triggerSchemaName}
                         advancedGroups={dataTemplateGroups}
                       />
                     </Field>
@@ -761,6 +839,8 @@ function ActionEditor({
                 targetFields={targetFields}
                 triggerFields={triggerFields}
                 includeContext={includeContext}
+                triggerSchemaName={triggerSchemaName}
+                targetSchemaName={targetSchemaName}
                 onChange={(data) => onChange({ data })}
               />
             </div>
@@ -777,6 +857,7 @@ export function WorkflowActionsBuilder({
   pipelines,
   triggerFields,
   triggerSchemaId,
+  triggerSchemaName,
   onChange,
 }: {
   value: ActionDraft[]
@@ -784,6 +865,7 @@ export function WorkflowActionsBuilder({
   pipelines: PipelineDefinition[]
   triggerFields: JsonSchemaProperty[]
   triggerSchemaId?: string
+  triggerSchemaName?: string
   onChange: (next: ActionDraft[]) => void
 }) {
   function update(key: string, patch: Partial<ActionDraft>) {
@@ -857,6 +939,7 @@ export function WorkflowActionsBuilder({
                 pipelines={pipelines}
                 triggerFields={triggerFields}
                 triggerSchemaId={triggerSchemaId}
+                triggerSchemaName={triggerSchemaName}
                 canMoveUp={index > 0}
                 canMoveDown={index < value.length - 1}
                 onChange={(patch) => update(action.key, patch)}

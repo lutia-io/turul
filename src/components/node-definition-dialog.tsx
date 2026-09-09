@@ -42,7 +42,6 @@ import {
 } from "@/lib/json-definition"
 import { useWorkspaceNetworkList } from "@/lib/network-workspace"
 import {
-  addTemplate,
   defaultDefinition,
   executableNodeTypes,
   httpDefinitionFromDraft,
@@ -61,6 +60,7 @@ import {
   type PipelineTemplateContext,
 } from "@/lib/node-definition"
 import { slugifyId } from "@/lib/slug"
+import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
 import { getHumaErrorMessage } from "@/store/api"
 import {
   useCreateNodeDefinitionMutation,
@@ -92,14 +92,14 @@ function pipelineTemplateGroups(
 ): TemplateVariableGroup[] {
   const namedField = pipelineInputFieldTemplate()
   const common: TemplateVariableGroup = {
+    label: "Common values",
     variables: [
-      { label: "Entire input", token: pipelineInputTemplate },
-      { label: "Current time", token: nowTemplate },
-      {
-        label: "Add numbers",
-        token: addTemplate,
-        caretOffset: addTemplate.indexOf("1"),
-      },
+      { label: "Entire input", token: pipelineInputTemplate, hint: "input" },
+      { label: "Current time", token: nowTemplate, hint: "now" },
+      ...arithmeticTemplateVariables.map((item) => ({
+        ...item,
+        hint: "math",
+      })),
     ],
   }
   const named: TemplateVariableGroup = {
@@ -109,6 +109,7 @@ function pipelineTemplateGroups(
         label: "Field path",
         token: namedField,
         caretOffset: namedField.lastIndexOf(".") + 1,
+        hint: "input",
       },
     ],
   }
@@ -121,6 +122,7 @@ function pipelineTemplateGroups(
     variables: previousOutputs.map((output) => ({
       label: output.label,
       token: pipelineOutputTemplate(output.index),
+      hint: "previous",
     })),
   }
 

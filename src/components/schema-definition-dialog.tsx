@@ -76,6 +76,7 @@ import {
   workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
 import { slugifyId, toFieldName } from "@/lib/slug"
+import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import {
@@ -293,9 +294,10 @@ function asItemsType(value: string | undefined): PropertyDraft["itemsType"] {
 
 const schemaDefaultTemplateGroups = [
   {
+    label: "Common values",
     variables: [
-      { label: "Current time", token: "{{ now }}" },
-      { label: "UUID", token: "{{ uuid }}" },
+      { label: "Current time", token: "{{ now }}", hint: "now" },
+      { label: "UUID", token: "{{ uuid }}", hint: "id" },
     ],
   },
 ]
@@ -305,15 +307,13 @@ function defaultTemplateGroups(type: PropertyType) {
     return schemaDefaultTemplateGroups
   }
   return [
+    ...schemaDefaultTemplateGroups,
     {
-      variables: [
-        ...schemaDefaultTemplateGroups[0]!.variables,
-        {
-          label: "Add numbers",
-          token: "{{ add 1 1 }}",
-          caretOffset: "{{ add ".length,
-        },
-      ],
+      label: "Math",
+      variables: arithmeticTemplateVariables.map((item) => ({
+        ...item,
+        hint: "math",
+      })),
     },
   ]
 }

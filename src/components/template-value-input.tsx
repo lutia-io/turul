@@ -8,7 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -26,10 +25,12 @@ export type TemplateVariable = {
   label: string
   token: string
   caretOffset?: number
+  hint?: string
 }
 
 export type TemplateVariableGroup = {
   label?: string
+  description?: string
   variables: TemplateVariable[]
 }
 
@@ -270,50 +271,52 @@ export function TemplateValueInput({
                   type="button"
                   variant="ghost"
                   disabled={disabled}
-                  className="h-8 shrink-0 rounded-none px-2 font-mono text-[11px] text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  aria-label={hasPresets ? "Choose a value" : "Insert a value"}
+                  className="h-8 shrink-0 rounded-none px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 />
               }
             >
-              {"{{ }}"}
-              <span className="sr-only">
-                {hasPresets
-                  ? "Set value from a variable"
-                  : "Insert variable at cursor"}
-              </span>
+              Insert
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-auto max-w-80 min-w-56"
-            >
-              <div className="px-1.5 py-1">
-                <p className="text-xs font-medium">
-                  {hasPresets ? "Use a variable" : "Insert at cursor"}
+            <DropdownMenuContent align="end" className="w-72">
+              <div className="px-2.5 py-2">
+                <p className="text-sm font-medium">
+                  {hasPresets ? "Choose a value" : "Insert a value"}
                 </p>
-                <p className="text-[11px] leading-snug text-muted-foreground">
+                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
                   {hasPresets
-                    ? "Replaces the selected value with a template from the triggering record."
-                    : "Adds {{ }} next to any text. Inside an existing {{ }}, inserts the path only so {{ add .Context.data.total .Record.data.amount }} stays valid."}
+                    ? "Replaces whatever is selected now."
+                    : "Adds it where your cursor is in the field."}
                 </p>
               </div>
               {visibleGroups.map((group, index) => (
                 <DropdownMenuGroup key={group.label ?? `group-${index}`}>
                   <DropdownMenuSeparator />
                   {group.label ? (
-                    <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                    <DropdownMenuLabel className="px-2.5 py-1.5 text-foreground">
+                      {group.label}
+                      {group.description ? (
+                        <span className="mt-0.5 block font-normal text-muted-foreground">
+                          {group.description}
+                        </span>
+                      ) : null}
+                    </DropdownMenuLabel>
                   ) : null}
                   {group.variables.map((variable) => (
                     <DropdownMenuItem
                       key={`${group.label ?? index}-${variable.label}`}
+                      title={variable.token}
                       onClick={() => insert(variable)}
-                      className="items-baseline gap-3"
+                      className="gap-2 px-2.5 py-1.5"
                     >
-                      <span className="min-w-0 truncate">{variable.label}</span>
-                      <DropdownMenuShortcut
-                        title={variable.token}
-                        className="max-w-[11rem] truncate font-mono text-[10px] tracking-normal"
-                      >
-                        {variable.token}
-                      </DropdownMenuShortcut>
+                      <span className="min-w-0 flex-1 truncate">
+                        {variable.label}
+                      </span>
+                      {variable.hint ? (
+                        <span className="max-w-[9rem] shrink-0 truncate rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground group-focus/dropdown-menu-item:bg-background/70">
+                          {variable.hint}
+                        </span>
+                      ) : null}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuGroup>

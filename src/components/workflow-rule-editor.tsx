@@ -59,6 +59,7 @@ export function WorkflowRuleEditor({
           pipelines={pipelines}
           triggerFields={fields}
           triggerSchemaId={triggerSchemaId}
+          triggerSchemaName={schemaName}
           onChange={onActionsChange}
         />
       </DefinitionCard>
