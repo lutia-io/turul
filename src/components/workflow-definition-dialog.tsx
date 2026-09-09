@@ -403,7 +403,7 @@ export function WorkflowDefinitionDialog({
                       id={`${formId}-active`}
                       checked={active}
                       onChange={setActive}
-                      label="Published"
+                      label="Enabled"
                     />
                   </Field>
                 </div>

@@ -4,7 +4,7 @@ import { CheckIcon, CopyIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getBadgeColor, statusBadgeConfig } from "@/lib/badge"
 import {
-  publicationStatus,
+  enabledStatus,
   stringifyDefinition,
   type DefinitionStep,
   type JsonObject,
@@ -34,7 +34,7 @@ export function DefinitionFlags({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <StatusBadge status={publicationStatus(active)} />
+      <StatusBadge status={enabledStatus(active)} />
       {internal ? (
         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
           Internal

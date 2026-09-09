@@ -609,7 +609,7 @@ function WorkflowDefinitionEdit({
                 id={`${formId}-active`}
                 checked={active}
                 onChange={setActive}
-                label="Published"
+                label="Enabled"
               />
             </div>
             <p className="max-w-2xl text-sm text-pretty text-muted-foreground">

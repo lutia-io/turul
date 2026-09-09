@@ -68,6 +68,8 @@ export const statusBadgeConfig: Record<
   { icon: LucideIcon; color: BadgeColor }
 > = {
   Active: { icon: BadgeCheckIcon, color: "green" },
+  Enabled: { icon: BadgeCheckIcon, color: "green" },
+  Disabled: { icon: CircleDashedIcon, color: "yellow" },
   Published: { icon: BadgeCheckIcon, color: "green" },
   Draft: { icon: CircleDashedIcon, color: "yellow" },
   Running: { icon: LoaderCircleIcon, color: "cyan" },

@@ -332,6 +332,8 @@ export function getRecordFileIds(
   })
 }
 
-export function publicationStatus(active: boolean) {
-  return active ? "Published" : "Draft"
+export type EnabledStatus = "Enabled" | "Disabled"
+
+export function enabledStatus(active: boolean): EnabledStatus {
+  return active ? "Enabled" : "Disabled"
 }

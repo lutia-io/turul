@@ -33,7 +33,8 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import type { WorkflowDefinition } from "@/data/networks"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
-import { publicationStatus } from "@/lib/json-definition"
+import { getBadgeColor, statusBadgeConfig } from "@/lib/badge"
+import { enabledStatus } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
@@ -63,7 +64,7 @@ type WorkflowColumnFilters = {
   network?: { op: StringFilterOp; value: string }
   schema?: { op: StringFilterOp; value: string }
   actions?: { op: NumberFilterOp; value: number }
-  status?: "published" | "draft"
+  status?: "enabled" | "disabled"
 }
 
 const sortFields: WorkflowDefinitionListSort[] = [
@@ -133,9 +134,9 @@ export default function WorkflowDefinitionList() {
       networkId: network?.id,
       organizationId,
       active:
-        columnFilters.status === "published"
+        columnFilters.status === "enabled"
           ? true
-          : columnFilters.status === "draft"
+          : columnFilters.status === "disabled"
             ? false
             : undefined,
       name: columnFilters.name?.value,
@@ -354,7 +355,7 @@ export default function WorkflowDefinitionList() {
           ),
           size: 280,
         }),
-        helper.accessor((workflow) => publicationStatus(workflow.active), {
+        helper.accessor((workflow) => enabledStatus(workflow.active), {
           id: "status",
           header: ({ column }) => (
             <DataTableColumnHeader
@@ -366,8 +367,8 @@ export default function WorkflowDefinitionList() {
                 type: "enum",
                 value: columnFilters.status,
                 options: [
-                  { value: "published", label: "Published" },
-                  { value: "draft", label: "Draft" },
+                  { value: "enabled", label: "Enabled" },
+                  { value: "disabled", label: "Disabled" },
                 ],
                 onChange: (value) =>
                   setColumnFilters((current) => ({
@@ -378,14 +379,15 @@ export default function WorkflowDefinitionList() {
             />
           ),
           cell: ({ row }) => {
-            const status = publicationStatus(row.original.active)
+            const status = enabledStatus(row.original.active)
+            const tone = getBadgeColor(statusBadgeConfig[status]?.color)
             return (
               <DataTableCellLink
                 to={hrefFor(row.original)}
                 className="inline-flex items-center gap-1.5"
               >
                 <StatusBadge status={status} />
-                <span className="text-muted-foreground">{status}</span>
+                <span className={tone.fg}>{status}</span>
               </DataTableCellLink>
             )
           },
@@ -528,7 +530,7 @@ export default function WorkflowDefinitionList() {
       chips.push({
         id: "status",
         label: "Status",
-        value: columnFilters.status === "published" ? "Published" : "Draft",
+        value: columnFilters.status === "enabled" ? "Enabled" : "Disabled",
         onRemove: () =>
           setColumnFilters((current) => ({ ...current, status: undefined })),
       })

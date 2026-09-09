@@ -96,7 +96,7 @@ export function PublicationPills({
             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
             active
               ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-              : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              : "bg-yellow-400/20 text-yellow-800 dark:text-yellow-400"
           )}
         >
           {active ? (
@@ -104,7 +104,7 @@ export function PublicationPills({
           ) : (
             <CircleDashedIcon className="size-3.5" />
           )}
-          {active ? "Published" : "Draft"}
+          {active ? "Enabled" : "Disabled"}
         </span>
       ) : null}
       {internal ? (

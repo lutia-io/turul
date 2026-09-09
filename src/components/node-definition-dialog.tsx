@@ -501,11 +501,11 @@ export function NodeDefinitionDialog({
                   id={`${formId}-active`}
                   checked={active}
                   onChange={setActive}
-                  label="Published"
+                  label="Enabled"
                 />
                 <FieldDescription>
                   {executableNodeTypes.has(type)
-                    ? "Published nodes can be used in new pipeline runs."
+                    ? "Enabled nodes can be used in new pipeline runs."
                     : "This type is stored for later; the executor reports it as not implemented."}
                 </FieldDescription>
               </Field>

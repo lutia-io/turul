@@ -338,11 +338,11 @@ export function PipelineDefinitionDialog({
                   id={`${formId}-active`}
                   checked={active}
                   onChange={setActive}
-                  label="Published"
+                  label="Enabled"
                 />
                 <FieldDescription>
-                  Published pipelines can be started. Drafts are saved but do
-                  not run.
+                  Enabled pipelines can be started. Disabled pipelines are saved
+                  but do not run.
                 </FieldDescription>
               </Field>
               {error ? (
