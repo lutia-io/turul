@@ -17,10 +17,7 @@ import { PipelineDefinitionDialog } from "@/components/pipeline-definition-dialo
 import { SchemaDefinitionDialog } from "@/components/schema-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
 import type { PipelineTemplateContext } from "@/lib/node-definition"
-import {
-  networkWorkspacePath,
-  parseNetworkPath,
-} from "@/lib/network-workspace"
+import { networkWorkspacePath, parseNetworkPath } from "@/lib/network-workspace"
 
 type CreateState =
   | { kind: "network"; networkId?: string }
@@ -50,6 +47,7 @@ type CreateState =
       networkId?: string
       organizationId?: string
       schemaId?: string
+      recordId?: string
     }
   | { kind: "file"; networkId?: string; organizationId?: string }
   | null
@@ -100,6 +98,7 @@ type CreateEntityContextValue = {
     organizationId?: string
     schemaId?: string
   }) => void
+  openEditRecord: (recordId: string) => void
   openCreateFile: (scope?: {
     networkId?: string
     organizationId?: string
@@ -178,6 +177,9 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       },
       openCreateRecord(scope) {
         open({ kind: "record", ...scope })
+      },
+      openEditRecord(recordId) {
+        open({ kind: "record", recordId })
       },
       openCreateFile(scope) {
         open({ kind: "file", ...scope })
@@ -301,6 +303,7 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           state?.kind === "record" ? state.organizationId : undefined
         }
         schemaId={state?.kind === "record" ? state.schemaId : undefined}
+        recordId={state?.kind === "record" ? state.recordId : undefined}
       />
       <CreateFileDialog
         key={`file-${dialogKeys.file}`}

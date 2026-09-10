@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useSearchParams } from "react-router"
-import { PlusIcon, TableIcon, ViewIcon } from "lucide-react"
+import { PencilIcon, PlusIcon, TableIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import { useCreateEntity } from "@/components/create-entity"
@@ -210,7 +210,7 @@ function fieldFilterChip(filter: FieldFilter): string {
 export default function RecordsPage() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organizationId } = useNetworkWorkspace()
-  const { openCreateRecord } = useCreateEntity()
+  const { openCreateRecord, openEditRecord } = useCreateEntity()
   const {
     networks: workspaceNetworks,
     refetch: refetchNetworks,
@@ -309,6 +309,7 @@ export default function RecordsPage() {
           organizationsById={organizationsById}
           filesById={filesById}
           isAuthenticated={isAuthenticated}
+          onEdit={openEditRecord}
           onRefreshRelated={() => {
             void refetchFiles()
             void refetchNetworks()
@@ -332,6 +333,7 @@ function SchemaRecordsDataTable({
   organizationsById,
   filesById,
   isAuthenticated,
+  onEdit,
   onRefreshRelated,
   isRelatedRefreshing,
 }: {
@@ -341,6 +343,7 @@ function SchemaRecordsDataTable({
   organizationsById: Map<string, Organization>
   filesById: Map<string, StoredFile>
   isAuthenticated: boolean
+  onEdit: (recordId: string) => void
   onRefreshRelated: () => void
   isRelatedRefreshing: boolean
 }) {
@@ -578,10 +581,18 @@ function SchemaRecordsDataTable({
           cell: ({ row }) => (
             <DataTableRowActions
               items={
-                <DropdownMenuItem render={<Link to={hrefFor(row.original)} />}>
-                  <ViewIcon />
-                  View
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    render={<Link to={hrefFor(row.original)} />}
+                  >
+                    <ViewIcon />
+                    View
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(row.original.id)}>
+                    <PencilIcon />
+                    Edit
+                  </DropdownMenuItem>
+                </>
               }
             />
           ),
@@ -594,6 +605,7 @@ function SchemaRecordsDataTable({
       hrefFor,
       hrefForRelated,
       network.schemas,
+      onEdit,
       organizationId,
       organizationsById,
       properties,

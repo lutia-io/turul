@@ -61,7 +61,9 @@ import { useCreateFileMutation, useListFilesQuery } from "@/store/file-slice"
 import { useListOrganizationUsersQuery } from "@/store/organization-user-slice"
 import {
   useCreateRecordMutation,
+  useGetRecordQuery,
   useListRecordsQuery,
+  useUpdateRecordMutation,
 } from "@/store/record-slice"
 
 export function CreateRecordDialog({
@@ -70,20 +72,27 @@ export function CreateRecordDialog({
   networkId,
   organizationId,
   schemaId,
+  recordId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
   organizationId?: string
   schemaId?: string
+  recordId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
   const { organizations } = useWorkspaceOrganizations({ skip: !open })
   const { schemas } = useWorkspaceSchemas({ skip: !open })
-  const lockNetwork = Boolean(networkId)
-  const lockOrganization = Boolean(organizationId)
+  const editing = Boolean(recordId)
+  const existingQuery = useGetRecordQuery(recordId ?? "", {
+    skip: !open || !recordId,
+  })
+  const existing = existingQuery.currentData
+  const lockNetwork = Boolean(networkId) || editing
+  const lockOrganization = Boolean(organizationId) || editing
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? networks[0]?.id ?? ""
   )
@@ -97,9 +106,15 @@ export function CreateRecordDialog({
   const [uploads, setUploads] = useState<Record<string, File | undefined>>({})
   const [formError, setFormError] = useState<string>()
   const [createRecord, createState] = useCreateRecordMutation()
+  const [updateRecord, updateState] = useUpdateRecordMutation()
   const [createFile, createFileState] = useCreateFileMutation()
-  const isLoading = createState.isLoading || createFileState.isLoading
-  const mutationError = createState.error ?? createFileState.error
+  const isLoading =
+    createState.isLoading ||
+    updateState.isLoading ||
+    createFileState.isLoading ||
+    (editing && existingQuery.isFetching && !existing)
+  const mutationError =
+    createState.error ?? updateState.error ?? createFileState.error
   const firstNetworkId = networks[0]?.id ?? ""
   const networkOrganizations = useMemo(
     () =>
@@ -141,7 +156,7 @@ export function CreateRecordDialog({
       sort: "name",
       order: "asc",
     },
-    { skip: !open || !selectedNetworkId || !selectedOrganizationId }
+    { skip: !open || editing || !selectedNetworkId || !selectedOrganizationId }
   )
   const organizationUsers = useMemo(
     () =>
@@ -155,6 +170,7 @@ export function CreateRecordDialog({
 
   useEffect(() => {
     createState.reset()
+    updateState.reset()
     createFileState.reset()
     setFormError(undefined)
     setUploads({})
@@ -168,18 +184,24 @@ export function CreateRecordDialog({
       return
     }
     setSelectedNetworkId((current) => {
+      if (recordId && existing?.networkId) {
+        return existing.networkId
+      }
       if (networkId) {
         return networkId
       }
       return current || firstNetworkId
     })
-  }, [firstNetworkId, networkId, open])
+  }, [existing?.networkId, firstNetworkId, networkId, open, recordId])
 
   useEffect(() => {
     if (!open) {
       return
     }
     setSelectedOrganizationId((current) => {
+      if (recordId && existing?.organizationId) {
+        return existing.organizationId
+      }
       if (organizationId) {
         return organizationId
       }
@@ -198,10 +220,12 @@ export function CreateRecordDialog({
       return firstOrganizationId
     })
   }, [
+    existing?.organizationId,
     firstOrganizationId,
     networkOrganizations,
     open,
     organizationId,
+    recordId,
     schemaId,
     schemas,
     selectedSchemaId,
@@ -212,18 +236,34 @@ export function CreateRecordDialog({
       return
     }
     setSelectedOrganizationUserId((current) => {
+      if (recordId && existing?.organizationUserId) {
+        return existing.organizationUserId
+      }
       if (organizationUsers.some((item) => item.id === current)) {
         return current
       }
       return firstOrganizationUserId
     })
-  }, [firstOrganizationUserId, open, organizationUsers])
+  }, [
+    existing?.organizationUserId,
+    firstOrganizationUserId,
+    open,
+    organizationUsers,
+    recordId,
+  ])
 
   useEffect(() => {
     if (!open) {
       return
     }
     setSelectedSchemaId((current) => {
+      if (
+        recordId &&
+        existing?.schemaId &&
+        availableSchemas.some((schema) => schema.id === existing.schemaId)
+      ) {
+        return existing.schemaId
+      }
       if (
         schemaId &&
         availableSchemas.some((schema) => schema.id === schemaId)
@@ -235,23 +275,40 @@ export function CreateRecordDialog({
       }
       return firstSchemaId
     })
-  }, [availableSchemas, firstSchemaId, open, schemaId])
+  }, [
+    availableSchemas,
+    existing?.schemaId,
+    firstSchemaId,
+    open,
+    recordId,
+    schemaId,
+  ])
 
   useEffect(() => {
     if (!open) {
       return
     }
-    setValues(emptyValues(properties))
     setUploads({})
+    if (recordId) {
+      if (existing?.data) {
+        setValues(valuesFromData(properties, existing.data))
+      }
+      return
+    }
+    setValues(emptyValues(properties))
     // Seed defaults when the selected schema changes. `properties` is a new
     // array whenever workspace schemas remap, which would wipe in-progress input.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- schema id + count
-  }, [open, properties.length, selectedSchemaId])
+  }, [existing?.data, open, properties.length, recordId, selectedSchemaId])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setFormError(undefined)
-    if (
+    if (editing) {
+      if (!recordId || !selectedOrganizationUserId) {
+        return
+      }
+    } else if (
       !selectedSchemaId ||
       !selectedOrganizationUserId ||
       !selectedNetworkId ||
@@ -278,13 +335,19 @@ export function CreateRecordDialog({
           values[property.name] ?? ""
         )
         if (coerced === undefined) {
-          if (inputRequired(property)) {
+          if (inputRequired(property, editing)) {
             setFormError(`${propertyLabel(property.name)} is required.`)
             return
           }
           continue
         }
         data[property.name] = coerced
+      }
+
+      if (editing) {
+        await updateRecord({ id: recordId!, data }).unwrap()
+        onOpenChange(false)
+        return
       }
 
       const created = await createRecord({
@@ -306,55 +369,81 @@ export function CreateRecordDialog({
   }
 
   const schemaLocksOrganization = Boolean(selectedSchema?.organizationId)
+  const canSubmit = editing
+    ? Boolean(recordId && existing && selectedOrganizationUserId)
+    : Boolean(
+        selectedNetworkId &&
+        selectedOrganizationId &&
+        selectedOrganizationUserId &&
+        selectedSchemaId
+      )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Create a record</DialogTitle>
+          <DialogTitle>
+            {editing ? "Edit record" : "Create a record"}
+          </DialogTitle>
           <DialogDescription>
-            Records follow a schema and are created as an organization user.
+            {editing
+              ? "Update the values stored on this record."
+              : "Records follow a schema and are created as an organization user."}
           </DialogDescription>
         </DialogHeader>
         <form id={formId} onSubmit={handleSubmit} autoComplete="off">
           <FieldGroup>
-            <CreateActorFields
-              formId={formId}
-              networks={networks}
-              organizations={networkOrganizations}
-              organizationUsers={organizationUsers}
-              selectedNetworkId={selectedNetworkId}
-              selectedOrganizationId={selectedOrganizationId}
-              selectedOrganizationUserId={selectedOrganizationUserId}
-              onNetworkChange={setSelectedNetworkId}
-              onOrganizationChange={setSelectedOrganizationId}
-              onOrganizationUserChange={setSelectedOrganizationUserId}
-              lockNetwork={lockNetwork}
-              lockOrganization={lockOrganization || schemaLocksOrganization}
-              disabled={isLoading}
-            />
-            {availableSchemas.length > 0 ? (
-              <Field>
-                <FieldLabel htmlFor={`${formId}-schema`}>Schema</FieldLabel>
-                <NativeSelect
-                  id={`${formId}-schema`}
-                  value={selectedSchemaId}
+            {editing ? null : (
+              <>
+                <CreateActorFields
+                  formId={formId}
+                  networks={networks}
+                  organizations={networkOrganizations}
+                  organizationUsers={organizationUsers}
+                  selectedNetworkId={selectedNetworkId}
+                  selectedOrganizationId={selectedOrganizationId}
+                  selectedOrganizationUserId={selectedOrganizationUserId}
+                  onNetworkChange={setSelectedNetworkId}
+                  onOrganizationChange={setSelectedOrganizationId}
+                  onOrganizationUserChange={setSelectedOrganizationUserId}
+                  lockNetwork={lockNetwork}
+                  lockOrganization={lockOrganization || schemaLocksOrganization}
                   disabled={isLoading}
-                  onChange={(event) => setSelectedSchemaId(event.target.value)}
-                  required
-                >
-                  {availableSchemas.map((schema) => (
-                    <NativeSelectOption key={schema.id} value={schema.id}>
-                      {schema.name}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Create a schema in this network first.
-              </p>
+                />
+                {availableSchemas.length > 0 ? (
+                  <Field>
+                    <FieldLabel htmlFor={`${formId}-schema`}>Schema</FieldLabel>
+                    <NativeSelect
+                      id={`${formId}-schema`}
+                      value={selectedSchemaId}
+                      disabled={isLoading}
+                      onChange={(event) =>
+                        setSelectedSchemaId(event.target.value)
+                      }
+                      required
+                    >
+                      {availableSchemas.map((schema) => (
+                        <NativeSelectOption key={schema.id} value={schema.id}>
+                          {schema.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Create a schema in this network first.
+                  </p>
+                )}
+              </>
             )}
+            {editing && existingQuery.isError ? (
+              <FieldError>
+                {getHumaErrorMessage(
+                  existingQuery.error,
+                  "Failed to load record"
+                )}
+              </FieldError>
+            ) : null}
             {properties.map((property) => (
               <RecordPropertyField
                 key={property.name}
@@ -365,6 +454,7 @@ export function CreateRecordDialog({
                 organizationId={selectedOrganizationId}
                 value={values[property.name] ?? ""}
                 upload={uploads[property.name]}
+                editing={editing}
                 disabled={isLoading || !selectedOrganizationId}
                 onChange={(value) =>
                   setValues((current) => ({
@@ -395,15 +485,15 @@ export function CreateRecordDialog({
           <Button
             type="submit"
             form={formId}
-            disabled={
-              isLoading ||
-              !selectedNetworkId ||
-              !selectedOrganizationId ||
-              !selectedOrganizationUserId ||
-              !selectedSchemaId
-            }
+            disabled={isLoading || !canSubmit}
           >
-            {isLoading ? "Creating..." : "Create record"}
+            {isLoading
+              ? editing
+                ? "Saving..."
+                : "Creating..."
+              : editing
+                ? "Save"
+                : "Create record"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -411,8 +501,8 @@ export function CreateRecordDialog({
   )
 }
 
-function inputRequired(property: JsonSchemaProperty) {
-  return property.required && !hasSchemaDefault(property)
+function inputRequired(property: JsonSchemaProperty, editing = false) {
+  return property.required && (editing || !hasSchemaDefault(property))
 }
 
 function staticDefaultValue(property: JsonSchemaProperty) {
@@ -443,6 +533,57 @@ function emptyValues(properties: JsonSchemaProperty[]) {
       (property.type === "boolean" && inputRequired(property) ? "false" : "")
   }
   return values
+}
+
+function valuesFromData(
+  properties: JsonSchemaProperty[],
+  data: JsonObject
+): Record<string, string> {
+  const values: Record<string, string> = {}
+  for (const property of properties) {
+    values[property.name] = formValueFromData(property, data[property.name])
+  }
+  return values
+}
+
+function formValueFromData(
+  property: JsonSchemaProperty,
+  value: JsonValue | undefined
+): string {
+  if (value == null || value === "") {
+    return ""
+  }
+  if (property.type === "boolean") {
+    if (value === true) {
+      return "true"
+    }
+    if (value === false) {
+      return "false"
+    }
+    return ""
+  }
+  if (isAddressProperty(property)) {
+    return serializeAddress(parseAddress(value))
+  }
+  if (property.type === "object" || property.type === "array") {
+    return JSON.stringify(value, null, 2)
+  }
+  if (property.format === "date-time" && typeof value === "string") {
+    return toDatetimeLocal(value)
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value)
+  }
+  return JSON.stringify(value)
+}
+
+function toDatetimeLocal(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ""
+  }
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function coercePropertyValue(
@@ -510,6 +651,7 @@ function RecordPropertyField({
   organizationId,
   value,
   upload,
+  editing,
   disabled,
   onChange,
   onUpload,
@@ -521,14 +663,15 @@ function RecordPropertyField({
   organizationId: string
   value: string
   upload?: File
+  editing?: boolean
   disabled?: boolean
   onChange: (value: string) => void
   onUpload: (file?: File) => void
 }) {
   const id = `${formId}-${property.name}`
   const label = propertyLabel(property.name)
-  const required = inputRequired(property)
-  const hint = defaultHint(property)
+  const required = inputRequired(property, editing)
+  const hint = editing ? undefined : defaultHint(property)
 
   if (isFileProperty(property)) {
     return (
@@ -866,6 +1009,9 @@ function RecordFileField({
         <NativeSelectOption value="">
           {upload ? `Upload: ${upload.name}` : "Select a file"}
         </NativeSelectOption>
+        {value && !upload && !files.some((file) => file.id === value) ? (
+          <NativeSelectOption value={value}>{value}</NativeSelectOption>
+        ) : null}
         {files.map((file) => (
           <NativeSelectOption key={file.id} value={file.id}>
             {file.filename}
@@ -939,6 +1085,9 @@ function ForeignRecordSelect({
       <NativeSelectOption value="">
         {schema ? `Select ${schema.name}` : "Select a record"}
       </NativeSelectOption>
+      {value && !records.some((record) => record.id === value) ? (
+        <NativeSelectOption value={value}>{value}</NativeSelectOption>
+      ) : null}
       {records.map((record) => (
         <NativeSelectOption key={record.id} value={record.id}>
           {recordDisplayTitle(

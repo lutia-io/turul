@@ -6,12 +6,14 @@ import {
   CopyIcon,
   FileIcon,
   FileJsonIcon,
+  PencilIcon,
   TableIcon,
   UsersIcon,
 } from "lucide-react"
 
 import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
+import { useCreateEntity } from "@/components/create-entity"
 import {
   propertyLabel,
   EmailRecordLink,
@@ -67,6 +69,7 @@ export default function RecordDetail() {
     organizationId,
     href,
   } = useNetworkWorkspace()
+  const { openEditRecord } = useCreateEntity()
   const { organizations } = useWorkspaceOrganizations()
   const { organizationUsers } = useWorkspaceOrganizationUsers()
   const { schemas } = useWorkspaceSchemas()
@@ -164,19 +167,29 @@ export default function RecordDetail() {
             {title}
           </h1>
         </div>
-        {schema && properties.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {schema && properties.length > 0 ? (
+            <Button
+              type="button"
+              variant={dataView === "json" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() =>
+                setDataView((view) => (view === "fields" ? "json" : "fields"))
+              }
+            >
+              <FileJsonIcon />
+              {dataView === "json" ? "Fields" : "JSON"}
+            </Button>
+          ) : null}
           <Button
-            type="button"
-            variant={dataView === "json" ? "secondary" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() =>
-              setDataView((view) => (view === "fields" ? "json" : "fields"))
-            }
+            onClick={() => openEditRecord(record.id)}
           >
-            <FileJsonIcon />
-            {dataView === "json" ? "Fields" : "JSON"}
+            <PencilIcon />
+            Edit
           </Button>
-        ) : null}
+        </div>
       </div>
 
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
