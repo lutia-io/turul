@@ -499,10 +499,10 @@ export default function PipelineDefinitionList() {
       title="Pipeline Definitions"
       description={
         organization
-          ? `Pipelines and their nodes in ${organization.name}.`
+          ? `Pipelines in ${organization.name} run one level at a time.`
           : network
-            ? `Pipelines and their nodes for the ${network.name} network.`
-            : "Pipelines and the nodes they run, grouped in BFS levels."
+            ? `Pipelines for ${network.name} run one level at a time.`
+            : "Pipelines that run one level at a time, then the next."
       }
       action={
         <Button onClick={() => openCreatePipeline(network?.id)}>

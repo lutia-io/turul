@@ -35,7 +35,7 @@ type CreateState =
       schemaId?: string
     }
   | { kind: "workflow"; networkId?: string }
-  | { kind: "pipeline"; networkId?: string; pipelineDefinitionId?: string }
+  | { kind: "pipeline"; networkId?: string }
   | {
       kind: "node"
       networkId?: string
@@ -167,7 +167,17 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         open({ kind: "pipeline", networkId })
       },
       openEditPipeline(pipelineDefinitionId) {
-        open({ kind: "pipeline", pipelineDefinitionId })
+        const parsed = parseNetworkPath(location.pathname)
+        if (!parsed) {
+          return
+        }
+        navigate(
+          `${networkWorkspacePath({
+            networkId: parsed.networkId,
+            organizationId: parsed.organizationId,
+            rest: `pipeline-definitions/${pipelineDefinitionId}`,
+          })}?edit=1`
+        )
       },
       openCreateNode(networkId, pipelineTemplateContext) {
         open({ kind: "node", networkId, pipelineTemplateContext })
@@ -270,9 +280,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           }
         }}
         networkId={state?.kind === "pipeline" ? state.networkId : undefined}
-        pipelineDefinitionId={
-          state?.kind === "pipeline" ? state.pipelineDefinitionId : undefined
-        }
       />
       <NodeDefinitionDialog
         key={`node-${dialogKeys.node}`}

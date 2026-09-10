@@ -6,23 +6,13 @@ import {
   useState,
   type FormEvent,
 } from "react"
-import { useNavigate } from "react-router"
-import { Loader } from "lucide-react"
+import { useNavigate, useParams } from "react-router"
+import { FileJsonIcon, Loader } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
-import {
-  DefinitionDialogBody,
-  DefinitionJsonPane,
-  definitionDialogClassName,
-} from "@/components/definition-dialog-layout"
+import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
-import {
-  PipelineLevelsEditor,
-  insertCreatedNode,
-  newPipelineLevel,
-  type CreatePipelineNodeTarget,
-  type PipelineLevelDraft,
-} from "@/components/pipeline-levels-editor"
+import { PipelineLevelsEditor } from "@/components/pipeline-levels-editor"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -35,7 +25,6 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -48,81 +37,77 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { stringifyDefinition } from "@/lib/json-definition"
+import {
+  parseJsonObject,
+  stringifyDefinition,
+  type JsonObject,
+} from "@/lib/json-definition"
 import {
   networkWorkspacePath,
   useWorkspaceNetworkList,
   useWorkspaceNodes,
-  workspacePipelineFromApi,
 } from "@/lib/network-workspace"
 import { pipelineTemplateContextForLevel } from "@/lib/node-definition"
 import {
+  emptyPipelineLevels,
+  insertCreatedNode,
+  levelsFromApi,
+  levelsToApi,
   parsePipelineDefinition,
+  pipelineDraftSentence,
+  type CreatePipelineNodeTarget,
   type PipelineDefinitionBody,
+  type PipelineLevelDraft,
 } from "@/lib/pipeline-definition"
-import { slugifyId } from "@/lib/slug"
 import { getHumaErrorMessage } from "@/store/api"
-import {
-  useCreatePipelineDefinitionMutation,
-  useGetPipelineDefinitionQuery,
-  useUpdatePipelineDefinitionMutation,
-} from "@/store/pipeline-slice"
+import { useCreatePipelineDefinitionMutation } from "@/store/pipeline-slice"
 
-function draftsFromDefinition(
-  definition?: PipelineDefinitionBody
-): PipelineLevelDraft[] {
-  if (!definition || definition.nodes.length === 0) {
-    return [newPipelineLevel()]
+function pipelineDefinitionError(text: string) {
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "JSON must be a pipeline definition object"
+    }
+    if (!parsePipelineDefinition(parsed as JsonObject)) {
+      return "JSON must include at least one level with a node"
+    }
+    return null
+  } catch {
+    return "Invalid JSON"
   }
-  return definition.nodes.map((level, index) => ({
-    key: `level-${index}-${level.map((node) => node.id).join("-")}`,
-    nodeIds: level.map((node) => node.id),
-  }))
-}
-
-function definitionFromDrafts(
-  levels: PipelineLevelDraft[]
-): PipelineDefinitionBody | undefined {
-  const nodes = levels.map((level) =>
-    level.nodeIds.filter(Boolean).map((id) => ({ id }))
-  )
-  if (nodes.length === 0 || nodes.some((level) => level.length === 0)) {
-    return undefined
-  }
-  return { nodes }
 }
 
 export function PipelineDefinitionDialog({
   open,
   onOpenChange,
   networkId,
-  pipelineDefinitionId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
-  pipelineDefinitionId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
+  const { organizationId } = useParams()
   const { networks } = useWorkspaceNetworkList()
   const { nodes } = useWorkspaceNodes({ skip: !open })
   const [createPipeline, createState] = useCreatePipelineDefinitionMutation()
-  const [updatePipeline, updateState] = useUpdatePipelineDefinitionMutation()
-  const isLoading = createState.isLoading || updateState.isLoading
-  const error = createState.error ?? updateState.error
-  const existingQuery = useGetPipelineDefinitionQuery(
-    pipelineDefinitionId ?? "",
-    { skip: !open || !pipelineDefinitionId }
+  const isLoading = createState.isLoading
+  const error = createState.error
+  const lockNetwork = Boolean(networkId)
+  const [definitionView, setDefinitionView] = useState<"levels" | "json">(
+    "levels"
   )
-  const editing = Boolean(pipelineDefinitionId)
-  const firstNetworkId = networks[0]?.id ?? ""
-  const [selectedNetworkId, setSelectedNetworkId] = useState(networkId ?? "")
+  const [selectedNetworkId, setSelectedNetworkId] = useState(
+    networkId ?? networks[0]?.id ?? ""
+  )
   const [name, setName] = useState("")
   const [active, setActive] = useState(true)
-  const [levels, setLevels] = useState<PipelineLevelDraft[]>([
-    newPipelineLevel(),
-  ])
+  const [levels, setLevels] =
+    useState<PipelineLevelDraft[]>(emptyPipelineLevels)
+  const [jsonText, setJsonText] = useState("")
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const jsonSourceRef = useRef<"builder" | "json">("builder")
   const [nodeDialogOpen, setNodeDialogOpen] = useState(false)
   const [nodeDialogKey, setNodeDialogKey] = useState(0)
   const [nodeDialogId, setNodeDialogId] = useState<string>()
@@ -130,6 +115,21 @@ export function PipelineDefinitionDialog({
     pipelineTemplateContextForLevel(0, [], () => undefined)
   )
   const createNodeTargetRef = useRef<CreatePipelineNodeTarget | null>(null)
+  const firstNetworkId = networks[0]?.id ?? ""
+
+  const networkNodes = useMemo(
+    () => nodes.filter((node) => node.networkId === selectedNetworkId),
+    [nodes, selectedNetworkId]
+  )
+  const nodeName = (id: string) =>
+    networkNodes.find((node) => node.id === id)?.name
+
+  useEffect(() => {
+    createState.reset()
+    // Reset only when the dialog opens or closes. `reset` changes after each
+    // mutation (it closes over requestId) and would clear a 409 before render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open only
+  }, [open])
 
   useEffect(() => {
     if (!open) {
@@ -138,42 +138,89 @@ export function PipelineDefinitionDialog({
       createNodeTargetRef.current = null
       return
     }
-    const current =
-      pipelineDefinitionId && existingQuery.currentData
-        ? workspacePipelineFromApi(existingQuery.currentData)
-        : undefined
-    const parsed = current
-      ? parsePipelineDefinition(current.definition)
-      : undefined
-    setSelectedNetworkId(networkId ?? current?.networkId ?? firstNetworkId)
-    setName(current?.name ?? "")
-    setActive(current?.active ?? true)
-    setLevels(draftsFromDefinition(parsed))
-  }, [
-    existingQuery.currentData,
-    firstNetworkId,
-    networkId,
-    open,
-    pipelineDefinitionId,
-  ])
 
-  const networkNodes = useMemo(
-    () => nodes.filter((node) => node.networkId === selectedNetworkId),
-    [nodes, selectedNetworkId]
-  )
-  const definition = definitionFromDrafts(levels)
-  const preview = stringifyDefinition(definition ?? { nodes: [] })
-  const networkItems = networks.map((item) => ({
-    value: item.id,
-    label: item.name,
-  }))
+    setName("")
+    setActive(true)
+    setDefinitionView("levels")
+    jsonSourceRef.current = "builder"
+    setJsonError(null)
+    setLevels(emptyPipelineLevels())
+  }, [open])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    setSelectedNetworkId((current) => {
+      if (networkId) {
+        return networkId
+      }
+      return current || firstNetworkId
+    })
+  }, [firstNetworkId, networkId, open])
+
+  const definition = useMemo(() => levelsToApi(levels), [levels])
+  const generatedJson = stringifyDefinition(definition ?? { nodes: [] })
+
+  useEffect(() => {
+    if (jsonSourceRef.current === "json") {
+      return
+    }
+    setJsonText(generatedJson)
+    setJsonError(null)
+  }, [generatedJson])
+
+  function markBuilderSource() {
+    jsonSourceRef.current = "builder"
+  }
+
+  function applyPipelineDefinition(body: PipelineDefinitionBody) {
+    jsonSourceRef.current = "json"
+    setLevels(levelsFromApi(body))
+  }
+
+  function handleJsonChange(text: string) {
+    jsonSourceRef.current = "json"
+    setJsonText(text)
+    const parsed = parseJsonObject(text)
+    if (!parsed) {
+      setJsonError(pipelineDefinitionError(text))
+      return
+    }
+    const body = parsePipelineDefinition(parsed)
+    if (!body) {
+      setJsonError("JSON must include at least one level with a node")
+      return
+    }
+    setJsonError(null)
+    applyPipelineDefinition(body)
+  }
+
+  function handleJsonBlur() {
+    if (!jsonText.trim()) {
+      jsonSourceRef.current = "builder"
+      setJsonText(generatedJson)
+      setJsonError(null)
+      return
+    }
+    const parsed = parseJsonObject(jsonText)
+    const body = parsed ? parsePipelineDefinition(parsed) : undefined
+    if (!parsed || !body) {
+      setJsonError(pipelineDefinitionError(jsonText))
+      return
+    }
+    jsonSourceRef.current = "json"
+    setJsonError(null)
+    applyPipelineDefinition(body)
+    setJsonText(stringifyDefinition(parsed))
+  }
 
   function templateContextForLevelIndex(levelIndex: number) {
     const index = Math.max(0, levelIndex)
     return pipelineTemplateContextForLevel(
       index,
       levels[index - 1]?.nodeIds ?? [],
-      (id) => networkNodes.find((node) => node.id === id)?.name
+      nodeName
     )
   }
 
@@ -213,40 +260,51 @@ export function PipelineDefinitionDialog({
     if (!target) {
       return
     }
+    markBuilderSource()
     setLevels((current) => insertCreatedNode(current, nodeId, target))
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const showNetwork = networks.length > 0 && !lockNetwork
+  const sentence = pipelineDraftSentence(levels, nodeName)
+  const canSubmit =
+    Boolean(name.trim()) &&
+    Boolean(selectedNetworkId) &&
+    Boolean(definition) &&
+    !jsonError
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!name.trim() || !selectedNetworkId || !definition) {
+    if (!canSubmit || !definition) {
       return
     }
+
+    const parsed = parseJsonObject(jsonText)
+    const body = parsed ? parsePipelineDefinition(parsed) : definition
+    if (!body) {
+      return
+    }
+
+    void submitDefinition(body)
+  }
+
+  async function submitDefinition(body: PipelineDefinitionBody) {
     try {
-      if (editing && pipelineDefinitionId) {
-        await updatePipeline({
-          id: pipelineDefinitionId,
-          name: name.trim(),
-          active,
-          definition,
-        }).unwrap()
-        onOpenChange(false)
-        return
-      }
       const created = await createPipeline({
         name: name.trim(),
         active,
-        definition,
+        definition: body,
         networkId: selectedNetworkId,
       }).unwrap()
       onOpenChange(false)
       navigate(
         networkWorkspacePath({
           networkId: selectedNetworkId,
+          organizationId: organizationId || undefined,
           rest: `pipeline-definitions/${created.id}`,
         })
       )
     } catch {
-      // RTK Query error is shown below.
+      // Error is rendered from the mutation state.
     }
   }
 
@@ -261,17 +319,30 @@ export function PipelineDefinitionDialog({
         onOpenChange(nextOpen)
       }}
     >
-      <DialogContent size="full" className={definitionDialogClassName}>
+      <DialogContent
+        size="full"
+        className="sm:inset-x-[8vw] lg:inset-x-16 xl:inset-x-[12vw]"
+      >
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-          <DialogTitle>
-            {editing
-              ? "Edit pipeline definition"
-              : "Create a pipeline definition"}
-          </DialogTitle>
-          <DialogDescription>
-            Orchestrate nodes in BFS levels. Every node in a level runs; the
-            next level receives those outputs by index.
-          </DialogDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1.5">
+              <DialogTitle>Create a pipeline</DialogTitle>
+              <DialogDescription>{sentence}</DialogDescription>
+            </div>
+            <Button
+              type="button"
+              variant={definitionView === "json" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() =>
+                setDefinitionView((view) =>
+                  view === "levels" ? "json" : "levels"
+                )
+              }
+            >
+              <FileJsonIcon />
+              {definitionView === "json" ? "Levels" : "JSON"}
+            </Button>
+          </div>
         </DialogHeader>
         <form
           id={formId}
@@ -279,101 +350,100 @@ export function PipelineDefinitionDialog({
           autoComplete="off"
           className="flex min-h-0 flex-1 flex-col"
         >
-          <DefinitionDialogBody
-            json={
-              <DefinitionJsonPane
-                title="JSON definition"
-                description="Persisted as levels of node IDs. Templates live on the nodes, not this graph."
-                value={preview}
-                readOnly
-              />
-            }
-          >
-            <FieldGroup className="gap-4">
-              {!editing ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
+            <FieldGroup className="shrink-0 gap-4 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
+              {showNetwork ? (
                 <Field>
                   <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
                   <Select
                     value={selectedNetworkId}
-                    disabled={Boolean(networkId) || isLoading}
+                    disabled={isLoading}
                     required
                     modal={false}
-                    items={networkItems}
+                    items={networks.map((network) => ({
+                      value: network.id,
+                      label: network.name,
+                    }))}
                     onValueChange={(value) => {
-                      if (value) {
-                        setSelectedNetworkId(value)
+                      if (!value) {
+                        return
                       }
+                      setSelectedNetworkId(value)
+                      markBuilderSource()
+                      setLevels(emptyPipelineLevels())
                     }}
                   >
                     <SelectTrigger id={`${formId}-network`}>
-                      <SelectValue placeholder="Select a network" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {networks.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name}
+                      {networks.map((network) => (
+                        <SelectItem key={network.id} value={network.id}>
+                          {network.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </Field>
               ) : null}
-              <Field>
-                <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
-                <Input
-                  id={`${formId}-name`}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Fetch and summarize"
-                  autoFocus
-                  required
-                  disabled={isLoading}
-                />
-                <FieldDescription>
-                  Slug {slugifyId(name) || "is generated from the name"}.
-                </FieldDescription>
-              </Field>
-              <Field>
-                <CheckboxField
-                  id={`${formId}-active`}
-                  checked={active}
-                  onChange={setActive}
-                  label="Enabled"
-                />
-                <FieldDescription>
-                  Enabled pipelines can be started. Disabled pipelines are saved
-                  but do not run.
-                </FieldDescription>
-              </Field>
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <Field>
+                  <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
+                  <Input
+                    id={`${formId}-name`}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Fetch and summarize"
+                    autoFocus
+                    required
+                    disabled={isLoading}
+                    aria-invalid={error ? true : undefined}
+                  />
+                </Field>
+                <Field className="sm:pb-1">
+                  <CheckboxField
+                    id={`${formId}-active`}
+                    checked={active}
+                    onChange={setActive}
+                    label="Enabled"
+                  />
+                </Field>
+              </div>
               {error ? (
-                <FieldError>
-                  {getHumaErrorMessage(
-                    error,
-                    "Failed to save pipeline definition"
-                  )}
-                </FieldError>
+                <FieldError>{getHumaErrorMessage(error)}</FieldError>
               ) : null}
             </FieldGroup>
 
-            <div className="flex flex-col gap-2">
-              <div>
-                <h3 className="text-sm font-medium">Levels</h3>
-                <p className="text-xs text-muted-foreground">
-                  All nodes in a level run. Edit a node to change its request.
-                  Later levels read previous outputs as {"{{ .Input.0 }}"},{" "}
-                  {"{{ .Input.1 }}"}.
-                </p>
+            {definitionView === "json" ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
+                <DefinitionJsonPane
+                  id={`${formId}-json`}
+                  title="JSON definition"
+                  description="Updates as you edit. Paste a definition to fill the builder."
+                  value={jsonText}
+                  onChange={handleJsonChange}
+                  onBlur={handleJsonBlur}
+                  error={jsonError}
+                />
               </div>
-              <PipelineLevelsEditor
-                levels={levels}
-                nodes={networkNodes}
-                onChange={setLevels}
-                onCreateNode={openCreateNode}
-                onEditNode={openEditNode}
-                createDisabled={!selectedNetworkId}
-              />
-            </div>
-          </DefinitionDialogBody>
+            ) : (
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+                <div className="rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
+                  <PipelineLevelsEditor
+                    levels={levels}
+                    nodes={networkNodes}
+                    onChange={(next) => {
+                      markBuilderSource()
+                      setLevels(next)
+                    }}
+                    onCreateNode={openCreateNode}
+                    onEditNode={openEditNode}
+                    createDisabled={!selectedNetworkId}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           <DialogFooter>
             <DialogClose
               render={<Button variant="outline" disabled={isLoading} />}
@@ -382,23 +452,17 @@ export function PipelineDefinitionDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={
-                isLoading || !name.trim() || !selectedNetworkId || !definition
-              }
+              disabled={isLoading || !canSubmit || Boolean(jsonError)}
               aria-busy={isLoading}
               className={isLoading ? "disabled:opacity-100" : undefined}
             >
               {isLoading ? (
                 <>
                   <Loader className="animate-spin" />
-                  <span className="sr-only">
-                    {editing ? "Saving" : "Creating"}
-                  </span>
+                  <span className="sr-only">Creating</span>
                 </>
-              ) : editing ? (
-                "Save pipeline definition"
               ) : (
-                "Create pipeline definition"
+                "Create pipeline"
               )}
             </Button>
           </DialogFooter>

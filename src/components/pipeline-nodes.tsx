@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Link } from "react-router"
 import { ChevronDownIcon } from "lucide-react"
 
 import { RunStatusPill } from "@/components/run-card"
@@ -13,6 +14,7 @@ import {
 import type { RunStatus } from "@/data/runs"
 import { stringifyDefinition, type JsonObject } from "@/lib/json-definition"
 import { nodeTypeLabel } from "@/lib/node-definition"
+import { useNetworkWorkspace } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
@@ -20,6 +22,7 @@ import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
   useListPipelineNodesQuery,
+  type ApiNodeFileRef,
   type ApiPipelineNode,
   type ApiSnapshotNode,
 } from "@/store/pipeline-slice"
@@ -46,6 +49,7 @@ export function PipelineNodesJournal({
   snapshot: ApiSnapshotNode[][]
 }) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const { href } = useNetworkWorkspace()
   const query = useListPipelineNodesQuery(pipelineId, {
     skip: !isAuthenticated || !pipelineId,
   })
@@ -119,6 +123,7 @@ export function PipelineNodesJournal({
                     type={type}
                     durationMs={durationMs}
                     expanded={expanded}
+                    fileHref={(fileId) => href(`files/${fileId}`)}
                     onToggle={() =>
                       setExpandedId(expanded ? undefined : node.id)
                     }
@@ -144,6 +149,7 @@ function NodeRows({
   type,
   durationMs,
   expanded,
+  fileHref,
   onToggle,
 }: {
   node: ApiPipelineNode
@@ -151,6 +157,7 @@ function NodeRows({
   type: string
   durationMs: number
   expanded: boolean
+  fileHref: (fileId: string) => string
   onToggle: () => void
 }) {
   return (
@@ -204,10 +211,46 @@ function NodeRows({
               <JsonBlock label="input" value={asJsonObject(node.input)} />
               <JsonBlock label="output" value={asJsonObject(node.output)} />
             </div>
+            <PayloadBlock files={node.payload?.files} fileHref={fileHref} />
           </TableCell>
         </TableRow>
       ) : null}
     </>
+  )
+}
+
+function PayloadBlock({
+  files,
+  fileHref,
+}: {
+  files?: ApiNodeFileRef[]
+  fileHref: (fileId: string) => string
+}) {
+  if (!files?.length) {
+    return null
+  }
+
+  return (
+    <div className="mt-2 rounded-lg bg-background ring-1 ring-foreground/10">
+      <p className="px-2.5 py-2 text-xs font-medium">payload · files</p>
+      <ul className="flex flex-col gap-1 border-t px-2.5 py-2">
+        {files.map((file) => (
+          <li key={file.fileId} className="text-xs">
+            <Link
+              to={fileHref(file.fileId)}
+              onClick={(event) => event.stopPropagation()}
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              {file.filename?.trim() || file.fileId}
+            </Link>
+            <span className="text-muted-foreground">
+              {file.contentType ? ` · ${file.contentType}` : ""}
+              {file.sizeBytes != null ? ` · ${file.sizeBytes} bytes` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

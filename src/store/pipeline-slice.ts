@@ -219,6 +219,17 @@ function listPipelineQueryParams(params?: ListPipelinesParams) {
 
 export type ApiPipelineNodeStatus = "completed" | "failed"
 
+export type ApiNodeFileRef = {
+  fileId: string
+  filename?: string
+  contentType?: string
+  sizeBytes?: number
+}
+
+export type ApiNodePayload = {
+  files?: ApiNodeFileRef[]
+}
+
 export type ApiPipelineNode = {
   id: string
   pipelineId: string
@@ -231,6 +242,7 @@ export type ApiPipelineNode = {
   status: ApiPipelineNodeStatus | string
   input?: JsonObject
   output?: JsonObject
+  payload?: ApiNodePayload
   error?: string
   startedAt: string
   completedAt: string
