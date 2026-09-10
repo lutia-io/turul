@@ -32,7 +32,6 @@ import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
   WorkflowActionView,
   WorkflowCriteriaView,
@@ -645,7 +644,7 @@ function WorkflowDefinitionEdit({
               <FieldLabel htmlFor={`${formId}-description`} className="sr-only">
                 Description
               </FieldLabel>
-              <Textarea
+              <Input
                 id={`${formId}-description`}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}

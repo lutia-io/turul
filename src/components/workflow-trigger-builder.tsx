@@ -131,7 +131,7 @@ export function WorkflowTriggerBuilder({
               </div>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
-                Pick a record type to choose fields.
+                Pick a schema to choose fields.
               </p>
             )}
           </Field>

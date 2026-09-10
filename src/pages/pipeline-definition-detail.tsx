@@ -46,7 +46,6 @@ import { RunPipelineDialog } from "@/components/run-pipeline-dialog"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import type { PipelineDefinition } from "@/data/networks"
 import {
   getPipelineLevels,
@@ -637,7 +636,7 @@ function PipelineDefinitionEdit({
               <FieldLabel htmlFor={`${formId}-description`} className="sr-only">
                 Description
               </FieldLabel>
-              <Textarea
+              <Input
                 id={`${formId}-description`}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}

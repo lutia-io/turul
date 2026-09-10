@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { Checkbox } from "@/components/ui/checkbox"
+import { Field, FieldLabel } from "@/components/ui/field"
 
 export function CheckboxField({
   id,
@@ -25,5 +26,31 @@ export function CheckboxField({
       />
       {label}
     </label>
+  )
+}
+
+export function EnabledField({
+  formId,
+  checked,
+  onChange,
+}: {
+  formId: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <Field className="gap-1">
+      <FieldLabel aria-hidden="true" className="invisible select-none">
+        Enabled
+      </FieldLabel>
+      <div className="flex h-8 items-center">
+        <CheckboxField
+          id={`${formId}-active`}
+          checked={checked}
+          onChange={onChange}
+          label="Enabled"
+        />
+      </div>
+    </Field>
   )
 }

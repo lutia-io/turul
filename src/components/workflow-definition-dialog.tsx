@@ -9,7 +9,7 @@ import {
 import { useNavigate } from "react-router"
 import { FileJsonIcon, Loader } from "lucide-react"
 
-import { CheckboxField } from "@/components/checkbox-field"
+import { EnabledField } from "@/components/checkbox-field"
 import { Button } from "@/components/ui/button"
 import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import {
@@ -28,7 +28,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -66,6 +65,7 @@ import {
   type TriggerDraft,
   type WorkflowDefinitionBody,
 } from "@/lib/workflow-definition"
+import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import { useCreateWorkflowDefinitionMutation } from "@/store/workflow-slice"
 
@@ -375,110 +375,16 @@ export function WorkflowDefinitionDialog({
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
-              <FieldGroup className="shrink-0 gap-4 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
-                {showNetwork || showOrganization ? (
-                  <div
-                    className={
-                      showNetwork && showOrganization
-                        ? "grid gap-4 sm:grid-cols-2"
-                        : undefined
-                    }
-                  >
-                    {showNetwork ? (
-                      <Field>
-                        <FieldLabel htmlFor={`${formId}-network`}>
-                          Network
-                        </FieldLabel>
-                        <Select
-                          value={selectedNetworkId}
-                          disabled={isLoading}
-                          required
-                          modal={false}
-                          items={networks.map((network) => ({
-                            value: network.id,
-                            label: network.name,
-                          }))}
-                          onValueChange={(value) => {
-                            if (!value) {
-                              return
-                            }
-                            setSelectedNetworkId(value)
-                            if (!lockOrganization) {
-                              setSelectedOrganizationId("")
-                            }
-                            setSchemaId("")
-                          }}
-                        >
-                          <SelectTrigger id={`${formId}-network`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {networks.map((network) => (
-                              <SelectItem key={network.id} value={network.id}>
-                                {network.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    ) : null}
-                    {showOrganization ? (
-                      <Field>
-                        <FieldLabel htmlFor={`${formId}-organization`}>
-                          Organization
-                        </FieldLabel>
-                        <Select
-                          value={selectedOrganizationId || entireNetworkValue}
-                          disabled={lockOrganization || isLoading}
-                          modal={false}
-                          items={[
-                            {
-                              value: entireNetworkValue,
-                              label: "Entire network",
-                            },
-                            ...networkOrganizations.map((organization) => ({
-                              value: organization.id,
-                              label: organization.name,
-                            })),
-                          ]}
-                          onValueChange={(value) => {
-                            if (!value || value === entireNetworkValue) {
-                              setSelectedOrganizationId("")
-                              return
-                            }
-                            setSelectedOrganizationId(value)
-                          }}
-                        >
-                          <SelectTrigger id={`${formId}-organization`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={entireNetworkValue}>
-                              Entire network
-                            </SelectItem>
-                            {networkOrganizations.map((organization) => (
-                              <SelectItem
-                                key={organization.id}
-                                value={organization.id}
-                              >
-                                {organization.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    ) : null}
-                  </div>
-                ) : null}
-                <SchemaSelect
-                  formId={formId}
-                  schemaId={schemaId}
-                  schemas={networkSchemas}
-                  isLoading={isLoading}
-                  onChange={setSchemaId}
-                />
-                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                  <Field>
+              <FieldGroup className="shrink-0 gap-3 rounded-2xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
+                <div
+                  className={cn(
+                    "grid gap-3",
+                    showNetwork
+                      ? "sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
+                      : "sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
+                  )}
+                >
+                  <Field className="gap-1">
                     <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
                     <Input
                       id={`${formId}-name`}
@@ -491,27 +397,115 @@ export function WorkflowDefinitionDialog({
                       aria-invalid={error ? true : undefined}
                     />
                   </Field>
-                  <Field className="sm:pb-1">
-                    <CheckboxField
-                      id={`${formId}-active`}
-                      checked={active}
-                      onChange={setActive}
-                      label="Enabled"
+                  <Field className="gap-1">
+                    <FieldLabel htmlFor={`${formId}-description`}>
+                      Description
+                    </FieldLabel>
+                    <Input
+                      id={`${formId}-description`}
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      placeholder="What this workflow does"
+                      disabled={isLoading}
                     />
                   </Field>
-                </div>
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-description`}>
-                    Description
-                  </FieldLabel>
-                  <Textarea
-                    id={`${formId}-description`}
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    placeholder="What this workflow does"
-                    disabled={isLoading}
+                  {showNetwork ? (
+                    <Field className="gap-1">
+                      <FieldLabel htmlFor={`${formId}-network`}>
+                        Network
+                      </FieldLabel>
+                      <Select
+                        value={selectedNetworkId}
+                        disabled={isLoading}
+                        required
+                        modal={false}
+                        items={networks.map((network) => ({
+                          value: network.id,
+                          label: network.name,
+                        }))}
+                        onValueChange={(value) => {
+                          if (!value) {
+                            return
+                          }
+                          setSelectedNetworkId(value)
+                          if (!lockOrganization) {
+                            setSelectedOrganizationId("")
+                          }
+                          setSchemaId("")
+                        }}
+                      >
+                        <SelectTrigger id={`${formId}-network`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {networks.map((network) => (
+                            <SelectItem key={network.id} value={network.id}>
+                              {network.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  ) : null}
+                  {showOrganization ? (
+                    <Field className="gap-1">
+                      <FieldLabel htmlFor={`${formId}-organization`}>
+                        Organization
+                      </FieldLabel>
+                      <Select
+                        value={selectedOrganizationId || entireNetworkValue}
+                        disabled={lockOrganization || isLoading}
+                        modal={false}
+                        items={[
+                          {
+                            value: entireNetworkValue,
+                            label: "Entire network",
+                          },
+                          ...networkOrganizations.map((organization) => ({
+                            value: organization.id,
+                            label: organization.name,
+                          })),
+                        ]}
+                        onValueChange={(value) => {
+                          if (!value || value === entireNetworkValue) {
+                            setSelectedOrganizationId("")
+                            return
+                          }
+                          setSelectedOrganizationId(value)
+                        }}
+                      >
+                        <SelectTrigger id={`${formId}-organization`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={entireNetworkValue}>
+                            Entire network
+                          </SelectItem>
+                          {networkOrganizations.map((organization) => (
+                            <SelectItem
+                              key={organization.id}
+                              value={organization.id}
+                            >
+                              {organization.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  ) : null}
+                  <SchemaSelect
+                    formId={formId}
+                    schemaId={schemaId}
+                    schemas={networkSchemas}
+                    isLoading={isLoading}
+                    onChange={setSchemaId}
                   />
-                </Field>
+                  <EnabledField
+                    formId={formId}
+                    checked={active}
+                    onChange={setActive}
+                  />
+                </div>
                 {error ? (
                   <FieldError>{getHumaErrorMessage(error)}</FieldError>
                 ) : null}
@@ -599,8 +593,8 @@ function SchemaSelect({
 }) {
   const chooseSchemaValue = "__choose_schema__"
   return (
-    <Field>
-      <FieldLabel htmlFor={`${formId}-schema`}>Record type</FieldLabel>
+    <Field className="gap-1">
+      <FieldLabel htmlFor={`${formId}-schema`}>Schema</FieldLabel>
       {schemas.length > 0 ? (
         <Select
           value={schemaId || chooseSchemaValue}
@@ -608,7 +602,7 @@ function SchemaSelect({
           required
           modal={false}
           items={[
-            { value: chooseSchemaValue, label: "Choose a record type" },
+            { value: chooseSchemaValue, label: "Choose a schema" },
             ...schemas.map((schema) => ({
               value: schema.id,
               label: schema.name,
@@ -626,9 +620,7 @@ function SchemaSelect({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={chooseSchemaValue}>
-              Choose a record type
-            </SelectItem>
+            <SelectItem value={chooseSchemaValue}>Choose a schema</SelectItem>
             {schemas.map((schema) => (
               <SelectItem key={schema.id} value={schema.id}>
                 {schema.name}
@@ -638,7 +630,7 @@ function SchemaSelect({
         </Select>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Create a record type in this network before adding a workflow.
+          Create a schema in this network before adding a workflow.
         </p>
       )}
     </Field>

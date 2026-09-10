@@ -243,17 +243,17 @@ function emptyProperty(
   defaults?: Partial<PropertyDraft>
 ): PropertyDraft {
   return {
-    key,
     name: "",
     type: "string",
     required: false,
     description: "",
     format: "",
     schemaId: "",
-    enumValues: [],
     itemsType: "string",
     defaultValue: "",
     ...defaults,
+    key,
+    enumValues: [...(defaults?.enumValues ?? [])],
   }
 }
 
@@ -280,7 +280,7 @@ function draftsFromProperties(
     description: property.description ?? "",
     format: asFormat(property.format),
     schemaId: property.schemaId ?? "",
-    enumValues: property.enumValues ?? [],
+    enumValues: [...(property.enumValues ?? [])],
     itemsType: asItemsType(property.itemsType),
     defaultValue: property.defaultValue ?? "",
   }))
@@ -798,6 +798,7 @@ export function SchemaDefinitionDialog({
     const copy = createProperty({
       ...source,
       name: source.name ? `${source.name}Copy` : "",
+      enumValues: [...source.enumValues],
     })
     setProperties((current) => {
       const next = [...current]

@@ -17,7 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import type { StoredFile, StoredRecord } from "@/data/files"
 import type { Schema } from "@/data/networks"
-import { fileKindLabel } from "@/lib/file-preview"
+import { fileKindLabel, matchFileKind } from "@/lib/file-preview"
 import { getBadgeColor } from "@/lib/badge"
 import {
   getJsonSchemaProperties,
@@ -269,7 +269,7 @@ function FileRecordCell({
           onClick={onPreview}
           className="w-full overflow-hidden rounded-lg text-left"
         >
-          {file?.contentType.startsWith("image/") ? (
+          {file && matchFileKind(file) === "image" ? (
             <FileThumbnail
               file={file}
               className="h-36 w-full rounded-none object-cover"

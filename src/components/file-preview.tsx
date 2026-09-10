@@ -12,6 +12,7 @@ import {
   ExternalLinkIcon,
   FileIcon,
   FileSpreadsheetIcon,
+  FileTextIcon,
   ImageIcon,
   RotateCcwIcon,
   ZoomInIcon,
@@ -27,7 +28,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { StoredFile } from "@/data/files"
-import { fileKindLabel, parseCsv } from "@/lib/file-preview"
+import {
+  fileKindHint,
+  fileKindLabel,
+  matchFileKind,
+  parseCsv,
+  type FileKind,
+} from "@/lib/file-preview"
 import { formatFileSize } from "@/lib/records"
 import { cn } from "@/lib/utils"
 import { useGetFileContentQuery } from "@/store/file-slice"
@@ -35,6 +42,22 @@ import { useGetFileContentQuery } from "@/store/file-slice"
 const MIN_SCALE = 1
 const MAX_SCALE = 8
 const ZOOM_STEP = 1.25
+const TEXT_PREVIEW_LIMIT = 512 * 1024
+
+function fileKindIcon(kind: FileKind) {
+  switch (kind) {
+    case "image":
+      return ImageIcon
+    case "csv":
+    case "spreadsheet":
+      return FileSpreadsheetIcon
+    case "pdf":
+    case "text":
+      return FileTextIcon
+    case "unknown":
+      return FileIcon
+  }
+}
 
 export function FileThumbnail({
   file,
@@ -43,10 +66,10 @@ export function FileThumbnail({
   file: StoredFile
   className?: string
 }) {
-  const isImage = file.contentType.startsWith("image/")
-  const { data } = useGetFileContentQuery(file.id, { skip: !isImage })
+  const kind = matchFileKind(file)
+  const { data } = useGetFileContentQuery(file.id, { skip: kind !== "image" })
 
-  if (isImage && data) {
+  if (kind === "image" && data) {
     return (
       <img
         src={data.objectUrl}
@@ -59,14 +82,7 @@ export function FileThumbnail({
     )
   }
 
-  const Icon = file.contentType.startsWith("image/")
-    ? ImageIcon
-    : file.contentType === "text/csv" ||
-        file.contentType.includes("spreadsheet") ||
-        file.filename.endsWith(".csv") ||
-        file.filename.endsWith(".xlsx")
-      ? FileSpreadsheetIcon
-      : FileIcon
+  const Icon = fileKindIcon(kind)
 
   return (
     <span
@@ -92,7 +108,13 @@ export function FileViewer({
   const { data, isLoading, isError } = useGetFileContentQuery(file.id)
 
   return (
-    <div className={cn("flex min-h-0 min-w-0 flex-col", fill && "h-full", className)}>
+    <div
+      className={cn(
+        "flex min-h-0 min-w-0 flex-col",
+        fill && "h-full",
+        className
+      )}
+    >
       {isLoading ? (
         <p className="p-4 text-sm text-muted-foreground">Loading preview...</p>
       ) : isError || !data ? (
@@ -122,7 +144,9 @@ function FilePreviewBody({
   blob: Blob
   fill: boolean
 }) {
-  if (file.contentType.startsWith("image/")) {
+  const kind = matchFileKind(file)
+
+  if (kind === "image") {
     return (
       <ZoomableImage
         src={objectUrl}
@@ -132,7 +156,7 @@ function FilePreviewBody({
     )
   }
 
-  if (file.contentType === "application/pdf") {
+  if (kind === "pdf") {
     return (
       <iframe
         title={file.filename}
@@ -145,7 +169,11 @@ function FilePreviewBody({
     )
   }
 
-  if (file.contentType === "text/csv" || file.filename.endsWith(".csv")) {
+  if (kind === "text") {
+    return <TextPreview blob={blob} filename={file.filename} fill={fill} />
+  }
+
+  if (kind === "csv") {
     return (
       <div className={cn(fill && "min-h-0 flex-1 overflow-auto")}>
         <CsvPreview blob={blob} filename={file.filename} />
@@ -194,15 +222,17 @@ function ZoomableImage({
   const [translate, setTranslate] = useState({ x: 0, y: 0 })
   const [dragging, setDragging] = useState(false)
 
-  const commit = useCallback((nextScale: number, nextTranslate: { x: number; y: number }) => {
-    const clampedScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, nextScale))
-    const next =
-      clampedScale === MIN_SCALE ? { x: 0, y: 0 } : nextTranslate
-    scaleRef.current = clampedScale
-    translateRef.current = next
-    setScale(clampedScale)
-    setTranslate(next)
-  }, [])
+  const commit = useCallback(
+    (nextScale: number, nextTranslate: { x: number; y: number }) => {
+      const clampedScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, nextScale))
+      const next = clampedScale === MIN_SCALE ? { x: 0, y: 0 } : nextTranslate
+      scaleRef.current = clampedScale
+      translateRef.current = next
+      setScale(clampedScale)
+      setTranslate(next)
+    },
+    []
+  )
 
   const zoomAt = useCallback(
     (clientX: number, clientY: number, nextScale: number) => {
@@ -354,7 +384,7 @@ function ZoomableImage({
       <div
         ref={containerRef}
         className={cn(
-          "flex size-full items-center justify-center overflow-hidden touch-none",
+          "flex size-full touch-none items-center justify-center overflow-hidden",
           scale > MIN_SCALE
             ? dragging
               ? "cursor-grabbing"
@@ -377,7 +407,7 @@ function ZoomableImage({
           src={src}
           alt={alt}
           draggable={false}
-          className="max-h-full max-w-full select-none object-contain"
+          className="max-h-full max-w-full object-contain select-none"
           style={{
             transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
             transformOrigin: "center center",
@@ -422,6 +452,76 @@ function ZoomableImage({
         </div>
       </div>
     </figure>
+  )
+}
+
+function TextPreview({
+  blob,
+  filename,
+  fill,
+}: {
+  blob: Blob
+  filename: string
+  fill: boolean
+}) {
+  const [text, setText] = useState<string>()
+  const [truncated, setTruncated] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const slice =
+      blob.size > TEXT_PREVIEW_LIMIT ? blob.slice(0, TEXT_PREVIEW_LIMIT) : blob
+
+    slice.text().then((raw) => {
+      if (cancelled) {
+        return
+      }
+
+      let next = raw
+      const isJson =
+        blob.type === "application/json" ||
+        filename.toLowerCase().endsWith(".json")
+      if (isJson) {
+        try {
+          next = JSON.stringify(JSON.parse(raw), null, 2)
+        } catch {
+          // Keep the raw contents when the file is not valid JSON.
+        }
+      }
+
+      setTruncated(blob.size > TEXT_PREVIEW_LIMIT)
+      setText(next)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [blob, filename])
+
+  if (text == null) {
+    return <p className="text-sm text-muted-foreground">Loading preview...</p>
+  }
+
+  if (text.length === 0) {
+    return <p className="text-sm text-muted-foreground">This file is empty.</p>
+  }
+
+  return (
+    <div
+      className={cn(
+        "overflow-auto rounded-xl border bg-background",
+        fill && "min-h-0 flex-1"
+      )}
+    >
+      {truncated ? (
+        <p className="border-b px-3 py-2 text-xs text-muted-foreground">
+          Showing the first 512 KB of this file.
+        </p>
+      ) : null}
+      <pre className="p-4 font-mono text-[13px] leading-relaxed break-words whitespace-pre-wrap">
+        {text}
+      </pre>
+    </div>
   )
 }
 
@@ -533,10 +633,13 @@ export function FilePreviewDialog({
             <DialogHeader className="shrink-0 gap-1 border-b px-5 py-4 pr-12">
               <DialogTitle className="truncate">{file.filename}</DialogTitle>
               <DialogDescription>
-                {fileKindLabel(file)} · {formatFileSize(file.sizeBytes)}
-                {file.contentType.startsWith("image/")
-                  ? " · Scroll or use +/− to zoom, drag to pan, double-click to reset"
-                  : ""}
+                {[
+                  fileKindLabel(file),
+                  formatFileSize(file.sizeBytes),
+                  fileKindHint(file),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </DialogDescription>
             </DialogHeader>
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/30 p-4">
