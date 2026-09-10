@@ -65,6 +65,7 @@ export function defineWorkflow({
   id,
   name,
   slug,
+  description = "",
   schemaId,
   trigger,
   steps,
@@ -72,10 +73,12 @@ export function defineWorkflow({
   actions,
   active = true,
   internal = false,
+  organizationId,
 }: {
   id: string
   name: string
   slug: string
+  description?: string
   schemaId: string
   trigger?: WorkflowTrigger | { type: string; event: string }
   steps?: { id: string; type: string; name: string }[]
@@ -83,6 +86,7 @@ export function defineWorkflow({
   actions?: WorkflowAction[]
   active?: boolean
   internal?: boolean
+  organizationId?: string
 }) {
   const nextTrigger = normalizeMockTrigger(trigger)
   const nextActions =
@@ -94,9 +98,11 @@ export function defineWorkflow({
     id,
     name,
     slug,
+    description,
     active,
     internal,
     schemaId,
+    organizationId,
     definition: {
       trigger: nextTrigger,
       criteria: criteria ?? {},
@@ -146,25 +152,31 @@ export function definePipeline({
   id,
   name,
   slug,
+  description = "",
   source,
   stages,
   active = true,
   internal = false,
+  organizationId,
 }: {
   id: string
   name: string
   slug: string
+  description?: string
   source: { type: string; name: string }
   stages: { id: string; type: string; name: string }[]
   active?: boolean
   internal?: boolean
+  organizationId?: string
 }) {
   return {
     id,
     name,
     slug,
+    description,
     active,
     internal,
+    organizationId,
     definition: {
       version: 1,
       source,

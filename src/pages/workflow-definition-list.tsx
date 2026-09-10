@@ -36,8 +36,10 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor, statusBadgeConfig } from "@/lib/badge"
 import { enabledStatus } from "@/lib/json-definition"
 import {
+  definitionScopeLabel,
   networkWorkspacePath,
   useNetworkWorkspace,
+  useWorkspaceOrganizations,
   useWorkspaceSchemas,
   workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
@@ -62,6 +64,7 @@ type WorkflowColumnFilters = {
   name?: { op: StringFilterOp; value: string }
   slug?: { op: StringFilterOp; value: string }
   network?: { op: StringFilterOp; value: string }
+  scope?: "network" | "organization"
   schema?: { op: StringFilterOp; value: string }
   actions?: { op: NumberFilterOp; value: number }
   status?: "enabled" | "disabled"
@@ -73,6 +76,7 @@ const sortFields: WorkflowDefinitionListSort[] = [
   "status",
   "schema",
   "network",
+  "scope",
   "actions",
 ]
 
@@ -99,6 +103,7 @@ export default function WorkflowDefinitionList() {
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateWorkflow } = useCreateEntity()
   const { schemas } = useWorkspaceSchemas()
+  const { organizations } = useWorkspaceOrganizations()
   const { data: networks } = useListNetworksQuery(undefined, {
     skip: !isAuthenticated || Boolean(network),
   })
@@ -133,6 +138,7 @@ export default function WorkflowDefinitionList() {
       order: sort?.desc ? "desc" : "asc",
       networkId: network?.id,
       organizationId,
+      scope: columnFilters.scope,
       active:
         columnFilters.status === "enabled"
           ? true
@@ -219,9 +225,14 @@ export default function WorkflowDefinitionList() {
           cell: ({ row }) => (
             <DataTableCellLink
               to={hrefFor(row.original)}
-              className="font-medium"
+              className="block overflow-visible whitespace-normal font-medium"
             >
-              {row.original.name}
+              <span className="block truncate">{row.original.name}</span>
+              {row.original.description ? (
+                <span className="mt-0.5 block truncate text-sm font-normal text-muted-foreground">
+                  {row.original.description}
+                </span>
+              ) : null}
             </DataTableCellLink>
           ),
           size: 240,
@@ -252,6 +263,49 @@ export default function WorkflowDefinitionList() {
           ),
           size: 180,
         }),
+        helper.accessor(
+          (workflow) =>
+            definitionScopeLabel(workflow.organizationId, organizations),
+          {
+            id: "scope",
+            header: ({ column }) => (
+              <DataTableColumnHeader
+                title="Scope"
+                sorted={column.getIsSorted()}
+                onSort={column.getToggleSortingHandler()}
+                pin={headerPin(column)}
+                filter={{
+                  type: "enum",
+                  value: columnFilters.scope,
+                  options: [
+                    { value: "network", label: "Network workflows" },
+                    {
+                      value: "organization",
+                      label: "Organization workflows",
+                    },
+                  ],
+                  onChange: (value) =>
+                    setColumnFilters((current) => ({
+                      ...current,
+                      scope: value as WorkflowColumnFilters["scope"],
+                    })),
+                }}
+              />
+            ),
+            cell: ({ row }) => (
+              <DataTableCellLink
+                to={hrefFor(row.original)}
+                className="text-muted-foreground"
+              >
+                {definitionScopeLabel(
+                  row.original.organizationId,
+                  organizations
+                )}
+              </DataTableCellLink>
+            ),
+            size: 160,
+          }
+        ),
         ...(!network
           ? [
               helper.accessor(
@@ -432,7 +486,7 @@ export default function WorkflowDefinitionList() {
       hrefFor,
       network,
       networksById,
-      schemasById,
+      organizations,
       schemasById,
     ]
   )
@@ -493,6 +547,18 @@ export default function WorkflowDefinitionList() {
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
     }
+    if (columnFilters.scope) {
+      chips.push({
+        id: "scope",
+        label: "Scope",
+        value:
+          columnFilters.scope === "network"
+            ? "Network workflows"
+            : "Organization workflows",
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, scope: undefined })),
+      })
+    }
     if (columnFilters.network) {
       chips.push({
         id: "network",
@@ -543,13 +609,20 @@ export default function WorkflowDefinitionList() {
       title="Workflow Definitions"
       description={
         organization
-          ? `Workflows for ${organization.name} run when their trigger fires.`
+          ? `Network-wide workflows shared with ${organization.name}, plus workflows that belong only to this organization.`
           : network
             ? `Workflows for ${network.name} run when their trigger fires.`
             : "Workflows that run when their trigger fires."
       }
       action={
-        <Button onClick={() => openCreateWorkflow(network?.id)}>
+        <Button
+          onClick={() =>
+            openCreateWorkflow({
+              networkId: network?.id,
+              organizationId,
+            })
+          }
+        >
           <PlusIcon />
           Create workflow definition
         </Button>

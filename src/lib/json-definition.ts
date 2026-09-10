@@ -209,7 +209,9 @@ export function getWorkflowSteps(definition: JsonObject) {
 }
 
 export type PipelineLevelNode = {
-  id: string
+  name: string
+  type: string
+  definition: JsonObject
 }
 
 export function getPipelineLevels(
@@ -225,24 +227,26 @@ export function getPipelineLevels(
     }
     const nodes = level.flatMap((item) => {
       const node = asObject(item)
-      const id = asString(node?.id)
-      return id ? [{ id }] : []
+      const name = asString(node?.name)
+      const type = asString(node?.type)
+      const nodeDefinition = asObject(node?.definition)
+      if (!name || !type || !nodeDefinition) {
+        return []
+      }
+      return [{ name, type, definition: nodeDefinition }]
     })
     return nodes.length > 0 ? [nodes] : []
   })
 }
 
-export function getPipelineStages(
-  definition: JsonObject,
-  names?: Map<string, string>
-) {
+export function getPipelineStages(definition: JsonObject) {
   const levels = getPipelineLevels(definition)
   if (levels.length > 0) {
     return levels.map((level, index) => ({
       id: `level-${index}`,
       type: "level",
       name: level
-        .map((node, nodeIndex) => names?.get(node.id) ?? `[${nodeIndex}]`)
+        .map((node) => node.name.trim() || node.type)
         .join(", "),
       order: index + 1,
     }))

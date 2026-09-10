@@ -10,7 +10,6 @@ import {
   type Schema,
   type WorkflowDefinition,
   type PipelineDefinition,
-  type NodeDefinition,
 } from "@/data/networks"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -46,10 +45,6 @@ import {
   useListPipelinesQuery,
   type ApiPipelineDefinition,
 } from "@/store/pipeline-slice"
-import {
-  useListNodeDefinitionsQuery,
-  type ApiNodeDefinition,
-} from "@/store/node-slice"
 
 export function useWorkspaceVersion() {
   return useSyncExternalStore(
@@ -109,10 +104,6 @@ export function networkSectionRest(rest: string) {
     return "pipeline-definitions"
   }
 
-  if (rest === "node-definitions" || rest.startsWith("node-definitions/")) {
-    return "pipeline-definitions"
-  }
-
   if (rest === "workflows" || rest.startsWith("workflows/")) {
     return "workflows"
   }
@@ -164,7 +155,6 @@ export function workspaceNetworkFromApi(network: ApiNetwork): Network {
     schemas: [],
     workflowDefinitions: [],
     pipelineDefinitions: [],
-    nodeDefinitions: [],
   }
 }
 
@@ -248,11 +238,13 @@ export function workspaceWorkflowFromApi(
     id: workflow.id,
     name: workflow.name,
     slug: workflow.slug,
+    description: workflow.description ?? "",
     active: workflow.active,
     internal: workflow.internal,
     schemaId: workflow.schemaId,
     definition: workflowDefinitionAsJson(workflow.definition),
     networkId: workflow.networkId,
+    organizationId: workflow.organizationId ?? undefined,
   }
 }
 
@@ -263,23 +255,12 @@ export function workspacePipelineFromApi(
     id: pipeline.id,
     name: pipeline.name,
     slug: pipeline.slug,
+    description: pipeline.description ?? "",
     active: pipeline.active,
     internal: pipeline.internal,
     definition: pipeline.definition,
     networkId: pipeline.networkId,
-  }
-}
-
-export function workspaceNodeFromApi(node: ApiNodeDefinition): NodeDefinition {
-  return {
-    id: node.id,
-    name: node.name,
-    slug: node.slug,
-    active: node.active,
-    internal: node.internal,
-    type: node.type,
-    definition: node.definition,
-    networkId: node.networkId,
+    organizationId: pipeline.organizationId ?? undefined,
   }
 }
 
@@ -316,52 +297,61 @@ export function withNetworkSchemas(
 
 export function withNetworkWorkflows(
   network: Network,
-  workflows: WorkflowDefinition[]
+  workflows: WorkflowDefinition[],
+  organizationId?: string
 ): Network {
   const schemaIds = new Set(network.schemas.map((schema) => schema.id))
   return {
     ...network,
-    workflowDefinitions: workflows.filter(
-      (workflow) =>
-        workflow.networkId === network.id && schemaIds.has(workflow.schemaId)
-    ),
+    workflowDefinitions: workflows.filter((workflow) => {
+      if (workflow.networkId !== network.id || !schemaIds.has(workflow.schemaId)) {
+        return false
+      }
+      if (!organizationId) {
+        return true
+      }
+      return !workflow.organizationId || workflow.organizationId === organizationId
+    }),
   }
 }
 
 export function withNetworkPipelines(
   network: Network,
-  pipelines: PipelineDefinition[]
+  pipelines: PipelineDefinition[],
+  organizationId?: string
 ): Network {
   return {
     ...network,
-    pipelineDefinitions: pipelines.filter(
-      (pipeline) => pipeline.networkId === network.id
-    ),
+    pipelineDefinitions: pipelines.filter((pipeline) => {
+      if (pipeline.networkId !== network.id) {
+        return false
+      }
+      if (!organizationId) {
+        return true
+      }
+      return !pipeline.organizationId || pipeline.organizationId === organizationId
+    }),
   }
 }
 
-export function withNetworkNodes(
-  network: Network,
-  nodes: NodeDefinition[]
-): Network {
-  return {
-    ...network,
-    nodeDefinitions: nodes.filter((node) => node.networkId === network.id),
+export function definitionScopeLabel(
+  organizationId: string | undefined,
+  organizations: Organization[]
+) {
+  if (!organizationId) {
+    return "Network"
   }
+  return (
+    organizations.find((organization) => organization.id === organizationId)
+      ?.name ?? "Organization"
+  )
 }
 
 export function schemaScopeLabel(
   schema: Schema,
   organizations: Organization[]
 ) {
-  if (!schema.organizationId) {
-    return "Network"
-  }
-  return (
-    organizations.find(
-      (organization) => organization.id === schema.organizationId
-    )?.name ?? "Organization"
-  )
+  return definitionScopeLabel(schema.organizationId, organizations)
 }
 
 type WorkspaceQueryOptions = {
@@ -465,16 +455,6 @@ export function useWorkspacePipelines(options?: WorkspaceQueryOptions) {
   }
 }
 
-export function useWorkspaceNodes(options?: WorkspaceQueryOptions) {
-  const skip = useWorkspaceQuerySkip(options)
-  const query = useListNodeDefinitionsQuery(undefined, { skip })
-
-  return {
-    ...query,
-    nodes: (query.data?.items ?? []).map(workspaceNodeFromApi),
-  }
-}
-
 export function useWorkspaceNetworkList(options?: WorkspaceQueryOptions) {
   const skip = useWorkspaceQuerySkip(options)
   const query = useListNetworksQuery(undefined, { skip })
@@ -515,7 +495,6 @@ export function useWorkspaceNetworksWithDefinitions(
   const schemasQuery = useWorkspaceSchemas(options)
   const workflowsQuery = useWorkspaceWorkflows(options)
   const pipelinesQuery = useWorkspacePipelines(options)
-  const nodesQuery = useWorkspaceNodes(options)
 
   return {
     ...query,
@@ -523,43 +502,35 @@ export function useWorkspaceNetworksWithDefinitions(
       query.isLoading ||
       schemasQuery.isLoading ||
       workflowsQuery.isLoading ||
-      pipelinesQuery.isLoading ||
-      nodesQuery.isLoading,
+      pipelinesQuery.isLoading,
     isFetching:
       query.isFetching ||
       schemasQuery.isFetching ||
       workflowsQuery.isFetching ||
-      pipelinesQuery.isFetching ||
-      nodesQuery.isFetching,
+      pipelinesQuery.isFetching,
     isError:
       query.isError ||
       schemasQuery.isError ||
       workflowsQuery.isError ||
-      pipelinesQuery.isError ||
-      nodesQuery.isError,
+      pipelinesQuery.isError,
     error:
       query.error ??
       schemasQuery.error ??
       workflowsQuery.error ??
-      pipelinesQuery.error ??
-      nodesQuery.error,
+      pipelinesQuery.error,
     refetch: () => {
       query.refetch()
       void schemasQuery.refetch()
       void workflowsQuery.refetch()
       void pipelinesQuery.refetch()
-      void nodesQuery.refetch()
     },
     networks: query.networks.map((network) =>
-      withNetworkNodes(
-        withNetworkPipelines(
-          withNetworkWorkflows(
-            withNetworkSchemas(network, schemasQuery.schemas),
-            workflowsQuery.workflows
-          ),
-          pipelinesQuery.pipelines
+      withNetworkPipelines(
+        withNetworkWorkflows(
+          withNetworkSchemas(network, schemasQuery.schemas),
+          workflowsQuery.workflows
         ),
-        nodesQuery.nodes
+        pipelinesQuery.pipelines
       )
     ),
   }
@@ -584,7 +555,6 @@ export function useNetworkWorkspace() {
   const schemasQuery = useWorkspaceSchemas()
   const workflowsQuery = useWorkspaceWorkflows()
   const pipelinesQuery = useWorkspacePipelines()
-  const nodesQuery = useWorkspaceNodes()
   const organization =
     organizationId &&
     organizationQuery.data &&
@@ -593,22 +563,21 @@ export function useNetworkWorkspace() {
       ? workspaceOrganizationFromApi(organizationQuery.data)
       : undefined
   const network = networkQuery.data
-    ? withNetworkNodes(
-        withNetworkPipelines(
-          withNetworkWorkflows(
-            withNetworkSchemas(
-              withNetworkOrganizations(
-                workspaceNetworkFromApi(networkQuery.data),
-                organizationsQuery.organizations
-              ),
-              schemasQuery.schemas,
-              organization?.id
+    ? withNetworkPipelines(
+        withNetworkWorkflows(
+          withNetworkSchemas(
+            withNetworkOrganizations(
+              workspaceNetworkFromApi(networkQuery.data),
+              organizationsQuery.organizations
             ),
-            workflowsQuery.workflows
+            schemasQuery.schemas,
+            organization?.id
           ),
-          pipelinesQuery.pipelines
+          workflowsQuery.workflows,
+          organization?.id
         ),
-        nodesQuery.nodes
+        pipelinesQuery.pipelines,
+        organization?.id
       )
     : undefined
   const workspaceNetwork =
@@ -652,8 +621,7 @@ export function useNetworkWorkspace() {
       organizationsQuery.isFetching ||
       schemasQuery.isFetching ||
       workflowsQuery.isFetching ||
-      pipelinesQuery.isFetching ||
-      nodesQuery.isFetching,
+      pipelinesQuery.isFetching,
     refetch: () => {
       if (networkId) {
         void networkQuery.refetch()
@@ -665,7 +633,6 @@ export function useNetworkWorkspace() {
       void schemasQuery.refetch()
       void workflowsQuery.refetch()
       void pipelinesQuery.refetch()
-      void nodesQuery.refetch()
     },
     href,
   }

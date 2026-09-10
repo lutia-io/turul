@@ -46,14 +46,13 @@ export type PipelineTemplateContext = {
 
 export function pipelineTemplateContextForLevel(
   levelIndex: number,
-  previousNodeIds: string[],
-  nodeName: (id: string) => string | undefined
+  previousNodes: { name: string }[]
 ): PipelineTemplateContext {
   return {
     levelIndex,
-    previousOutputs: previousNodeIds.filter(Boolean).map((id, index) => ({
+    previousOutputs: previousNodes.map((node, index) => ({
       index,
-      label: nodeName(id) ?? `Output ${index}`,
+      label: node.name.trim() || `Output ${index}`,
     })),
   }
 }

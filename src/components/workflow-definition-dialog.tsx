@@ -6,7 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate } from "react-router"
 import { FileJsonIcon, Loader } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
@@ -28,6 +28,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -44,6 +45,7 @@ import {
 import {
   networkWorkspacePath,
   useWorkspaceNetworkList,
+  useWorkspaceOrganizations,
   useWorkspacePipelines,
   useWorkspaceSchemas,
 } from "@/lib/network-workspace"
@@ -67,6 +69,8 @@ import {
 import { getHumaErrorMessage } from "@/store/api"
 import { useCreateWorkflowDefinitionMutation } from "@/store/workflow-slice"
 
+const entireNetworkValue = "__network__"
+
 function workflowDefinitionError(text: string) {
   try {
     const parsed = JSON.parse(text) as unknown
@@ -86,26 +90,33 @@ export function WorkflowDefinitionDialog({
   open,
   onOpenChange,
   networkId,
+  organizationId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
+  organizationId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
+  const { organizations } = useWorkspaceOrganizations({ skip: !open })
   const { schemas } = useWorkspaceSchemas({ skip: !open })
   const { pipelines } = useWorkspacePipelines({ skip: !open })
-  const { organizationId } = useParams()
   const [createWorkflow, createState] = useCreateWorkflowDefinitionMutation()
   const isLoading = createState.isLoading
   const error = createState.error
   const lockNetwork = Boolean(networkId)
+  const lockOrganization = Boolean(organizationId)
   const [definitionView, setDefinitionView] = useState<"rule" | "json">("rule")
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? networks[0]?.id ?? ""
   )
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(
+    organizationId ?? ""
+  )
   const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
   const [schemaId, setSchemaId] = useState("")
   const [active, setActive] = useState(true)
   const [trigger, setTrigger] = useState<TriggerDraft>(emptyTrigger())
@@ -116,16 +127,42 @@ export function WorkflowDefinitionDialog({
   const jsonSourceRef = useRef<"builder" | "json">("builder")
 
   const firstNetworkId = networks[0]?.id ?? ""
+  const networkOrganizations = organizations.filter(
+    (organization) => organization.networkId === selectedNetworkId
+  )
   const networkSchemas = useMemo(
-    () => schemas.filter((schema) => schema.networkId === selectedNetworkId),
-    [schemas, selectedNetworkId]
+    () =>
+      schemas.filter((schema) => {
+        if (schema.networkId !== selectedNetworkId) {
+          return false
+        }
+        if (!selectedOrganizationId) {
+          return !schema.organizationId
+        }
+        return (
+          !schema.organizationId ||
+          schema.organizationId === selectedOrganizationId
+        )
+      }),
+    [schemas, selectedNetworkId, selectedOrganizationId]
   )
   const networkPipelines = useMemo(
     () =>
       pipelines
-        .filter((pipeline) => pipeline.networkId === selectedNetworkId)
+        .filter((pipeline) => {
+          if (pipeline.networkId !== selectedNetworkId) {
+            return false
+          }
+          if (!selectedOrganizationId) {
+            return !pipeline.organizationId
+          }
+          return (
+            !pipeline.organizationId ||
+            pipeline.organizationId === selectedOrganizationId
+          )
+        })
         .sort((left, right) => left.name.localeCompare(right.name)),
-    [pipelines, selectedNetworkId]
+    [pipelines, selectedNetworkId, selectedOrganizationId]
   )
   const triggerSchema = networkSchemas.find((schema) => schema.id === schemaId)
   const triggerFields = schemaFieldOptions(triggerSchema?.definition)
@@ -143,7 +180,9 @@ export function WorkflowDefinitionDialog({
     }
 
     setName("")
+    setDescription("")
     setSchemaId("")
+    setSelectedOrganizationId(organizationId ?? "")
     setActive(true)
     setDefinitionView("rule")
     jsonSourceRef.current = "builder"
@@ -151,7 +190,7 @@ export function WorkflowDefinitionDialog({
     setTrigger(emptyTrigger())
     setCriteria(emptyGroup())
     setActions([])
-  }, [open])
+  }, [open, organizationId])
 
   useEffect(() => {
     if (!open) {
@@ -166,11 +205,16 @@ export function WorkflowDefinitionDialog({
   }, [firstNetworkId, networkId, open])
 
   useEffect(() => {
-    if (!open || schemaId) {
+    if (!open) {
       return
     }
-    setSchemaId(networkSchemas[0]?.id ?? "")
-  }, [networkSchemas, open, schemaId])
+    setSchemaId((current) => {
+      if (current && networkSchemas.some((schema) => schema.id === current)) {
+        return current
+      }
+      return networkSchemas[0]?.id ?? ""
+    })
+  }, [networkSchemas, open])
 
   const definition = useMemo<WorkflowDefinitionBody | undefined>(() => {
     const nextActions = actionsToApi(actions)
@@ -244,6 +288,7 @@ export function WorkflowDefinitionDialog({
   }
 
   const showNetwork = networks.length > 0 && !lockNetwork
+  const showOrganization = true
   const sentence = workflowDraftSentence(
     trigger,
     criteria,
@@ -278,16 +323,18 @@ export function WorkflowDefinitionDialog({
     try {
       const workflow = await createWorkflow({
         name: name.trim(),
+        description: description.trim(),
         active,
         definition: body,
         schemaId,
         networkId: selectedNetworkId,
+        organizationId: selectedOrganizationId || undefined,
       }).unwrap()
       onOpenChange(false)
       navigate(
         networkWorkspacePath({
           networkId: selectedNetworkId,
-          organizationId: organizationId || undefined,
+          organizationId: selectedOrganizationId || undefined,
           rest: `workflow-definitions/${workflow.id}`,
         })
       )
@@ -329,61 +376,107 @@ export function WorkflowDefinitionDialog({
         >
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
               <FieldGroup className="shrink-0 gap-4 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
-                {showNetwork ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field>
-                      <FieldLabel htmlFor={`${formId}-network`}>
-                        Network
-                      </FieldLabel>
-                      <Select
-                        value={selectedNetworkId}
-                        disabled={isLoading}
-                        required
-                        modal={false}
-                        items={networks.map((network) => ({
-                          value: network.id,
-                          label: network.name,
-                        }))}
-                        onValueChange={(value) => {
-                          if (!value) {
-                            return
-                          }
-                          setSelectedNetworkId(value)
-                          const nextSchema = schemas.find(
-                            (schema) => schema.networkId === value
-                          )
-                          setSchemaId(nextSchema?.id ?? "")
-                        }}
-                      >
-                        <SelectTrigger id={`${formId}-network`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {networks.map((network) => (
-                            <SelectItem key={network.id} value={network.id}>
-                              {network.name}
+                {showNetwork || showOrganization ? (
+                  <div
+                    className={
+                      showNetwork && showOrganization
+                        ? "grid gap-4 sm:grid-cols-2"
+                        : undefined
+                    }
+                  >
+                    {showNetwork ? (
+                      <Field>
+                        <FieldLabel htmlFor={`${formId}-network`}>
+                          Network
+                        </FieldLabel>
+                        <Select
+                          value={selectedNetworkId}
+                          disabled={isLoading}
+                          required
+                          modal={false}
+                          items={networks.map((network) => ({
+                            value: network.id,
+                            label: network.name,
+                          }))}
+                          onValueChange={(value) => {
+                            if (!value) {
+                              return
+                            }
+                            setSelectedNetworkId(value)
+                            if (!lockOrganization) {
+                              setSelectedOrganizationId("")
+                            }
+                            setSchemaId("")
+                          }}
+                        >
+                          <SelectTrigger id={`${formId}-network`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {networks.map((network) => (
+                              <SelectItem key={network.id} value={network.id}>
+                                {network.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    ) : null}
+                    {showOrganization ? (
+                      <Field>
+                        <FieldLabel htmlFor={`${formId}-organization`}>
+                          Organization
+                        </FieldLabel>
+                        <Select
+                          value={selectedOrganizationId || entireNetworkValue}
+                          disabled={lockOrganization || isLoading}
+                          modal={false}
+                          items={[
+                            {
+                              value: entireNetworkValue,
+                              label: "Entire network",
+                            },
+                            ...networkOrganizations.map((organization) => ({
+                              value: organization.id,
+                              label: organization.name,
+                            })),
+                          ]}
+                          onValueChange={(value) => {
+                            if (!value || value === entireNetworkValue) {
+                              setSelectedOrganizationId("")
+                              return
+                            }
+                            setSelectedOrganizationId(value)
+                          }}
+                        >
+                          <SelectTrigger id={`${formId}-organization`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={entireNetworkValue}>
+                              Entire network
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <SchemaSelect
-                      formId={formId}
-                      schemaId={schemaId}
-                      schemas={networkSchemas}
-                      isLoading={isLoading}
-                      onChange={setSchemaId}
-                    />
+                            {networkOrganizations.map((organization) => (
+                              <SelectItem
+                                key={organization.id}
+                                value={organization.id}
+                              >
+                                {organization.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    ) : null}
                   </div>
-                ) : (
-                  <SchemaSelect
-                    formId={formId}
-                    schemaId={schemaId}
-                    schemas={networkSchemas}
-                    isLoading={isLoading}
-                    onChange={setSchemaId}
-                  />
-                )}
+                ) : null}
+                <SchemaSelect
+                  formId={formId}
+                  schemaId={schemaId}
+                  schemas={networkSchemas}
+                  isLoading={isLoading}
+                  onChange={setSchemaId}
+                />
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                   <Field>
                     <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
@@ -407,6 +500,18 @@ export function WorkflowDefinitionDialog({
                     />
                   </Field>
                 </div>
+                <Field>
+                  <FieldLabel htmlFor={`${formId}-description`}>
+                    Description
+                  </FieldLabel>
+                  <Textarea
+                    id={`${formId}-description`}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="What this workflow does"
+                    disabled={isLoading}
+                  />
+                </Field>
                 {error ? (
                   <FieldError>{getHumaErrorMessage(error)}</FieldError>
                 ) : null}

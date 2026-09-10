@@ -5,6 +5,7 @@ import {
   FileJsonIcon,
   FilterIcon,
   GalleryVerticalEndIcon,
+  Building2Icon,
   Loader,
   PencilIcon,
   WorkflowIcon,
@@ -31,6 +32,7 @@ import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   WorkflowActionView,
   WorkflowCriteriaView,
@@ -44,7 +46,9 @@ import {
   type JsonObject,
 } from "@/lib/json-definition"
 import {
+  networkWorkspacePath,
   useNetworkWorkspace,
+  useWorkspaceOrganizations,
   useWorkspacePipelines,
   useWorkspaceSchemas,
   useWorkspaceWorkflowRuns,
@@ -107,6 +111,7 @@ export default function WorkflowDefinitionDetail() {
   } = useNetworkWorkspace()
   const { schemas } = useWorkspaceSchemas()
   const { pipelines } = useWorkspacePipelines()
+  const { organizations } = useWorkspaceOrganizations()
   const { runs } = useWorkspaceWorkflowRuns()
   const { openEditWorkflow } = useCreateEntity()
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
@@ -118,9 +123,16 @@ export default function WorkflowDefinitionDetail() {
     ? workspaceWorkflowFromApi(workflowQuery.data)
     : undefined
   const belongsToWorkspace =
-    !workspaceNetwork || workflowDefinition?.networkId === workspaceNetwork.id
+    !workspaceNetwork ||
+    (workflowDefinition?.networkId === workspaceNetwork.id &&
+      (!organizationId ||
+        !workflowDefinition.organizationId ||
+        workflowDefinition.organizationId === organizationId))
   const visibleWorkflow = belongsToWorkspace ? workflowDefinition : undefined
   const network = belongsToWorkspace ? workspaceNetwork : undefined
+  const organization = visibleWorkflow?.organizationId
+    ? organizations.find((item) => item.id === visibleWorkflow.organizationId)
+    : undefined
   const schema = visibleWorkflow
     ? schemas.find((item) => item.id === visibleWorkflow.schemaId)
     : undefined
@@ -235,6 +247,20 @@ export default function WorkflowDefinitionDetail() {
               {actions.length} {actions.length === 1 ? "action" : "actions"}
             </span>
           </AsideRow>
+          {organization ? (
+            <AsideRow label="Organization">
+              <Link
+                to={networkWorkspacePath({
+                  networkId: network.id,
+                  organizationId: organization.id,
+                })}
+                className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+              >
+                <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{organization.name}</span>
+              </Link>
+            </AsideRow>
+          ) : null}
           <AsideRow label="Network">
             <Link
               to={href()}
@@ -335,11 +361,12 @@ export default function WorkflowDefinitionDetail() {
             />
           </div>
           <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-            {workflowRuleSentence(
-              parsed?.trigger,
-              parsed?.criteria,
-              actions.length
-            )}
+            {visibleWorkflow.description ||
+              workflowRuleSentence(
+                parsed?.trigger,
+                parsed?.criteria,
+                actions.length
+              )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -457,6 +484,7 @@ function WorkflowDefinitionEdit({
   const parsed = parseWorkflowDefinition(workflow.definition)
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
   const [name, setName] = useState(workflow.name)
+  const [description, setDescription] = useState(workflow.description ?? "")
   const [active, setActive] = useState(workflow.active)
   const [trigger, setTrigger] = useState<TriggerDraft>(() =>
     triggerFromApi(parsed?.trigger)
@@ -565,6 +593,7 @@ function WorkflowDefinitionEdit({
       await updateWorkflow({
         id: workflow.id,
         name: name.trim(),
+        description: description.trim(),
         active,
         definition: body,
         schemaId: workflow.schemaId,
@@ -612,6 +641,18 @@ function WorkflowDefinitionEdit({
                 label="Enabled"
               />
             </div>
+            <Field className="max-w-2xl gap-1">
+              <FieldLabel htmlFor={`${formId}-description`} className="sr-only">
+                Description
+              </FieldLabel>
+              <Textarea
+                id={`${formId}-description`}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="What this workflow does"
+                disabled={isLoading}
+              />
+            </Field>
             <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
               {workflowDraftSentence(trigger, criteria, actions, triggerFields)}
             </p>

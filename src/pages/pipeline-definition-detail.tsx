@@ -10,6 +10,7 @@ import {
 import { Link, useParams, useSearchParams } from "react-router"
 import {
   BoxIcon,
+  Building2Icon,
   FileJsonIcon,
   GalleryVerticalEndIcon,
   LayersIcon,
@@ -45,7 +46,8 @@ import { RunPipelineDialog } from "@/components/run-pipeline-dialog"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import type { NodeDefinition, PipelineDefinition } from "@/data/networks"
+import { Textarea } from "@/components/ui/textarea"
+import type { PipelineDefinition } from "@/data/networks"
 import {
   getPipelineLevels,
   parseJsonObject,
@@ -54,8 +56,9 @@ import {
   type PipelineLevelNode,
 } from "@/lib/json-definition"
 import {
+  networkWorkspacePath,
   useNetworkWorkspace,
-  useWorkspaceNodes,
+  useWorkspaceOrganizations,
   useWorkspacePipelineRuns,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
@@ -74,12 +77,14 @@ import {
   pipelineLevelTitle,
   pipelineNodeCount,
   pipelineSummary,
+  replacePipelineNode,
   type CreatePipelineNodeTarget,
   type PipelineDefinitionBody,
   type PipelineLevelDraft,
+  type PipelineNodeConfig,
+  type PipelineNodeEditorTarget,
 } from "@/lib/pipeline-definition"
 import { apiPipelineStatus, formatRelativeTime } from "@/lib/runs"
-import { cn } from "@/lib/utils"
 import { getHumaErrorMessage, getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -114,9 +119,9 @@ export default function PipelineDefinitionDetail() {
     organizationId,
     href,
   } = useNetworkWorkspace()
-  const { nodes } = useWorkspaceNodes()
   const { runs } = useWorkspacePipelineRuns()
-  const { openEditPipeline, openEditNode } = useCreateEntity()
+  const { organizations } = useWorkspaceOrganizations()
+  const { openEditPipeline } = useCreateEntity()
   const [runOpen, setRunOpen] = useState(false)
   const [pipelineView, setPipelineView] = useState<PipelineView>("levels")
 
@@ -128,11 +133,16 @@ export default function PipelineDefinitionDetail() {
     ? workspacePipelineFromApi(pipelineQuery.data)
     : undefined
   const belongsToWorkspace =
-    !workspaceNetwork || pipelineDefinition?.networkId === workspaceNetwork.id
+    !workspaceNetwork ||
+    (pipelineDefinition?.networkId === workspaceNetwork.id &&
+      (!organizationId ||
+        !pipelineDefinition.organizationId ||
+        pipelineDefinition.organizationId === organizationId))
   const visiblePipeline = belongsToWorkspace ? pipelineDefinition : undefined
   const network = belongsToWorkspace ? workspaceNetwork : undefined
-  const nodesById = new Map(nodes.map((node) => [node.id, node]))
-  const nodeNames = new Map(nodes.map((node) => [node.id, node.name]))
+  const organization = visiblePipeline?.organizationId
+    ? organizations.find((item) => item.id === visiblePipeline.organizationId)
+    : undefined
   const levels = visiblePipeline
     ? getPipelineLevels(visiblePipeline.definition)
     : []
@@ -140,7 +150,7 @@ export default function PipelineDefinitionDetail() {
     ? pipelineNodeCount(visiblePipeline.definition)
     : 0
   const summary = visiblePipeline
-    ? pipelineSummary(visiblePipeline.definition, nodeNames)
+    ? pipelineSummary(visiblePipeline.definition)
     : ""
   const relatedRuns = visiblePipeline
     ? runs
@@ -212,6 +222,20 @@ export default function PipelineDefinitionDetail() {
           <AsideRow label="Nodes">
             <span className="tabular-nums">{nodeCount}</span>
           </AsideRow>
+          {organization ? (
+            <AsideRow label="Organization">
+              <Link
+                to={networkWorkspacePath({
+                  networkId: network.id,
+                  organizationId: organization.id,
+                })}
+                className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+              >
+                <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{organization.name}</span>
+              </Link>
+            </AsideRow>
+          ) : null}
           <AsideRow label="Network">
             <Link
               to={href()}
@@ -278,9 +302,6 @@ export default function PipelineDefinitionDetail() {
       <PipelineDefinitionEdit
         key={visiblePipeline.id}
         pipeline={visiblePipeline}
-        nodes={nodes.filter(
-          (node) => node.networkId === visiblePipeline.networkId
-        )}
         href={href}
         aside={aside}
         onCancel={() => setSearchParams({})}
@@ -308,7 +329,7 @@ export default function PipelineDefinitionDetail() {
             />
           </div>
           <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-            {summary}
+            {visiblePipeline.description || summary}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -348,14 +369,14 @@ export default function PipelineDefinitionDetail() {
           <JsonDefinitionCard
             definition={visiblePipeline.definition}
             label="JSONB definition"
-            description="Levels and node references stored on this pipeline."
+            description="Levels and node configs stored on this pipeline."
           />
         ) : (
           <DefinitionCard>
             <SectionHeading
               icon={LayersIcon}
               title="Levels"
-              description="The pipeline runs one level at a time. Open a node to edit it. Nodes in the same level run together. When a level finishes, the next level starts."
+              description="The pipeline runs one level at a time. Nodes in the same level run together. When a level finishes, the next level starts."
             />
             {levels.length === 0 ? (
               <p className="mt-6 text-sm text-muted-foreground">
@@ -372,13 +393,6 @@ export default function PipelineDefinitionDetail() {
                       level={level}
                       levelIndex={levelIndex}
                       totalLevels={levels.length}
-                      nodesById={nodesById}
-                      onSelectNode={(nodeId) =>
-                        openEditNode(
-                          nodeId,
-                          templateContextForLevel(levelIndex, levels, nodesById)
-                        )
-                      }
                     />
                   </div>
                 ))}
@@ -401,13 +415,11 @@ export default function PipelineDefinitionDetail() {
 
 function PipelineDefinitionEdit({
   pipeline,
-  nodes,
   href,
   aside,
   onCancel,
 }: {
   pipeline: PipelineDefinition
-  nodes: NodeDefinition[]
   href: (rest?: string) => string
   aside: ReactNode
   onCancel: () => void
@@ -417,6 +429,7 @@ function PipelineDefinitionEdit({
   const parsed = parsePipelineDefinition(pipeline.definition)
   const [definitionView, setDefinitionView] = useState<PipelineView>("levels")
   const [name, setName] = useState(pipeline.name)
+  const [description, setDescription] = useState(pipeline.description ?? "")
   const [active, setActive] = useState(pipeline.active)
   const [levels, setLevels] = useState<PipelineLevelDraft[]>(() =>
     levelsFromApi(parsed)
@@ -426,14 +439,13 @@ function PipelineDefinitionEdit({
   const jsonSourceRef = useRef<"builder" | "json">("builder")
   const [nodeDialogOpen, setNodeDialogOpen] = useState(false)
   const [nodeDialogKey, setNodeDialogKey] = useState(0)
-  const [nodeDialogId, setNodeDialogId] = useState<string>()
+  const [nodeDialogNode, setNodeDialogNode] = useState<PipelineNodeConfig>()
   const [nodeDialogContext, setNodeDialogContext] = useState(
-    pipelineTemplateContextForLevel(0, [], () => undefined)
+    pipelineTemplateContextForLevel(0, [])
   )
-  const createNodeTargetRef = useRef<CreatePipelineNodeTarget | null>(null)
+  const createNodeTargetRef = useRef<PipelineNodeEditorTarget | null>(null)
   const isLoading = updateState.isLoading
   const error = updateState.error
-  const nodeName = (id: string) => nodes.find((node) => node.id === id)?.name
 
   const definition = useMemo(() => levelsToApi(levels), [levels])
   const generatedJson = stringifyDefinition(definition ?? { nodes: [] })
@@ -495,18 +507,17 @@ function PipelineDefinitionEdit({
     const index = Math.max(0, levelIndex)
     return pipelineTemplateContextForLevel(
       index,
-      levels[index - 1]?.nodeIds ?? [],
-      nodeName
+      levels[index - 1]?.nodes ?? []
     )
   }
 
   function openNodeDialog(options: {
-    nodeDefinitionId?: string
+    node?: PipelineNodeConfig
     levelIndex: number
-    createTarget?: CreatePipelineNodeTarget | null
+    target: PipelineNodeEditorTarget
   }) {
-    createNodeTargetRef.current = options.createTarget ?? null
-    setNodeDialogId(options.nodeDefinitionId)
+    createNodeTargetRef.current = options.target
+    setNodeDialogNode(options.node)
     setNodeDialogContext(templateContextForLevelIndex(options.levelIndex))
     setNodeDialogKey((key) => key + 1)
     setNodeDialogOpen(true)
@@ -516,28 +527,47 @@ function PipelineDefinitionEdit({
     const levelIndex =
       target.kind === "level"
         ? levels.findIndex((level) => level.key === target.levelKey)
-        : levels.findIndex((level) => level.nodeIds.some((id) => !id))
+        : 0
+    const level = levels[Math.max(0, levelIndex)]
     openNodeDialog({
       levelIndex,
-      createTarget: target,
+      target: {
+        levelKey:
+          level?.key ??
+          (target.kind === "level" ? target.levelKey : (levels[0]?.key ?? "")),
+      },
     })
   }
 
-  function openEditNode(nodeId: string, levelKey: string) {
+  function openEditNode(nodeKey: string, levelKey: string) {
+    const levelIndex = levels.findIndex((level) => level.key === levelKey)
+    const node = levels[levelIndex]?.nodes.find((item) => item.key === nodeKey)
     openNodeDialog({
-      nodeDefinitionId: nodeId,
-      levelIndex: levels.findIndex((level) => level.key === levelKey),
+      node,
+      levelIndex,
+      target: { levelKey, nodeKey },
     })
   }
 
-  function handleNodeCreated(nodeId: string) {
+  function handleNodeSave(node: PipelineNodeConfig) {
     const target = createNodeTargetRef.current
     createNodeTargetRef.current = null
     if (!target) {
       return
     }
     markBuilderSource()
-    setLevels((current) => insertCreatedNode(current, nodeId, target))
+    if (target.nodeKey) {
+      setLevels((current) =>
+        replacePipelineNode(current, target.levelKey, target.nodeKey!, node)
+      )
+      return
+    }
+    setLevels((current) =>
+      insertCreatedNode(current, node, {
+        kind: "level",
+        levelKey: target.levelKey,
+      })
+    )
   }
 
   const canSubmit = Boolean(name.trim()) && Boolean(definition) && !jsonError
@@ -556,6 +586,7 @@ function PipelineDefinitionEdit({
       await updatePipeline({
         id: pipeline.id,
         name: name.trim(),
+        description: description.trim(),
         active,
         definition: body,
       }).unwrap()
@@ -602,8 +633,20 @@ function PipelineDefinitionEdit({
                 label="Enabled"
               />
             </div>
+            <Field className="max-w-2xl gap-1">
+              <FieldLabel htmlFor={`${formId}-description`} className="sr-only">
+                Description
+              </FieldLabel>
+              <Textarea
+                id={`${formId}-description`}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="What this pipeline does"
+                disabled={isLoading}
+              />
+            </Field>
             <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-              {pipelineDraftSentence(levels, nodeName)}
+              {pipelineDraftSentence(levels)}
             </p>
             {error ? (
               <FieldError>{getHumaErrorMessage(error)}</FieldError>
@@ -668,7 +711,6 @@ function PipelineDefinitionEdit({
             <DefinitionCard>
               <PipelineLevelsEditor
                 levels={levels}
-                nodes={nodes}
                 onChange={(next) => {
                   markBuilderSource()
                   setLevels(next)
@@ -684,24 +726,11 @@ function PipelineDefinitionEdit({
         key={nodeDialogKey}
         open={nodeDialogOpen}
         onOpenChange={setNodeDialogOpen}
-        networkId={pipeline.networkId}
-        nodeDefinitionId={nodeDialogId}
-        onCreated={handleNodeCreated}
+        node={nodeDialogNode}
+        onSave={handleNodeSave}
         pipelineTemplateContext={nodeDialogContext}
       />
     </DefinitionPage>
-  )
-}
-
-function templateContextForLevel(
-  levelIndex: number,
-  levels: PipelineLevelNode[][],
-  nodesById: Map<string, NodeDefinition>
-) {
-  return pipelineTemplateContextForLevel(
-    levelIndex,
-    (levels[levelIndex - 1] ?? []).map((ref) => ref.id),
-    (id) => nodesById.get(id)?.name
   )
 }
 
@@ -731,14 +760,10 @@ function LevelCard({
   level,
   levelIndex,
   totalLevels,
-  nodesById,
-  onSelectNode,
 }: {
   level: PipelineLevelNode[]
   levelIndex: number
   totalLevels: number
-  nodesById: Map<string, NodeDefinition>
-  onSelectNode: (nodeId: string) => void
 }) {
   const parallel = level.length > 1
 
@@ -774,83 +799,34 @@ function LevelCard({
         </div>
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2">
-        {level.map((ref, nodeIndex) => (
-          <NodeCard
-            key={`${ref.id}-${nodeIndex}`}
-            node={nodesById.get(ref.id)}
-            nodeId={ref.id}
-            onSelect={onSelectNode}
-          />
+        {level.map((node, nodeIndex) => (
+          <NodeCard key={`${node.name}-${nodeIndex}`} node={node} />
         ))}
       </div>
     </div>
   )
 }
 
-function NodeCard({
-  node,
-  nodeId,
-  onSelect,
-}: {
-  node?: NodeDefinition
-  nodeId: string
-  onSelect: (nodeId: string) => void
-}) {
-  const summary = node
-    ? nodeConfigSummary(node.type, node.definition)
-    : undefined
-  const canEdit = Boolean(node) && !node?.internal
-  const body = (
-    <>
+function NodeCard({ node }: { node: PipelineLevelNode }) {
+  const summary = nodeConfigSummary(node.type, node.definition)
+  return (
+    <div className="rounded-xl border bg-background p-4 shadow-xs">
       <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-md",
-            node
-              ? "bg-violet-500/10 text-violet-700 dark:text-violet-300"
-              : "bg-muted text-muted-foreground"
-          )}
-        >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300">
           <BoxIcon className="size-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            {node?.name ?? "Missing node"}
-          </p>
+          <p className="truncate text-sm font-medium">{node.name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {node ? nodeTypeLabel(node.type) : nodeId}
+            {nodeTypeLabel(node.type)}
           </p>
         </div>
-        {canEdit ? (
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground">
-            <PencilIcon className="size-3.5" />
-            <span className="sr-only">Edit node</span>
-          </span>
-        ) : null}
       </div>
       {summary ? (
         <p className="mt-3 truncate font-mono text-xs text-muted-foreground">
           {summary}
         </p>
       ) : null}
-    </>
-  )
-
-  if (!canEdit || !node) {
-    return (
-      <div className="rounded-xl border bg-background p-4 shadow-xs">
-        {body}
-      </div>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(node.id)}
-      className="rounded-xl border bg-background p-4 text-left shadow-xs transition-colors hover:bg-muted/40"
-    >
-      {body}
-    </button>
+    </div>
   )
 }

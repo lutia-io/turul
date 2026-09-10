@@ -6,7 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate } from "react-router"
 import { FileJsonIcon, Loader } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
@@ -30,6 +30,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -45,7 +46,7 @@ import {
 import {
   networkWorkspacePath,
   useWorkspaceNetworkList,
-  useWorkspaceNodes,
+  useWorkspaceOrganizations,
 } from "@/lib/network-workspace"
 import { pipelineTemplateContextForLevel } from "@/lib/node-definition"
 import {
@@ -55,12 +56,17 @@ import {
   levelsToApi,
   parsePipelineDefinition,
   pipelineDraftSentence,
+  replacePipelineNode,
   type CreatePipelineNodeTarget,
   type PipelineDefinitionBody,
   type PipelineLevelDraft,
+  type PipelineNodeConfig,
+  type PipelineNodeEditorTarget,
 } from "@/lib/pipeline-definition"
 import { getHumaErrorMessage } from "@/store/api"
 import { useCreatePipelineDefinitionMutation } from "@/store/pipeline-slice"
+
+const entireNetworkValue = "__network__"
 
 function pipelineDefinitionError(text: string) {
   try {
@@ -81,27 +87,33 @@ export function PipelineDefinitionDialog({
   open,
   onOpenChange,
   networkId,
+  organizationId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
+  organizationId?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
-  const { organizationId } = useParams()
   const { networks } = useWorkspaceNetworkList()
-  const { nodes } = useWorkspaceNodes({ skip: !open })
+  const { organizations } = useWorkspaceOrganizations({ skip: !open })
   const [createPipeline, createState] = useCreatePipelineDefinitionMutation()
   const isLoading = createState.isLoading
   const error = createState.error
   const lockNetwork = Boolean(networkId)
+  const lockOrganization = Boolean(organizationId)
   const [definitionView, setDefinitionView] = useState<"levels" | "json">(
     "levels"
   )
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? networks[0]?.id ?? ""
   )
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(
+    organizationId ?? ""
+  )
   const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
   const [active, setActive] = useState(true)
   const [levels, setLevels] =
     useState<PipelineLevelDraft[]>(emptyPipelineLevels)
@@ -110,19 +122,15 @@ export function PipelineDefinitionDialog({
   const jsonSourceRef = useRef<"builder" | "json">("builder")
   const [nodeDialogOpen, setNodeDialogOpen] = useState(false)
   const [nodeDialogKey, setNodeDialogKey] = useState(0)
-  const [nodeDialogId, setNodeDialogId] = useState<string>()
+  const [nodeDialogNode, setNodeDialogNode] = useState<PipelineNodeConfig>()
   const [nodeDialogContext, setNodeDialogContext] = useState(
-    pipelineTemplateContextForLevel(0, [], () => undefined)
+    pipelineTemplateContextForLevel(0, [])
   )
-  const createNodeTargetRef = useRef<CreatePipelineNodeTarget | null>(null)
+  const createNodeTargetRef = useRef<PipelineNodeEditorTarget | null>(null)
   const firstNetworkId = networks[0]?.id ?? ""
-
-  const networkNodes = useMemo(
-    () => nodes.filter((node) => node.networkId === selectedNetworkId),
-    [nodes, selectedNetworkId]
+  const networkOrganizations = organizations.filter(
+    (organization) => organization.networkId === selectedNetworkId
   )
-  const nodeName = (id: string) =>
-    networkNodes.find((node) => node.id === id)?.name
 
   useEffect(() => {
     createState.reset()
@@ -134,18 +142,20 @@ export function PipelineDefinitionDialog({
   useEffect(() => {
     if (!open) {
       setNodeDialogOpen(false)
-      setNodeDialogId(undefined)
+      setNodeDialogNode(undefined)
       createNodeTargetRef.current = null
       return
     }
 
     setName("")
+    setDescription("")
+    setSelectedOrganizationId(organizationId ?? "")
     setActive(true)
     setDefinitionView("levels")
     jsonSourceRef.current = "builder"
     setJsonError(null)
     setLevels(emptyPipelineLevels())
-  }, [open])
+  }, [open, organizationId])
 
   useEffect(() => {
     if (!open) {
@@ -219,18 +229,17 @@ export function PipelineDefinitionDialog({
     const index = Math.max(0, levelIndex)
     return pipelineTemplateContextForLevel(
       index,
-      levels[index - 1]?.nodeIds ?? [],
-      nodeName
+      levels[index - 1]?.nodes ?? []
     )
   }
 
   function openNodeDialog(options: {
-    nodeDefinitionId?: string
+    node?: PipelineNodeConfig
     levelIndex: number
-    createTarget?: CreatePipelineNodeTarget | null
+    target: PipelineNodeEditorTarget
   }) {
-    createNodeTargetRef.current = options.createTarget ?? null
-    setNodeDialogId(options.nodeDefinitionId)
+    createNodeTargetRef.current = options.target
+    setNodeDialogNode(options.node)
     setNodeDialogContext(templateContextForLevelIndex(options.levelIndex))
     setNodeDialogKey((key) => key + 1)
     setNodeDialogOpen(true)
@@ -240,32 +249,52 @@ export function PipelineDefinitionDialog({
     const levelIndex =
       target.kind === "level"
         ? levels.findIndex((level) => level.key === target.levelKey)
-        : levels.findIndex((level) => level.nodeIds.some((id) => !id))
+        : 0
+    const level = levels[Math.max(0, levelIndex)]
     openNodeDialog({
       levelIndex,
-      createTarget: target,
+      target: {
+        levelKey:
+          level?.key ??
+          (target.kind === "level" ? target.levelKey : (levels[0]?.key ?? "")),
+      },
     })
   }
 
-  function openEditNode(nodeId: string, levelKey: string) {
+  function openEditNode(nodeKey: string, levelKey: string) {
+    const levelIndex = levels.findIndex((level) => level.key === levelKey)
+    const node = levels[levelIndex]?.nodes.find((item) => item.key === nodeKey)
     openNodeDialog({
-      nodeDefinitionId: nodeId,
-      levelIndex: levels.findIndex((level) => level.key === levelKey),
+      node,
+      levelIndex,
+      target: { levelKey, nodeKey },
     })
   }
 
-  function handleNodeCreated(nodeId: string) {
+  function handleNodeSave(node: PipelineNodeConfig) {
     const target = createNodeTargetRef.current
     createNodeTargetRef.current = null
     if (!target) {
       return
     }
     markBuilderSource()
-    setLevels((current) => insertCreatedNode(current, nodeId, target))
+    if (target.nodeKey) {
+      setLevels((current) =>
+        replacePipelineNode(current, target.levelKey, target.nodeKey!, node)
+      )
+      return
+    }
+    setLevels((current) =>
+      insertCreatedNode(current, node, {
+        kind: "level",
+        levelKey: target.levelKey,
+      })
+    )
   }
 
   const showNetwork = networks.length > 0 && !lockNetwork
-  const sentence = pipelineDraftSentence(levels, nodeName)
+  const showOrganization = true
+  const sentence = pipelineDraftSentence(levels)
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(selectedNetworkId) &&
@@ -291,15 +320,17 @@ export function PipelineDefinitionDialog({
     try {
       const created = await createPipeline({
         name: name.trim(),
+        description: description.trim(),
         active,
         definition: body,
         networkId: selectedNetworkId,
+        organizationId: selectedOrganizationId || undefined,
       }).unwrap()
       onOpenChange(false)
       navigate(
         networkWorkspacePath({
           networkId: selectedNetworkId,
-          organizationId: organizationId || undefined,
+          organizationId: selectedOrganizationId || undefined,
           rest: `pipeline-definitions/${created.id}`,
         })
       )
@@ -352,39 +383,100 @@ export function PipelineDefinitionDialog({
         >
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
             <FieldGroup className="shrink-0 gap-4 rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
-              {showNetwork ? (
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
-                  <Select
-                    value={selectedNetworkId}
-                    disabled={isLoading}
-                    required
-                    modal={false}
-                    items={networks.map((network) => ({
-                      value: network.id,
-                      label: network.name,
-                    }))}
-                    onValueChange={(value) => {
-                      if (!value) {
-                        return
-                      }
-                      setSelectedNetworkId(value)
-                      markBuilderSource()
-                      setLevels(emptyPipelineLevels())
-                    }}
-                  >
-                    <SelectTrigger id={`${formId}-network`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {networks.map((network) => (
-                        <SelectItem key={network.id} value={network.id}>
-                          {network.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+              {showNetwork || showOrganization ? (
+                <div
+                  className={
+                    showNetwork && showOrganization
+                      ? "grid gap-4 sm:grid-cols-2"
+                      : undefined
+                  }
+                >
+                  {showNetwork ? (
+                    <Field>
+                      <FieldLabel htmlFor={`${formId}-network`}>
+                        Network
+                      </FieldLabel>
+                      <Select
+                        value={selectedNetworkId}
+                        disabled={isLoading}
+                        required
+                        modal={false}
+                        items={networks.map((network) => ({
+                          value: network.id,
+                          label: network.name,
+                        }))}
+                        onValueChange={(value) => {
+                          if (!value) {
+                            return
+                          }
+                          setSelectedNetworkId(value)
+                          if (!lockOrganization) {
+                            setSelectedOrganizationId("")
+                          }
+                          markBuilderSource()
+                          setLevels(emptyPipelineLevels())
+                        }}
+                      >
+                        <SelectTrigger id={`${formId}-network`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {networks.map((network) => (
+                            <SelectItem key={network.id} value={network.id}>
+                              {network.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  ) : null}
+                  {showOrganization ? (
+                    <Field>
+                      <FieldLabel htmlFor={`${formId}-organization`}>
+                        Organization
+                      </FieldLabel>
+                      <Select
+                        value={selectedOrganizationId || entireNetworkValue}
+                        disabled={lockOrganization || isLoading}
+                        modal={false}
+                        items={[
+                          {
+                            value: entireNetworkValue,
+                            label: "Entire network",
+                          },
+                          ...networkOrganizations.map((organization) => ({
+                            value: organization.id,
+                            label: organization.name,
+                          })),
+                        ]}
+                        onValueChange={(value) => {
+                          if (!value || value === entireNetworkValue) {
+                            setSelectedOrganizationId("")
+                            return
+                          }
+                          setSelectedOrganizationId(value)
+                        }}
+                      >
+                        <SelectTrigger id={`${formId}-organization`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={entireNetworkValue}>
+                            Entire network
+                          </SelectItem>
+                          {networkOrganizations.map((organization) => (
+                            <SelectItem
+                              key={organization.id}
+                              value={organization.id}
+                            >
+                              {organization.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  ) : null}
+                </div>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                 <Field>
@@ -407,11 +499,23 @@ export function PipelineDefinitionDialog({
                     onChange={setActive}
                     label="Enabled"
                   />
+                  </Field>
+                </div>
+                <Field>
+                  <FieldLabel htmlFor={`${formId}-description`}>
+                    Description
+                  </FieldLabel>
+                  <Textarea
+                    id={`${formId}-description`}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="What this pipeline does"
+                    disabled={isLoading}
+                  />
                 </Field>
-              </div>
-              {error ? (
-                <FieldError>{getHumaErrorMessage(error)}</FieldError>
-              ) : null}
+                {error ? (
+                  <FieldError>{getHumaErrorMessage(error)}</FieldError>
+                ) : null}
             </FieldGroup>
 
             {definitionView === "json" ? (
@@ -431,14 +535,12 @@ export function PipelineDefinitionDialog({
                 <div className="rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
                   <PipelineLevelsEditor
                     levels={levels}
-                    nodes={networkNodes}
                     onChange={(next) => {
                       markBuilderSource()
                       setLevels(next)
                     }}
                     onCreateNode={openCreateNode}
                     onEditNode={openEditNode}
-                    createDisabled={!selectedNetworkId}
                   />
                 </div>
               </div>
@@ -472,9 +574,8 @@ export function PipelineDefinitionDialog({
         key={nodeDialogKey}
         open={nodeDialogOpen}
         onOpenChange={setNodeDialogOpen}
-        networkId={selectedNetworkId || undefined}
-        nodeDefinitionId={nodeDialogId}
-        onCreated={handleNodeCreated}
+        node={nodeDialogNode}
+        onSave={handleNodeSave}
         pipelineTemplateContext={nodeDialogContext}
       />
     </Dialog>

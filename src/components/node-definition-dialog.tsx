@@ -1,7 +1,6 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
 import { PlusIcon, Trash2Icon } from "lucide-react"
 
-import { CheckboxField } from "@/components/checkbox-field"
 import {
   DefinitionDialogBody,
   DefinitionJsonPane,
@@ -38,10 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { stringifyDefinition, type JsonObject } from "@/lib/json-definition"
-import {
-  useWorkspaceNetworkList,
-  useWorkspaceSchemas,
-} from "@/lib/network-workspace"
+import { useWorkspaceSchemas } from "@/lib/network-workspace"
 import {
   defaultDefinition,
   emptyRecordFilter,
@@ -81,14 +77,8 @@ import {
   type PipelineTemplateContext,
   type RecordDefinitionDraft,
 } from "@/lib/node-definition"
-import { slugifyId } from "@/lib/slug"
 import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
-import { getHumaErrorMessage } from "@/store/api"
-import {
-  useCreateNodeDefinitionMutation,
-  useGetNodeDefinitionQuery,
-  useUpdateNodeDefinitionMutation,
-} from "@/store/node-slice"
+import type { PipelineNodeConfig } from "@/lib/pipeline-definition"
 
 const CHOOSE_SCHEMA = "__choose_schema__"
 
@@ -201,57 +191,36 @@ function itemFieldToken(alias: string) {
 export function NodeDefinitionDialog({
   open,
   onOpenChange,
-  networkId,
-  nodeDefinitionId,
-  onCreated,
+  node,
+  onSave,
   pipelineTemplateContext,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  networkId?: string
-  nodeDefinitionId?: string
-  onCreated?: (nodeId: string) => void
+  node?: PipelineNodeConfig
+  onSave: (node: PipelineNodeConfig) => void
   pipelineTemplateContext?: PipelineTemplateContext
 }) {
   const formId = useId()
-  const { networks } = useWorkspaceNetworkList()
   const { schemas } = useWorkspaceSchemas()
-  const [createNode, createState] = useCreateNodeDefinitionMutation()
-  const [updateNode, updateState] = useUpdateNodeDefinitionMutation()
-  const isLoading = createState.isLoading || updateState.isLoading
-  const error = createState.error ?? updateState.error
-  const existingQuery = useGetNodeDefinitionQuery(nodeDefinitionId ?? "", {
-    skip: !open || !nodeDefinitionId,
-  })
-  const editing = Boolean(nodeDefinitionId)
-  const firstNetworkId = networks[0]?.id ?? ""
-  const [selectedNetworkId, setSelectedNetworkId] = useState(networkId ?? "")
+  const editing = Boolean(node)
   const [name, setName] = useState("")
-  const [active, setActive] = useState(true)
   const [type, setType] = useState<NodeType>("HTTP")
   const [drafts, setDrafts] = useState<NodeDrafts>(() =>
     draftsFromDefinition("HTTP", defaultDefinition("HTTP"))
   )
+  const isLoading = false
 
   useEffect(() => {
     if (!open) {
       return
     }
-    const current = nodeDefinitionId ? existingQuery.currentData : undefined
-    const nextType = current && isNodeType(current.type) ? current.type : "HTTP"
-    const nextDefinition = current?.definition ?? defaultDefinition(nextType)
-    setSelectedNetworkId(networkId ?? current?.networkId ?? firstNetworkId)
-    setName(current?.name ?? "")
-    setActive(current?.active ?? true)
+    const nextType = node && isNodeType(node.type) ? node.type : "HTTP"
+    const nextDefinition = node?.definition ?? defaultDefinition(nextType)
+    setName(node?.name ?? "")
     setType(nextType)
     setDrafts(draftsFromDefinition(nextType, nextDefinition))
-  }, [
-    existingQuery.currentData,
-    firstNetworkId,
-    networkId,
-    nodeDefinitionId,
-    open,
-  ])
+  }, [node, open])
 
   const composed = definitionFromDrafts(type, drafts)
   const preview = stringifyDefinition(
@@ -298,10 +267,6 @@ export function NodeDefinitionDialog({
       })),
     []
   )
-  const networkItems = useMemo(
-    () => networks.map((item) => ({ value: item.id, label: item.name })),
-    [networks]
-  )
   const methodItems = useMemo(
     () => httpMethods.map((item) => ({ value: item, label: item })),
     []
@@ -314,35 +279,17 @@ export function NodeDefinitionDialog({
     [schemas]
   )
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!name.trim() || !selectedNetworkId || !composed.definition) {
+    if (!name.trim() || !composed.definition) {
       return
     }
-    try {
-      if (editing && nodeDefinitionId) {
-        await updateNode({
-          id: nodeDefinitionId,
-          name: name.trim(),
-          active,
-          type,
-          definition: composed.definition,
-        }).unwrap()
-        onOpenChange(false)
-        return
-      }
-      const created = await createNode({
-        name: name.trim(),
-        active,
-        type,
-        definition: composed.definition,
-        networkId: selectedNetworkId,
-      }).unwrap()
-      onCreated?.(created.id)
-      onOpenChange(false)
-    } catch {
-      // RTK Query error is shown below.
-    }
+    onSave({
+      name: name.trim(),
+      type,
+      definition: composed.definition,
+    })
+    onOpenChange(false)
   }
 
   const recordNeedsSchema =
@@ -362,7 +309,7 @@ export function NodeDefinitionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="full" className={definitionDialogClassName}>
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-          <DialogTitle>{editing ? "Edit node" : "Create a node"}</DialogTitle>
+          <DialogTitle>{editing ? "Edit node" : "Add a node"}</DialogTitle>
           <DialogDescription>
             {pipelineTemplateContext
               ? pipelineTemplateContext.levelIndex === 0
@@ -381,7 +328,7 @@ export function NodeDefinitionDialog({
             json={
               <DefinitionJsonPane
                 title="JSON definition"
-                description="Stored on the node and snapshotted when a pipeline run starts."
+                description="Stored on this pipeline and snapshotted when a run starts."
                 value={preview}
                 readOnly
                 error={jsonError}
@@ -389,34 +336,6 @@ export function NodeDefinitionDialog({
             }
           >
             <FieldGroup className="gap-4">
-              {!editing ? (
-                <Field>
-                  <FieldLabel htmlFor={`${formId}-network`}>Network</FieldLabel>
-                  <Select
-                    value={selectedNetworkId}
-                    disabled={Boolean(networkId) || isLoading}
-                    required
-                    modal={false}
-                    items={networkItems}
-                    onValueChange={(value) => {
-                      if (value) {
-                        setSelectedNetworkId(value)
-                      }
-                    }}
-                  >
-                    <SelectTrigger id={`${formId}-network`}>
-                      <SelectValue placeholder="Select a network" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {networks.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
@@ -429,9 +348,6 @@ export function NodeDefinitionDialog({
                     required
                     disabled={isLoading}
                   />
-                  <FieldDescription>
-                    Slug {slugifyId(name) || "is generated from the name"}.
-                  </FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={`${formId}-type`}>Type</FieldLabel>
@@ -1068,23 +984,7 @@ export function NodeDefinitionDialog({
                   ) : null}
                 </>
               ) : null}
-              <Field>
-                <CheckboxField
-                  id={`${formId}-active`}
-                  checked={active}
-                  onChange={setActive}
-                  label="Enabled"
-                />
-                <FieldDescription>
-                  Enabled nodes can be used in new pipeline runs.
-                </FieldDescription>
-              </Field>
               {jsonError ? <FieldError>{jsonError}</FieldError> : null}
-              {error ? (
-                <FieldError>
-                  {getHumaErrorMessage(error, "Failed to save node definition")}
-                </FieldError>
-              ) : null}
             </FieldGroup>
           </DefinitionDialogBody>
           <DialogFooter>
@@ -1095,20 +995,9 @@ export function NodeDefinitionDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={
-                isLoading ||
-                Boolean(jsonError) ||
-                !name.trim() ||
-                !selectedNetworkId
-              }
+              disabled={Boolean(jsonError) || !name.trim()}
             >
-              {isLoading
-                ? editing
-                  ? "Saving..."
-                  : "Creating..."
-                : editing
-                  ? "Save node"
-                  : "Create node"}
+              {editing ? "Save node" : "Add node"}
             </Button>
           </DialogFooter>
         </form>

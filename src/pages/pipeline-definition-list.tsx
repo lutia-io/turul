@@ -36,8 +36,10 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor, statusBadgeConfig } from "@/lib/badge"
 import { enabledStatus, getPipelineLevels } from "@/lib/json-definition"
 import {
+  definitionScopeLabel,
   networkWorkspacePath,
   useNetworkWorkspace,
+  useWorkspaceOrganizations,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
 import { pipelineSummary } from "@/lib/pipeline-definition"
@@ -58,6 +60,7 @@ type PipelineColumnFilters = {
   name?: { op: StringFilterOp; value: string }
   slug?: { op: StringFilterOp; value: string }
   network?: { op: StringFilterOp; value: string }
+  scope?: "network" | "organization"
   stages?: { op: NumberFilterOp; value: number }
   status?: "enabled" | "disabled"
 }
@@ -67,6 +70,7 @@ const sortFields: PipelineDefinitionListSort[] = [
   "slug",
   "status",
   "network",
+  "scope",
   "source",
   "stages",
 ]
@@ -93,6 +97,7 @@ export default function PipelineDefinitionList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreatePipeline, openEditPipeline } = useCreateEntity()
+  const { organizations } = useWorkspaceOrganizations()
   const { data: networks } = useListNetworksQuery(undefined, {
     skip: !isAuthenticated || Boolean(network),
   })
@@ -126,6 +131,8 @@ export default function PipelineDefinitionList() {
       sort: sort && isPipelineSort(sort.id) ? sort.id : "name",
       order: sort?.desc ? "desc" : "asc",
       networkId: network?.id,
+      organizationId,
+      scope: columnFilters.scope,
       active:
         columnFilters.status === "enabled"
           ? true
@@ -145,6 +152,7 @@ export default function PipelineDefinitionList() {
     columnFilters,
     debouncedQuery,
     network?.id,
+    organizationId,
     pagination.pageIndex,
     pagination.pageSize,
     sorting,
@@ -205,9 +213,14 @@ export default function PipelineDefinitionList() {
           cell: ({ row }) => (
             <DataTableCellLink
               to={hrefFor(row.original)}
-              className="font-medium"
+              className="block overflow-visible whitespace-normal font-medium"
             >
-              {row.original.name}
+              <span className="block truncate">{row.original.name}</span>
+              {row.original.description ? (
+                <span className="mt-0.5 block truncate text-sm font-normal text-muted-foreground">
+                  {row.original.description}
+                </span>
+              ) : null}
             </DataTableCellLink>
           ),
           size: 240,
@@ -238,6 +251,49 @@ export default function PipelineDefinitionList() {
           ),
           size: 180,
         }),
+        helper.accessor(
+          (pipeline) =>
+            definitionScopeLabel(pipeline.organizationId, organizations),
+          {
+            id: "scope",
+            header: ({ column }) => (
+              <DataTableColumnHeader
+                title="Scope"
+                sorted={column.getIsSorted()}
+                onSort={column.getToggleSortingHandler()}
+                pin={headerPin(column)}
+                filter={{
+                  type: "enum",
+                  value: columnFilters.scope,
+                  options: [
+                    { value: "network", label: "Network pipelines" },
+                    {
+                      value: "organization",
+                      label: "Organization pipelines",
+                    },
+                  ],
+                  onChange: (value) =>
+                    setColumnFilters((current) => ({
+                      ...current,
+                      scope: value as PipelineColumnFilters["scope"],
+                    })),
+                }}
+              />
+            ),
+            cell: ({ row }) => (
+              <DataTableCellLink
+                to={hrefFor(row.original)}
+                className="text-muted-foreground"
+              >
+                {definitionScopeLabel(
+                  row.original.organizationId,
+                  organizations
+                )}
+              </DataTableCellLink>
+            ),
+            size: 160,
+          }
+        ),
         ...(!network
           ? [
               helper.accessor(
@@ -393,7 +449,7 @@ export default function PipelineDefinitionList() {
           ),
         }),
       ]),
-    [columnFilters, hrefFor, network, networksById, openEditPipeline]
+    [columnFilters, hrefFor, network, networksById, openEditPipeline, organizations]
   )
 
   const table = useTable({
@@ -458,6 +514,18 @@ export default function PipelineDefinitionList() {
           setColumnFilters((current) => ({ ...current, slug: undefined })),
       })
     }
+    if (columnFilters.scope) {
+      chips.push({
+        id: "scope",
+        label: "Scope",
+        value:
+          columnFilters.scope === "network"
+            ? "Network pipelines"
+            : "Organization pipelines",
+        onRemove: () =>
+          setColumnFilters((current) => ({ ...current, scope: undefined })),
+      })
+    }
     if (columnFilters.network) {
       chips.push({
         id: "network",
@@ -499,13 +567,20 @@ export default function PipelineDefinitionList() {
       title="Pipeline Definitions"
       description={
         organization
-          ? `Pipelines in ${organization.name} run one level at a time.`
+          ? `Network-wide pipelines shared with ${organization.name}, plus pipelines that belong only to this organization.`
           : network
             ? `Pipelines for ${network.name} run one level at a time.`
             : "Pipelines that run one level at a time, then the next."
       }
       action={
-        <Button onClick={() => openCreatePipeline(network?.id)}>
+        <Button
+          onClick={() =>
+            openCreatePipeline({
+              networkId: network?.id,
+              organizationId,
+            })
+          }
+        >
           <PlusIcon />
           Create pipeline definition
         </Button>

@@ -7,10 +7,12 @@ export type ApiPipelineDefinition = {
   id: string
   name: string
   slug: string
+  description: string
   active: boolean
   internal: boolean
   definition: JsonObject
   networkId: string
+  organizationId?: string | null
   userId: string
   createdBy: ApiUserRef
   updatedBy: ApiUserRef
@@ -21,14 +23,17 @@ export type ApiPipelineDefinition = {
 
 export type CreatePipelineDefinitionRequest = {
   name: string
+  description: string
   active: boolean
   definition: PipelineDefinitionBody
   networkId: string
+  organizationId?: string
 }
 
 export type UpdatePipelineDefinitionRequest = {
   id: string
   name: string
+  description: string
   active: boolean
   definition: PipelineDefinitionBody
 }
@@ -40,6 +45,7 @@ export type PipelineDefinitionListSort =
   | "slug"
   | "status"
   | "network"
+  | "scope"
   | "source"
   | "stages"
   | "createdAt"
@@ -52,6 +58,8 @@ export type ListPipelineDefinitionsParams = {
   sort?: PipelineDefinitionListSort
   order?: "asc" | "desc"
   networkId?: string
+  organizationId?: string
+  scope?: "network" | "organization"
   active?: boolean
   name?: string
   nameOp?: StringFilterOp
@@ -98,6 +106,12 @@ function listPipelineDefinitionQueryParams(
   if (params.networkId) {
     query.networkId = params.networkId
   }
+  if (params.organizationId) {
+    query.organizationId = params.organizationId
+  }
+  if (params.scope) {
+    query.scope = params.scope
+  }
   if (params.active != null) {
     query.active = String(params.active)
   }
@@ -113,7 +127,6 @@ function listPipelineDefinitionQueryParams(
 export type ApiPipelineStatus = "pending" | "running" | "completed" | "failed"
 
 export type ApiSnapshotNode = {
-  id: string
   name: string
   slug: string
   type: string
@@ -236,7 +249,6 @@ export type ApiPipelineNode = {
   levelIndex: number
   nodeIndex: number
   attempt: number
-  nodeDefinitionId: string
   nodeSlug: string
   nodeType: string
   status: ApiPipelineNodeStatus | string

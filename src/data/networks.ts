@@ -41,32 +41,25 @@ export type WorkflowDefinition = {
   id: string
   name: string
   slug: string
+  description: string
   active: boolean
   internal: boolean
   schemaId: string
   definition: JsonObject
   networkId?: string
+  organizationId?: string
 }
 
 export type PipelineDefinition = {
   id: string
   name: string
   slug: string
+  description: string
   active: boolean
   internal: boolean
   definition: JsonObject
   networkId?: string
-}
-
-export type NodeDefinition = {
-  id: string
-  name: string
-  slug: string
-  active: boolean
-  internal: boolean
-  type: string
-  definition: JsonObject
-  networkId?: string
+  organizationId?: string
 }
 
 export type Network = {
@@ -83,7 +76,6 @@ export type Network = {
   schemas: Schema[]
   workflowDefinitions: WorkflowDefinition[]
   pipelineDefinitions: PipelineDefinition[]
-  nodeDefinitions?: NodeDefinition[]
   slug?: string
   createdAt?: string
   updatedAt?: string
@@ -1913,6 +1905,7 @@ export function updateSchema(
 
 export type CreateWorkflowInput = {
   name: string
+  description?: string
   slug?: string
   schemaId: string
   triggerType?: string
@@ -1920,6 +1913,7 @@ export type CreateWorkflowInput = {
   steps: { id: string; type: string; name: string }[]
   active?: boolean
   internal?: boolean
+  organizationId?: string
 }
 
 export function createWorkflowDefinition(
@@ -1939,7 +1933,9 @@ export function createWorkflowDefinition(
     id: uniqueId(`${networkId}-${slug}`, takenWorkflowId),
     name,
     slug,
+    description: input.description?.trim() ?? "",
     schemaId: input.schemaId,
+    organizationId: input.organizationId,
     trigger: {
       type: input.triggerType?.trim() || "event",
       event: input.triggerEvent?.trim() || `${slug}.created`,
@@ -1972,7 +1968,9 @@ export function updateWorkflowDefinition(
     id: result.workflowDefinition.id,
     name: input.name.trim(),
     slug: result.workflowDefinition.slug,
+    description: input.description?.trim() ?? result.workflowDefinition.description,
     schemaId: input.schemaId,
+    organizationId: result.workflowDefinition.organizationId,
     trigger: {
       type: input.triggerType?.trim() || "event",
       event:
@@ -1993,12 +1991,14 @@ export function updateWorkflowDefinition(
 
 export type CreatePipelineInput = {
   name: string
+  description?: string
   slug?: string
   sourceType?: string
   sourceName?: string
   stages: { id: string; type: string; name: string }[]
   active?: boolean
   internal?: boolean
+  organizationId?: string
 }
 
 export function createPipelineDefinition(
@@ -2018,6 +2018,8 @@ export function createPipelineDefinition(
     id: uniqueId(`${networkId}-${slug}`, takenPipelineId),
     name,
     slug,
+    description: input.description?.trim() ?? "",
+    organizationId: input.organizationId,
     source: {
       type: input.sourceType?.trim() || "api",
       name: input.sourceName?.trim() || "Partner API",
@@ -2050,6 +2052,8 @@ export function updatePipelineDefinition(
     id: result.pipelineDefinition.id,
     name: input.name.trim(),
     slug: result.pipelineDefinition.slug,
+    description: input.description?.trim() ?? result.pipelineDefinition.description,
+    organizationId: result.pipelineDefinition.organizationId,
     source: {
       type: input.sourceType?.trim() || "api",
       name: input.sourceName?.trim() || "Partner API",

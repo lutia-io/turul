@@ -12,11 +12,9 @@ import { CreateNetworkDialog } from "@/components/create-network-dialog"
 import { CreateOrganizationDialog } from "@/components/create-organization-dialog"
 import { CreateOrganizationUserDialog } from "@/components/create-organization-user-dialog"
 import { CreateRecordDialog } from "@/components/create-record-dialog"
-import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
 import { PipelineDefinitionDialog } from "@/components/pipeline-definition-dialog"
 import { SchemaDefinitionDialog } from "@/components/schema-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
-import type { PipelineTemplateContext } from "@/lib/node-definition"
 import { networkWorkspacePath, parseNetworkPath } from "@/lib/network-workspace"
 
 type CreateState =
@@ -34,14 +32,8 @@ type CreateState =
       organizationId?: string
       schemaId?: string
     }
-  | { kind: "workflow"; networkId?: string }
-  | { kind: "pipeline"; networkId?: string }
-  | {
-      kind: "node"
-      networkId?: string
-      nodeDefinitionId?: string
-      pipelineTemplateContext?: PipelineTemplateContext
-    }
+  | { kind: "workflow"; networkId?: string; organizationId?: string }
+  | { kind: "pipeline"; networkId?: string; organizationId?: string }
   | {
       kind: "record"
       networkId?: string
@@ -61,7 +53,6 @@ const initialDialogKeys: Record<DialogKind, number> = {
   schema: 0,
   workflow: 0,
   pipeline: 0,
-  node: 0,
   record: 0,
   file: 0,
 }
@@ -81,18 +72,16 @@ type CreateEntityContextValue = {
     organizationId?: string
   }) => void
   openEditSchema: (schemaId: string) => void
-  openCreateWorkflow: (networkId?: string) => void
+  openCreateWorkflow: (scope?: {
+    networkId?: string
+    organizationId?: string
+  }) => void
   openEditWorkflow: (workflowDefinitionId: string) => void
-  openCreatePipeline: (networkId?: string) => void
+  openCreatePipeline: (scope?: {
+    networkId?: string
+    organizationId?: string
+  }) => void
   openEditPipeline: (pipelineDefinitionId: string) => void
-  openCreateNode: (
-    networkId?: string,
-    pipelineTemplateContext?: PipelineTemplateContext
-  ) => void
-  openEditNode: (
-    nodeDefinitionId: string,
-    pipelineTemplateContext?: PipelineTemplateContext
-  ) => void
   openCreateRecord: (scope?: {
     networkId?: string
     organizationId?: string
@@ -147,8 +136,8 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       openEditSchema(schemaId) {
         open({ kind: "schema", schemaId })
       },
-      openCreateWorkflow(networkId) {
-        open({ kind: "workflow", networkId })
+      openCreateWorkflow(scope) {
+        open({ kind: "workflow", ...scope })
       },
       openEditWorkflow(workflowDefinitionId) {
         const parsed = parseNetworkPath(location.pathname)
@@ -163,8 +152,8 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           })}?edit=1`
         )
       },
-      openCreatePipeline(networkId) {
-        open({ kind: "pipeline", networkId })
+      openCreatePipeline(scope) {
+        open({ kind: "pipeline", ...scope })
       },
       openEditPipeline(pipelineDefinitionId) {
         const parsed = parseNetworkPath(location.pathname)
@@ -178,12 +167,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
             rest: `pipeline-definitions/${pipelineDefinitionId}`,
           })}?edit=1`
         )
-      },
-      openCreateNode(networkId, pipelineTemplateContext) {
-        open({ kind: "node", networkId, pipelineTemplateContext })
-      },
-      openEditNode(nodeDefinitionId, pipelineTemplateContext) {
-        open({ kind: "node", nodeDefinitionId, pipelineTemplateContext })
       },
       openCreateRecord(scope) {
         open({ kind: "record", ...scope })
@@ -270,6 +253,9 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           }
         }}
         networkId={state?.kind === "workflow" ? state.networkId : undefined}
+        organizationId={
+          state?.kind === "workflow" ? state.organizationId : undefined
+        }
       />
       <PipelineDefinitionDialog
         key={`pipeline-${dialogKeys.pipeline}`}
@@ -280,21 +266,8 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
           }
         }}
         networkId={state?.kind === "pipeline" ? state.networkId : undefined}
-      />
-      <NodeDefinitionDialog
-        key={`node-${dialogKeys.node}`}
-        open={state?.kind === "node"}
-        onOpenChange={(open) => {
-          if (!open) {
-            close()
-          }
-        }}
-        networkId={state?.kind === "node" ? state.networkId : undefined}
-        nodeDefinitionId={
-          state?.kind === "node" ? state.nodeDefinitionId : undefined
-        }
-        pipelineTemplateContext={
-          state?.kind === "node" ? state.pipelineTemplateContext : undefined
+        organizationId={
+          state?.kind === "pipeline" ? state.organizationId : undefined
         }
       />
       <CreateRecordDialog

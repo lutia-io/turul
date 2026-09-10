@@ -2,7 +2,6 @@ import { useMemo } from "react"
 import { Link } from "react-router"
 import {
   ArrowRightIcon,
-  BoxIcon,
   Building2Icon,
   FileIcon,
   FileJsonIcon,
@@ -46,7 +45,6 @@ import {
   useWorkspaceRecords,
   useWorkspaceWorkflowRuns,
 } from "@/lib/network-workspace"
-import { pipelinesUsingNode } from "@/lib/pipeline-definition"
 import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage, useMeQuery } from "@/store/api"
@@ -626,26 +624,6 @@ export default function Home() {
           icon: LayersIcon,
           status: "Draft",
         })),
-      ...(network.nodeDefinitions ?? [])
-        .filter((nodeDefinition) => !nodeDefinition.active)
-        .map((nodeDefinition) => {
-          const match = pipelinesUsingNode(
-            network.pipelineDefinitions,
-            nodeDefinition.id
-          )[0]
-          return {
-            id: nodeDefinition.id,
-            name: nodeDefinition.name,
-            kind: "Node",
-            networkName: network.name,
-            to: match
-              ? `/app/networks/${network.id}/pipeline-definitions/${match.pipeline.id}`
-              : `/app/networks/${network.id}/pipeline-definitions`,
-            color: "purple" as const,
-            icon: BoxIcon,
-            status: "Draft",
-          }
-        }),
     ])
 
     return [...failedRuns, ...drafts]

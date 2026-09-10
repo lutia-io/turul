@@ -195,7 +195,6 @@ export const api = createApi({
     "PipelineDefinition",
     "Pipeline",
     "PipelineNode",
-    "NodeDefinition",
   ],
   endpoints: (build) => ({
     createUser: build.mutation<CreateUserResponse, CreateUserRequest>({

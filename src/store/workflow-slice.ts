@@ -7,11 +7,13 @@ export type ApiWorkflowDefinition = {
   id: string
   name: string
   slug: string
+  description: string
   active: boolean
   internal: boolean
   definition: WorkflowDefinitionBody
   schemaId: string
   networkId: string
+  organizationId?: string | null
   userId: string
   createdBy: ApiUserRef
   updatedBy: ApiUserRef
@@ -22,10 +24,12 @@ export type ApiWorkflowDefinition = {
 
 export type CreateWorkflowDefinitionRequest = {
   name: string
+  description: string
   active: boolean
   definition: WorkflowDefinitionBody
   schemaId: string
   networkId: string
+  organizationId?: string
 }
 
 export type CreateWorkflowDefinitionResponse = {
@@ -35,6 +39,7 @@ export type CreateWorkflowDefinitionResponse = {
 export type UpdateWorkflowDefinitionRequest = {
   id: string
   name: string
+  description: string
   active: boolean
   definition: WorkflowDefinitionBody
   schemaId: string
@@ -52,6 +57,7 @@ export type WorkflowDefinitionListSort =
   | "status"
   | "schema"
   | "network"
+  | "scope"
   | "actions"
   | "createdAt"
   | "updatedAt"
@@ -64,6 +70,7 @@ export type ListWorkflowDefinitionsParams = {
   order?: "asc" | "desc"
   networkId?: string
   organizationId?: string
+  scope?: "network" | "organization"
   active?: boolean
   name?: string
   nameOp?: StringFilterOp
@@ -112,6 +119,9 @@ function listWorkflowDefinitionQueryParams(
   }
   if (params.organizationId) {
     query.organizationId = params.organizationId
+  }
+  if (params.scope) {
+    query.scope = params.scope
   }
   if (params.active != null) {
     query.active = String(params.active)
