@@ -112,7 +112,12 @@ export function networkSectionRest(rest: string) {
     return "pipelines"
   }
 
-  if (rest === "organizations" || rest.startsWith("organizations/")) {
+  if (
+    rest === "organization" ||
+    rest.startsWith("organization/") ||
+    rest === "organizations" ||
+    rest.startsWith("organizations/")
+  ) {
     return "organizations"
   }
 
@@ -304,13 +309,18 @@ export function withNetworkWorkflows(
   return {
     ...network,
     workflowDefinitions: workflows.filter((workflow) => {
-      if (workflow.networkId !== network.id || !schemaIds.has(workflow.schemaId)) {
+      if (
+        workflow.networkId !== network.id ||
+        !schemaIds.has(workflow.schemaId)
+      ) {
         return false
       }
       if (!organizationId) {
         return true
       }
-      return !workflow.organizationId || workflow.organizationId === organizationId
+      return (
+        !workflow.organizationId || workflow.organizationId === organizationId
+      )
     }),
   }
 }
@@ -329,7 +339,9 @@ export function withNetworkPipelines(
       if (!organizationId) {
         return true
       }
-      return !pipeline.organizationId || pipeline.organizationId === organizationId
+      return (
+        !pipeline.organizationId || pipeline.organizationId === organizationId
+      )
     }),
   }
 }

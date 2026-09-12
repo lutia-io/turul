@@ -598,6 +598,140 @@ const dentistClaims: StoredRecord[] = [
     })
 )
 
+const schoolEnrollments: StoredRecord[] = [
+  record({
+    id: "rec-sch-enr-01",
+    schemaId: "school-enrollment",
+    organizationId: "school-high",
+    networkId: "school",
+    hours: 40,
+    key: "school-high:student:STU-4412",
+    data: {
+      studentId: "STU-4412",
+      givenName: "Maya",
+      familyName: "Chen",
+      gradeLevel: "11",
+      campusId: "school-high",
+      status: "enrolled",
+      enrolledOn: "2025-08-18",
+      transcriptFileId: "file-school-transcript-01",
+    },
+  }),
+  record({
+    id: "rec-sch-enr-02",
+    schemaId: "school-enrollment",
+    organizationId: "school-middle",
+    networkId: "school",
+    hours: 16,
+    key: "school-middle:student:STU-4508",
+    data: {
+      studentId: "STU-4508",
+      givenName: "Leo",
+      familyName: "Park",
+      gradeLevel: "7",
+      campusId: "school-middle",
+      status: "enrolled",
+      enrolledOn: "2025-08-18",
+      transcriptFileId: "file-school-transcript-02",
+    },
+  }),
+  record({
+    id: "rec-sch-enr-03",
+    schemaId: "school-enrollment",
+    organizationId: "school-elementary",
+    networkId: "school",
+    hours: 22,
+    data: {
+      studentId: "STU-4601",
+      givenName: "Nora",
+      familyName: "Ellis",
+      gradeLevel: "K",
+      campusId: "school-elementary",
+      status: "enrolled",
+      enrolledOn: "2026-08-12",
+    },
+  }),
+  record({
+    id: "rec-sch-enr-04",
+    schemaId: "school-enrollment",
+    organizationId: "school-high",
+    networkId: "school",
+    hours: 2,
+    data: {
+      studentId: "STU-4704",
+      givenName: "Sam",
+      familyName: "Rivera",
+      gradeLevel: "9",
+      campusId: "school-high",
+      status: "enrolled",
+      enrolledOn: "2026-09-08",
+    },
+  }),
+  record({
+    id: "rec-sch-enr-05",
+    schemaId: "school-enrollment",
+    organizationId: "school-district",
+    networkId: "school",
+    hours: 8,
+    data: {
+      studentId: "STU-4480",
+      givenName: "Jordan",
+      familyName: "Hale",
+      gradeLevel: "8",
+      campusId: "school-middle",
+      status: "waitlisted",
+      enrolledOn: "2026-08-25",
+    },
+  }),
+]
+
+const schoolAttendance: StoredRecord[] = [
+  ["STU-4412", "school-high", "present", 6],
+  ["STU-4508", "school-middle", "tardy", 5],
+  ["STU-4601", "school-elementary", "present", 4],
+  ["STU-4412", "school-high", "absent", 2],
+  ["STU-4704", "school-high", "present", 1],
+].map(([studentId, organizationId, status, hours], index) =>
+  record({
+    id: `rec-sch-att-${String(index + 1).padStart(2, "0")}`,
+    schemaId: "school-attendance",
+    organizationId,
+    networkId: "school",
+    hours,
+    data: {
+      attendanceId: `ATT-3${20 + index}`,
+      studentId,
+      campusId: organizationId,
+      status,
+      markedOn: recordReady(hours, 0).slice(0, 10),
+    },
+  })
+)
+
+const schoolCourses: StoredRecord[] = [
+  ["CRS-ALG-2", "Algebra II", "Priya Shah", "school-high", 2, 28, 10],
+  ["CRS-BIO-1", "Biology", "Owen Blake", "school-high", 4, 24, 8],
+  ["CRS-ELA-7", "English 7", "Elena Ruiz", "school-middle", 1, 26, 6],
+  ["CRS-ART-K", "Art Studio", "Grace Owens", "school-elementary", 3, 22, 3],
+].map(
+  ([courseId, title, teacher, organizationId, period, seats, hours], index) =>
+    record({
+      id: `rec-sch-crs-${String(index + 1).padStart(2, "0")}`,
+      schemaId: "school-course",
+      organizationId,
+      networkId: "school",
+      hours,
+      data: {
+        courseId,
+        title,
+        teacher,
+        campusId: organizationId,
+        period,
+        seats,
+      },
+    })
+)
+
 const personalExpenses: StoredRecord[] = [
   record({
     id: "rec-pers-exp-01",
@@ -1036,6 +1170,9 @@ export let records: StoredRecord[] = [
   ...dentistAppointments,
   ...dentistPlans,
   ...dentistClaims,
+  ...schoolEnrollments,
+  ...schoolAttendance,
+  ...schoolCourses,
   ...personalExpenses,
   ...personalTasks,
   ...personalContacts,

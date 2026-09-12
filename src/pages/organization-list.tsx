@@ -176,12 +176,16 @@ export default function OrganizationList() {
   const filtersActive =
     query.trim().length > 0 || Object.values(columnFilters).some(Boolean)
 
-  const hrefFor = useCallback((item: OrganizationRow) => {
-    return networkWorkspacePath({
-      networkId: item.networkId,
-      organizationId: item.id,
-    })
-  }, [])
+  const hrefFor = useCallback(
+    (item: OrganizationRow) => {
+      return networkWorkspacePath({
+        networkId: item.networkId,
+        organizationId,
+        rest: `organization/${item.id}`,
+      })
+    },
+    [organizationId]
+  )
 
   const columns = useMemo(
     () =>

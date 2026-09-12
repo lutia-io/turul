@@ -1,4 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react"
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react"
 import { Link, useParams, useSearchParams } from "react-router"
 import {
   ClockIcon,
@@ -38,14 +46,17 @@ import {
   WorkflowSectionHeading,
 } from "@/components/workflow-rule"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
-import type { PipelineDefinition, Schema, WorkflowDefinition } from "@/data/networks"
+import type {
+  PipelineDefinition,
+  Schema,
+  WorkflowDefinition,
+} from "@/data/networks"
 import {
   parseJsonObject,
   stringifyDefinition,
   type JsonObject,
 } from "@/lib/json-definition"
 import {
-  networkWorkspacePath,
   useNetworkWorkspace,
   useWorkspaceOrganizations,
   useWorkspacePipelines,
@@ -220,9 +231,7 @@ export default function WorkflowDefinitionDetail() {
               </span>
             )}
           </AsideRow>
-          <AsideRow label="Trigger">
-            {triggerSummary(parsed?.trigger)}
-          </AsideRow>
+          <AsideRow label="Trigger">{triggerSummary(parsed?.trigger)}</AsideRow>
           <AsideRow label="Match">
             {rootLogic ? (
               <span className="inline-flex items-center gap-1.5">
@@ -249,10 +258,7 @@ export default function WorkflowDefinitionDetail() {
           {organization ? (
             <AsideRow label="Organization">
               <Link
-                to={networkWorkspacePath({
-                  networkId: network.id,
-                  organizationId: organization.id,
-                })}
+                to={href(`organization/${organization.id}`)}
                 className="inline-flex max-w-full items-center gap-1.5 hover:underline"
               >
                 <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -620,7 +626,7 @@ function WorkflowDefinitionEdit({
               Workflow definition
             </Link>
             <div className="flex flex-wrap items-center gap-2.5">
-              <Field className="min-w-56 max-w-md gap-1">
+              <Field className="max-w-md min-w-56 gap-1">
                 <FieldLabel htmlFor={`${formId}-name`} className="sr-only">
                   Name
                 </FieldLabel>

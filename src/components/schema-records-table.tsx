@@ -21,6 +21,7 @@ import { fileKindLabel, matchFileKind } from "@/lib/file-preview"
 import { getBadgeColor } from "@/lib/badge"
 import {
   getJsonSchemaProperties,
+  fileIdsFromValue,
   isEmailProperty,
   isFileProperty,
   isForeignProperty,
@@ -64,14 +65,22 @@ export function RecordCell({
 }) {
   const value = record.data[property.name]
 
-  if (isFileProperty(property) && typeof value === "string" && value) {
-    return (
-      <FileRecordCell
-        fileId={value}
-        file={filesById.get(value)}
-        onPreview={() => onPreviewFile(value)}
-      />
-    )
+  if (isFileProperty(property)) {
+    const fileIds = fileIdsFromValue(value)
+    if (fileIds.length > 0) {
+      return (
+        <div className="flex max-w-[18rem] min-w-[6rem] flex-wrap gap-1">
+          {fileIds.map((fileId) => (
+            <FileRecordCell
+              key={fileId}
+              fileId={fileId}
+              file={filesById.get(fileId)}
+              onPreview={() => onPreviewFile(fileId)}
+            />
+          ))}
+        </div>
+      )
+    }
   }
 
   if (isForeignProperty(property) && typeof value === "string" && value) {

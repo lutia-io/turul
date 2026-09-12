@@ -1,4 +1,4 @@
-import { type ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -60,7 +60,7 @@ const CHOOSE_FIELD = "__choose_field__"
 const CHOOSE_PIPELINE = "__choose_pipeline__"
 
 function pipelineRef(pipeline: PipelineDefinition) {
-  return pipeline.slug || pipeline.id
+  return pipeline.id
 }
 
 function findPipeline(pipelines: PipelineDefinition[], value: string) {
@@ -506,6 +506,12 @@ function ActionEditor({
   const pipelineValue = selectedPipeline
     ? pipelineRef(selectedPipeline)
     : action.pipeline || CHOOSE_PIPELINE
+
+  useEffect(() => {
+    if (selectedPipeline && action.pipeline !== selectedPipeline.id) {
+      onChange({ pipeline: selectedPipeline.id })
+    }
+  }, [action.pipeline, onChange, selectedPipeline])
   const dataLabel =
     action.type === "TRIGGER_PIPELINE" ? "Input" : "Fields"
   const targetSchemaName = targetSchema?.name

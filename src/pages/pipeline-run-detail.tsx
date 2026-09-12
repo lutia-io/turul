@@ -7,6 +7,7 @@ import {
   FileJsonIcon,
   GalleryVerticalEndIcon,
   LayersIcon,
+  RotateCcwIcon,
 } from "lucide-react"
 
 import { JsonDefinitionCard } from "@/components/json-definition-card"
@@ -31,10 +32,13 @@ import {
   runProgress,
 } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { getHumaLoadErrorCopy } from "@/store/api"
+import { getHumaErrorMessage, getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
-import { useGetPipelineQuery } from "@/store/pipeline-slice"
+import {
+  useGetPipelineQuery,
+  useRetryPipelineMutation,
+} from "@/store/pipeline-slice"
 
 type DataView = "levels" | "json"
 
@@ -48,9 +52,18 @@ export default function PipelineRunDetail() {
   } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
   const { pipelines } = useWorkspacePipelines()
+  const skipPipeline = !isAuthenticated || !pipelineRunId
   const pipelineQuery = useGetPipelineQuery(pipelineRunId ?? "", {
-    skip: !isAuthenticated || !pipelineRunId,
+    skip: skipPipeline,
   })
+  const live =
+    pipelineQuery.data?.status === "pending" ||
+    pipelineQuery.data?.status === "running"
+  useGetPipelineQuery(pipelineRunId ?? "", {
+    skip: skipPipeline || !live,
+    pollingInterval: 2000,
+  })
+  const [retryPipeline, retryState] = useRetryPipelineMutation()
   const pipeline = pipelineQuery.data
   const belongsToWorkspace =
     !workspaceNetwork ||
@@ -118,20 +131,46 @@ export default function PipelineRunDetail() {
               {resolved.error}
             </p>
           ) : null}
+          {retryState.isError ? (
+            <p className="max-w-2xl text-sm text-destructive">
+              {getHumaErrorMessage(
+                retryState.error,
+                "Failed to retry pipeline"
+              )}
+            </p>
+          ) : null}
         </div>
-        {resolved.input ? (
-          <Button
-            type="button"
-            variant={dataView === "json" ? "secondary" : "outline"}
-            size="sm"
-            onClick={() =>
-              setDataView((view) => (view === "levels" ? "json" : "levels"))
-            }
-          >
-            <FileJsonIcon />
-            {dataView === "json" ? "Levels" : "JSON"}
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {resolved.status === "failed" ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                void retryPipeline(resolved.id)
+              }}
+              disabled={retryState.isLoading}
+              aria-busy={retryState.isLoading}
+            >
+              <RotateCcwIcon
+                className={retryState.isLoading ? "animate-spin" : undefined}
+              />
+              {retryState.isLoading ? "Retrying..." : "Retry"}
+            </Button>
+          ) : null}
+          {resolved.input ? (
+            <Button
+              type="button"
+              variant={dataView === "json" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() =>
+                setDataView((view) => (view === "levels" ? "json" : "levels"))
+              }
+            >
+              <FileJsonIcon />
+              {dataView === "json" ? "Levels" : "JSON"}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
@@ -186,6 +225,7 @@ export default function PipelineRunDetail() {
             <PipelineNodesJournal
               pipelineId={resolved.id}
               snapshot={resolved.definition.nodes}
+              pollingInterval={live ? 2000 : 0}
             />
           ) : null}
         </div>
@@ -223,10 +263,7 @@ export default function PipelineRunDetail() {
               {organization ? (
                 <AsideRow label="Organization">
                   <Link
-                    to={networkWorkspacePath({
-                      networkId: resolved.networkId,
-                      organizationId: organization.id,
-                    })}
+                    to={href(`organization/${organization.id}`)}
                     className="inline-flex max-w-full items-center gap-1.5 hover:underline"
                   >
                     <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />

@@ -33,6 +33,7 @@ import { formatAddressLines } from "@/lib/address"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
+  fileIdsFromValue,
   isAddressProperty,
   isEmailProperty,
   isFileProperty,
@@ -42,7 +43,6 @@ import {
   type JsonValue,
 } from "@/lib/json-definition"
 import {
-  networkWorkspacePath,
   organizationUserName,
   useNetworkWorkspace,
   useWorkspaceOrganizationUsers,
@@ -103,8 +103,7 @@ export default function RecordDetail() {
     if (!isFileProperty(property) || !record) {
       return false
     }
-    const value = record.data[property.name]
-    return typeof value === "string" && value.length > 0
+    return fileIdsFromValue(record.data[property.name]).length > 0
   })
   const tone = getBadgeColor(schema?.color)
   const title = record
@@ -225,10 +224,7 @@ export default function RecordDetail() {
               {organization ? (
                 <AsideRow label="Organization">
                   <Link
-                    to={networkWorkspacePath({
-                      networkId: network.id,
-                      organizationId: organization.id,
-                    })}
+                    to={href(`organization/${organization.id}`)}
                     className="inline-flex max-w-full items-center gap-1.5 hover:underline"
                   >
                     <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -278,20 +274,16 @@ export default function RecordDetail() {
                 Files
               </h2>
               <div className="mt-3 flex flex-col gap-1">
-                {fileProperties.map((property) => {
-                  const fileId = record.data[property.name]
-                  if (typeof fileId !== "string") {
-                    return null
-                  }
-
-                  return (
+                {fileProperties.flatMap((property) => {
+                  const fileIds = fileIdsFromValue(record.data[property.name])
+                  return fileIds.map((fileId) => (
                     <RecordFileRow
-                      key={property.name}
+                      key={`${property.name}-${fileId}`}
                       fileId={fileId}
                       label={propertyLabel(property.name)}
                       onPreview={() => setPreviewFileId(fileId)}
                     />
-                  )
+                  ))
                 })}
               </div>
             </section>

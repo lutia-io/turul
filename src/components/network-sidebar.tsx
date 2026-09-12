@@ -102,6 +102,18 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       exact: true,
     },
     {
+      title: "Organizations",
+      url: network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: "organizations",
+          })
+        : "/app/networks",
+      icon: <Building2Icon />,
+      isActive: networkSectionRest(rest) === "organizations",
+    },
+    {
       title: "Records",
       url: recordsUrl,
       icon: <TableIcon />,

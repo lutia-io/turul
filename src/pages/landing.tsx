@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
 const steps = [
   {
     title: "Make a network",
-    body: "Invite the teams that share data — warehouses, shops, clinics, funds.",
+    body: "Invite the teams that share data — warehouses, shops, clinics, schools, funds.",
   },
   {
     title: "Agree on a shape",
@@ -42,43 +42,43 @@ const capabilities: {
   color: BadgeColor
   icon: LucideIcon
 }[] = [
-    {
-      title: "Networks",
-      body: "The group that shares data.",
-      color: "purple",
-      icon: ListIcon,
-    },
-    {
-      title: "Organizations",
-      body: "Teams in the network, each with their own people and files.",
-      color: "orange",
-      icon: Building2Icon,
-    },
-    {
-      title: "Schemas",
-      body: "The shared form: fields, types, and what’s required.",
-      color: "blue",
-      icon: FileJsonIcon,
-    },
-    {
-      title: "Records & files",
-      body: "The rows and documents in that shape.",
-      color: "cyan",
-      icon: TableIcon,
-    },
-    {
-      title: "Workflows",
-      body: "When a row matches, Lutia does the next steps.",
-      color: "teal",
-      icon: WorkflowIcon,
-    },
-    {
-      title: "Pipelines",
-      body: "How data gets in, then gets saved.",
-      color: "pink",
-      icon: LayersIcon,
-    },
-  ]
+  {
+    title: "Networks",
+    body: "The group that shares data.",
+    color: "purple",
+    icon: ListIcon,
+  },
+  {
+    title: "Organizations",
+    body: "Teams in the network, each with their own people and files.",
+    color: "orange",
+    icon: Building2Icon,
+  },
+  {
+    title: "Schemas",
+    body: "The shared form: fields, types, and what’s required.",
+    color: "blue",
+    icon: FileJsonIcon,
+  },
+  {
+    title: "Records & files",
+    body: "The rows and documents in that shape.",
+    color: "cyan",
+    icon: TableIcon,
+  },
+  {
+    title: "Workflows",
+    body: "When a row matches, Lutia does the next steps.",
+    color: "teal",
+    icon: WorkflowIcon,
+  },
+  {
+    title: "Pipelines",
+    body: "How data gets in, then gets saved.",
+    color: "pink",
+    icon: LayersIcon,
+  },
+]
 
 function CapabilityIcon({
   color,

@@ -12,7 +12,7 @@ export type JsonSchemaPropertySpec = {
   format?: string
   schemaId?: string
   enum?: string[]
-  items?: { type: string }
+  items?: { type: string; format?: string }
   default?: JsonValue
 }
 

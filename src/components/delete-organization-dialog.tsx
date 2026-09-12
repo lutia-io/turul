@@ -10,10 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  networkWorkspacePath,
-  parseNetworkPath,
-} from "@/lib/network-workspace"
+import { networkWorkspacePath, parseNetworkPath } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
 import { useDeleteOrganizationMutation } from "@/store/organization-slice"
 
@@ -39,11 +36,22 @@ export function DeleteOrganizationDialog({
       await deleteOrganization(organization.id).unwrap()
       onOpenChange(false)
       const parsed = parseNetworkPath(pathname)
-      if (parsed?.organizationId === organization.id) {
+      if (!parsed) {
+        return
+      }
+      const viewingDeleted =
+        parsed.organizationId === organization.id ||
+        parsed.rest === `organization/${organization.id}` ||
+        parsed.rest.startsWith(`organization/${organization.id}/`)
+      if (viewingDeleted) {
         navigate(
           networkWorkspacePath({
             networkId: parsed.networkId,
-            rest: parsed.rest || "organizations",
+            organizationId:
+              parsed.organizationId === organization.id
+                ? undefined
+                : parsed.organizationId,
+            rest: "organizations",
           })
         )
       }

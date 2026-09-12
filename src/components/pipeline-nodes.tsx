@@ -44,14 +44,17 @@ function asJsonObject(value: unknown): JsonObject | undefined {
 export function PipelineNodesJournal({
   pipelineId,
   snapshot,
+  pollingInterval = 0,
 }: {
   pipelineId: string
   snapshot: ApiSnapshotNode[][]
+  pollingInterval?: number
 }) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { href } = useNetworkWorkspace()
   const query = useListPipelineNodesQuery(pipelineId, {
     skip: !isAuthenticated || !pipelineId,
+    pollingInterval,
   })
   const nodes = query.data ?? []
   const [expandedId, setExpandedId] = useState<string>()

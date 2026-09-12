@@ -105,6 +105,17 @@ const threads = [
     from: "Calendar",
   },
   {
+    id: "school",
+    label: "School",
+    networkId: "school",
+    schemaId: "school-enrollment",
+    workflowId: "school-student-onboarding",
+    pipelineId: "school-sis-ingest",
+    highlightRecordId: "rec-sch-enr-04",
+    story: "A new enrollment notifies the counselor.",
+    from: "SIS",
+  },
+  {
     id: "personal",
     label: "Personal",
     networkId: "personal",
@@ -149,7 +160,7 @@ function propertyKind(property: JsonSchemaProperty) {
     return "Date & time"
   }
   if (property.format === "file") {
-    return "File"
+    return property.type === "array" ? "Files" : "File"
   }
   if (property.format === "address") {
     return "Address"
@@ -1299,7 +1310,7 @@ export function LandingProductPreview() {
       <div
         role="tablist"
         aria-label="Example networks"
-        className="mx-auto mb-4 grid max-w-3xl grid-cols-2 rounded-xl border bg-muted p-1.5 sm:grid-cols-3 lg:grid-cols-6"
+        className="mx-auto mb-4 grid max-w-4xl grid-cols-2 rounded-xl border bg-muted p-1.5 sm:grid-cols-4 lg:grid-cols-7"
       >
         {threads.map((item) => {
           const selected = item.id === threadId

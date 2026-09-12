@@ -36,7 +36,6 @@ import {
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
 import {
-  networkWorkspacePath,
   useNetworkWorkspace,
   useWorkspaceOrganizations,
   useWorkspaceRecords,
@@ -253,10 +252,7 @@ export default function SchemaDetail() {
                   {organization ? (
                     <AsideRow label="Organization">
                       <Link
-                        to={networkWorkspacePath({
-                          networkId: network.id,
-                          organizationId: organization.id,
-                        })}
+                        to={href(`organization/${organization.id}`)}
                         className="inline-flex max-w-full items-center gap-1.5 hover:underline"
                       >
                         <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -414,7 +410,7 @@ function PropertyItem({ property }: { property: JsonSchemaProperty }) {
 
 function propertyTypeLabel(property: JsonSchemaProperty) {
   if (isFileProperty(property)) {
-    return "file"
+    return property.type === "array" ? "files" : "file"
   }
   if (isForeignProperty(property)) {
     return "foreign"

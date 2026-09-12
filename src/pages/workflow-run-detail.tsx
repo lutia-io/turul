@@ -267,10 +267,7 @@ export default function WorkflowRunDetail() {
               {organization ? (
                 <AsideRow label="Organization">
                   <Link
-                    to={networkWorkspacePath({
-                      networkId: resolved.networkId,
-                      organizationId: organization.id,
-                    })}
+                    to={href(`organization/${organization.id}`)}
                     className="inline-flex max-w-full items-center gap-1.5 hover:underline"
                   >
                     <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />

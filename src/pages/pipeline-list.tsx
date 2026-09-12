@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { ViewIcon } from "lucide-react"
+import { RotateCcwIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import {
@@ -49,6 +49,7 @@ import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
   useListPipelinesQuery,
+  useRetryPipelineMutation,
   type ApiPipelineStatus,
   type ListPipelinesParams,
   type PipelineListSort,
@@ -165,6 +166,14 @@ export default function PipelineList() {
     useListPipelinesQuery(listParams, {
       skip: !isAuthenticated,
     })
+  const hasLiveRuns = (data?.items ?? []).some(
+    (run) => run.status === "pending" || run.status === "running"
+  )
+  useListPipelinesQuery(listParams, {
+    skip: !isAuthenticated || !hasLiveRuns,
+    pollingInterval: 2000,
+  })
+  const [retryPipeline, retryState] = useRetryPipelineMutation()
   const dataRef = useRef(data)
   if (data) {
     dataRef.current = data
@@ -208,7 +217,8 @@ export default function PipelineList() {
           apiStatus: run.status,
           networkName: network?.name ?? run.networkId,
           organizationName: organization?.name ?? run.organizationId,
-          currentLabel: current?.name ?? `Level ${Math.max(currentIndex - 1, 0)}`,
+          currentLabel:
+            current?.name ?? `Level ${Math.max(currentIndex - 1, 0)}`,
           currentIndex,
           total: steps.length,
           startedAt: run.createdAt,
@@ -321,7 +331,10 @@ export default function PipelineList() {
             />
           ),
           cell: ({ row }) => (
-            <DataTableCellLink to={hrefFor(row.original)} className="max-w-[16rem]">
+            <DataTableCellLink
+              to={hrefFor(row.original)}
+              className="max-w-[16rem]"
+            >
               {row.original.status === "Queued"
                 ? "Waiting to start"
                 : row.original.currentLabel}
@@ -417,16 +430,34 @@ export default function PipelineList() {
           cell: ({ row }) => (
             <DataTableRowActions
               items={
-                <DropdownMenuItem render={<Link to={hrefFor(row.original)} />}>
-                  <ViewIcon />
-                  View
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    render={<Link to={hrefFor(row.original)} />}
+                  >
+                    <ViewIcon />
+                    View
+                  </DropdownMenuItem>
+                  {row.original.apiStatus === "failed" ? (
+                    <DropdownMenuItem
+                      disabled={
+                        retryState.isLoading &&
+                        retryState.originalArgs === row.original.id
+                      }
+                      onClick={() => {
+                        void retryPipeline(row.original.id)
+                      }}
+                    >
+                      <RotateCcwIcon />
+                      Retry
+                    </DropdownMenuItem>
+                  ) : null}
+                </>
               }
             />
           ),
         }),
       ]),
-    [columnFilters, hrefFor, organizationId]
+    [columnFilters, hrefFor, organizationId, retryState, retryPipeline]
   )
 
   const table = useTable({
@@ -541,6 +572,14 @@ export default function PipelineList() {
         </p>
       ) : (
         <>
+          {retryState.isError ? (
+            <p className="text-sm text-destructive">
+              {getHumaErrorMessage(
+                retryState.error,
+                "Failed to retry pipeline"
+              )}
+            </p>
+          ) : null}
           <DataTableView
             table={table}
             isRefreshing={isFetching}

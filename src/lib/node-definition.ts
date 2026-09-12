@@ -7,6 +7,7 @@ export const nodeTypes = [
   "LIST_MAPPER",
   "FILE",
   "RECORD",
+  "BULK",
 ] as const
 
 export type NodeType = (typeof nodeTypes)[number]
@@ -18,6 +19,7 @@ export const nodeTypeLabels: Record<NodeType, string> = {
   LIST_MAPPER: "List mapper",
   FILE: "File",
   RECORD: "Record API",
+  BULK: "Bulk records",
 }
 
 export const executableNodeTypes = new Set<NodeType>(nodeTypes)
@@ -80,6 +82,9 @@ export const recordOperations = [
 ] as const
 export type RecordOperation = (typeof recordOperations)[number]
 
+export const bulkOperations = ["CREATE", "UPSERT"] as const
+export type BulkOperation = (typeof bulkOperations)[number]
+
 export const recordFilterOps = [
   "eq",
   "contains",
@@ -96,6 +101,11 @@ export const recordOperationLabels: Record<RecordOperation, string> = {
   CREATE: "Create a record",
   UPDATE: "Update a record",
   UPSERT: "Create or update a record",
+}
+
+export const bulkOperationLabels: Record<BulkOperation, string> = {
+  CREATE: "Create records",
+  UPSERT: "Create or update records",
 }
 
 export const recordFilterOpLabels: Record<RecordFilterOp, string> = {
@@ -193,6 +203,18 @@ export function defaultDefinition(type: NodeType): JsonObject {
       }
     case "RECORD":
       return { operation: "LIST", schemaId: "", filters: [], data: {} }
+    case "BULK":
+      return {
+        operation: "CREATE",
+        records: [
+          {
+            schemaId: "",
+            from: "{{ .Input.0.items }}",
+            as: "item",
+            data: {},
+          },
+        ],
+      }
   }
 }
 
@@ -210,6 +232,10 @@ export function isFileOperation(value: string): value is FileOperation {
 
 export function isRecordOperation(value: string): value is RecordOperation {
   return recordOperations.includes(value as RecordOperation)
+}
+
+export function isBulkOperation(value: string): value is BulkOperation {
+  return bulkOperations.includes(value as BulkOperation)
 }
 
 export function isRecordFilterOp(value: string): value is RecordFilterOp {
@@ -264,6 +290,19 @@ export function nodeConfigSummary(type: string, definition: JsonObject) {
         ? recordOperationLabels[definition.operation]
         : "Record API"
     return operation
+  }
+  if (type === "BULK") {
+    const operation =
+      typeof definition.operation === "string" &&
+      isBulkOperation(definition.operation)
+        ? bulkOperationLabels[definition.operation]
+        : bulkOperationLabels.CREATE
+    const records = Array.isArray(definition.records)
+      ? definition.records.length
+      : 0
+    const types =
+      records === 1 ? "1 record type" : `${records} record types`
+    return `${operation} · ${types}`
   }
   return nodeTypeLabel(type)
 }
@@ -518,4 +557,106 @@ export function listMapperDefinitionFromDraft(
       mapping: mappingObjectFromEntries(draft.mapping),
     },
   }
+}
+
+export type BulkRecordDraft = {
+  key: string
+  schemaId: string
+  from: string
+  as: string
+  recordId: string
+  data: MappingEntry[]
+}
+
+export type BulkDefinitionDraft = {
+  operation: BulkOperation
+  records: BulkRecordDraft[]
+}
+
+export function emptyBulkRecord(): BulkRecordDraft {
+  return {
+    key: newDraftKey("bulk"),
+    schemaId: "",
+    from: "{{ .Input.0.items }}",
+    as: "item",
+    recordId: "",
+    data: [emptyMappingEntry()],
+  }
+}
+
+export function bulkDraftFromDefinition(
+  definition: JsonObject
+): BulkDefinitionDraft {
+  const records: BulkRecordDraft[] = []
+  if (Array.isArray(definition.records)) {
+    for (const item of definition.records) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        continue
+      }
+      const record = item as {
+        schemaId?: unknown
+        from?: unknown
+        as?: unknown
+        recordId?: unknown
+        data?: unknown
+      }
+      records.push({
+        key: newDraftKey("bulk"),
+        schemaId: typeof record.schemaId === "string" ? record.schemaId : "",
+        from: typeof record.from === "string" ? record.from : "",
+        as:
+          typeof record.as === "string" && record.as.trim()
+            ? record.as.trim()
+            : "item",
+        recordId:
+          typeof record.recordId === "string" ? record.recordId : "",
+        data: mappingEntriesFromObject(asObject(record.data)),
+      })
+    }
+  }
+  return {
+    operation:
+      typeof definition.operation === "string" &&
+      isBulkOperation(definition.operation)
+        ? definition.operation
+        : "CREATE",
+    records: records.length > 0 ? records : [emptyBulkRecord()],
+  }
+}
+
+export function bulkDefinitionFromDraft(
+  draft: BulkDefinitionDraft
+): { definition?: JsonObject; error?: string } {
+  if (draft.records.length === 0) {
+    return { error: "Add at least one record type" }
+  }
+  const records: JsonObject[] = []
+  for (const [index, record] of draft.records.entries()) {
+    const schemaId = record.schemaId.trim()
+    if (!schemaId) {
+      return { error: `Record type ${index + 1} needs a schema` }
+    }
+    const from = record.from.trim()
+    if (!from) {
+      return { error: `Record type ${index + 1} needs a list source` }
+    }
+    const alias = record.as.trim() || "item"
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
+      return { error: `Record type ${index + 1} item name must be an identifier` }
+    }
+    if (alias === "Record" || alias === "Context" || alias === "Input") {
+      return { error: `Record type ${index + 1} item name is reserved` }
+    }
+    const item: JsonObject = {
+      schemaId,
+      from,
+      as: alias,
+      data: mappingObjectFromEntries(record.data),
+    }
+    if (draft.operation === "UPSERT" && record.recordId.trim()) {
+      item.recordId = record.recordId.trim()
+    }
+    records.push(item)
+  }
+  return { definition: { operation: draft.operation, records } }
 }

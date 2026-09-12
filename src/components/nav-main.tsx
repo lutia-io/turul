@@ -100,7 +100,9 @@ function NavCollapsibleItem({
     >
       <SidebarMenuButton
         tooltip={item.title}
-        isActive={isItemActive(pathname, search, item.url, item.exact)}
+        isActive={
+          item.isActive ?? isItemActive(pathname, search, item.url, item.exact)
+        }
         render={<Link to={item.url} />}
         onClick={onNavigate}
       >
@@ -166,7 +168,10 @@ export function NavMain({
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton
                 tooltip={item.title}
-                isActive={isItemActive(pathname, search, item.url, item.exact)}
+                isActive={
+                  item.isActive ??
+                  isItemActive(pathname, search, item.url, item.exact)
+                }
                 render={<Link to={item.url} />}
                 onClick={closeMobileSidebar}
               >

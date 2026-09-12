@@ -120,7 +120,7 @@ export function CreateOrganizationDialog({
       navigate(
         networkWorkspacePath({
           networkId: selectedNetworkId,
-          organizationId: organization.id,
+          rest: `organization/${organization.id}`,
         })
       )
     } catch {

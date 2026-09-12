@@ -1098,6 +1098,250 @@ export const networks: Record<string, Network> = {
       }),
     ],
   },
+  school: {
+    id: "school",
+    name: "School",
+    summary: "District school network",
+    description:
+      "District network connecting elementary, middle, and high schools around enrollments, attendance, and courses.",
+    industry: "Education",
+    headquarters: "Denver, United States",
+    coverage: "4 campuses",
+    status: "Active",
+    color: "teal",
+    organizations: [
+      {
+        id: "school-district",
+        name: "District Office",
+        type: "Administration",
+        location: "Denver, United States",
+        members: 12,
+        description:
+          "District office that shares enrollment, attendance, and course records across campuses.",
+        status: "Active",
+        color: "teal",
+      },
+      {
+        id: "school-high",
+        name: "Riverside High",
+        type: "High school",
+        location: "Denver, United States",
+        members: 18,
+        description:
+          "High school campus for grades 9–12, counseling, and course sections.",
+        status: "Active",
+        color: "blue",
+      },
+      {
+        id: "school-middle",
+        name: "Cedar Middle",
+        type: "Middle school",
+        location: "Lakewood, United States",
+        members: 11,
+        description:
+          "Middle school campus for grades 6–8, homeroom attendance, and electives.",
+        status: "Active",
+        color: "orange",
+      },
+      {
+        id: "school-elementary",
+        name: "Maple Elementary",
+        type: "Elementary",
+        location: "Aurora, United States",
+        members: 9,
+        description:
+          "Elementary campus for kindergarten through grade 5 and family enrollment.",
+        status: "Active",
+        color: "green",
+      },
+    ],
+    schemas: [
+      defineSchema({
+        id: "school-enrollment",
+        name: "Enrollment",
+        slug: "enrollment",
+        color: "teal",
+        description:
+          "Student enrollment shared by campuses and the district office for placement and counseling.",
+        properties: {
+          studentId: { type: "string", description: "Student identifier" },
+          givenName: { type: "string", description: "Given name" },
+          familyName: { type: "string", description: "Family name" },
+          gradeLevel: {
+            type: "string",
+            enum: [
+              "K",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+            ],
+            description: "Grade level",
+          },
+          campusId: { type: "string", description: "Home campus" },
+          status: {
+            type: "string",
+            enum: ["enrolled", "waitlisted", "withdrawn"],
+            description: "Enrollment status",
+          },
+          enrolledOn: {
+            type: "string",
+            format: "date",
+            description: "Enrollment date",
+          },
+          transcriptFileId: {
+            type: "string",
+            format: "file",
+            description: "Prior transcript",
+          },
+        },
+      }),
+      defineSchema({
+        id: "school-attendance",
+        name: "Attendance",
+        slug: "attendance",
+        color: "blue",
+        description:
+          "Daily attendance marks from homeroom used to notify families and counselors.",
+        properties: {
+          attendanceId: { type: "string", description: "Attendance event id" },
+          studentId: { type: "string", description: "Student identifier" },
+          campusId: { type: "string", description: "Campus" },
+          status: {
+            type: "string",
+            enum: ["present", "absent", "tardy", "excused"],
+            description: "Attendance mark",
+          },
+          markedOn: {
+            type: "string",
+            format: "date",
+            description: "Attendance date",
+          },
+        },
+      }),
+      defineSchema({
+        id: "school-course",
+        name: "Course Section",
+        slug: "course-section",
+        color: "purple",
+        description:
+          "Course sections with teacher, period, and seats published across campuses.",
+        properties: {
+          courseId: { type: "string", description: "Course section id" },
+          title: { type: "string", description: "Course title" },
+          teacher: { type: "string", description: "Teacher name" },
+          campusId: { type: "string", description: "Campus" },
+          period: { type: "integer", description: "Bell period" },
+          seats: { type: "integer", description: "Available seats" },
+        },
+      }),
+    ],
+    workflowDefinitions: [
+      defineWorkflow({
+        id: "school-student-onboarding",
+        name: "Student Onboarding",
+        slug: "student-onboarding",
+        schemaId: "school-enrollment",
+        trigger: { type: "event", event: "enrollment.created" },
+        steps: [
+          { id: "homeroom", type: "task", name: "Assign homeroom" },
+          { id: "counselor", type: "notify", name: "Notify counselor" },
+          {
+            id: "credentials",
+            type: "http",
+            name: "Issue student credentials",
+          },
+        ],
+      }),
+      defineWorkflow({
+        id: "school-absence-notice",
+        name: "Absence Notice",
+        slug: "absence-notice",
+        schemaId: "school-attendance",
+        trigger: { type: "event", event: "attendance.marked_absent" },
+        steps: [
+          { id: "family", type: "notify", name: "Notify family" },
+          {
+            id: "consecutive",
+            type: "validate",
+            name: "Check consecutive absences",
+          },
+          { id: "counselor", type: "notify", name: "Flag counselor" },
+        ],
+      }),
+      defineWorkflow({
+        id: "school-report-card",
+        name: "Report Card",
+        slug: "report-card",
+        schemaId: "school-enrollment",
+        trigger: { type: "schedule", event: "term.closes" },
+        steps: [
+          { id: "compile", type: "transform", name: "Compile grades" },
+          { id: "publish", type: "notify", name: "Send to families" },
+        ],
+      }),
+      defineWorkflow({
+        id: "school-transfer-request",
+        name: "Transfer Request",
+        slug: "transfer-request",
+        schemaId: "school-enrollment",
+        active: false,
+        trigger: { type: "event", event: "enrollment.transfer_requested" },
+        steps: [
+          { id: "seats", type: "validate", name: "Check campus seats" },
+          { id: "records", type: "http", name: "Forward records" },
+          { id: "confirm", type: "notify", name: "Confirm placement" },
+        ],
+      }),
+    ],
+    pipelineDefinitions: [
+      definePipeline({
+        id: "school-sis-ingest",
+        name: "SIS Ingest",
+        slug: "sis-ingest",
+        source: { type: "api", name: "Student information system" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull enrollments" },
+          {
+            id: "validate",
+            type: "validate",
+            name: "Validate campus and grade",
+          },
+          { id: "publish", type: "publish", name: "Publish student records" },
+        ],
+      }),
+      definePipeline({
+        id: "school-attendance-capture",
+        name: "Attendance Capture",
+        slug: "attendance-capture",
+        source: { type: "stream", name: "Homeroom scanners" },
+        stages: [
+          { id: "ingest", type: "extract", name: "Ingest daily marks" },
+          { id: "match", type: "transform", name: "Match to enrollments" },
+          { id: "publish", type: "publish", name: "Write attendance" },
+        ],
+      }),
+      definePipeline({
+        id: "school-gradebook-sync",
+        name: "Gradebook Sync",
+        slug: "gradebook-sync",
+        source: { type: "api", name: "Gradebook" },
+        stages: [
+          { id: "extract", type: "extract", name: "Pull course grades" },
+          { id: "map", type: "transform", name: "Map to students" },
+          { id: "publish", type: "publish", name: "Sync report cards" },
+        ],
+      }),
+    ],
+  },
   personal: {
     id: "personal",
     name: "Personal",
@@ -1968,7 +2212,8 @@ export function updateWorkflowDefinition(
     id: result.workflowDefinition.id,
     name: input.name.trim(),
     slug: result.workflowDefinition.slug,
-    description: input.description?.trim() ?? result.workflowDefinition.description,
+    description:
+      input.description?.trim() ?? result.workflowDefinition.description,
     schemaId: input.schemaId,
     organizationId: result.workflowDefinition.organizationId,
     trigger: {
@@ -2052,7 +2297,8 @@ export function updatePipelineDefinition(
     id: result.pipelineDefinition.id,
     name: input.name.trim(),
     slug: result.pipelineDefinition.slug,
-    description: input.description?.trim() ?? result.pipelineDefinition.description,
+    description:
+      input.description?.trim() ?? result.pipelineDefinition.description,
     organizationId: result.pipelineDefinition.organizationId,
     source: {
       type: input.sourceType?.trim() || "api",

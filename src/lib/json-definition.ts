@@ -146,7 +146,7 @@ export function getJsonSchemaProperties(
       type: asString(property?.type) ?? "any",
       required: required.has(name),
       description: asString(property?.description),
-      format: asString(property?.format),
+      format: asString(property?.format) ?? asString(items?.format),
       schemaId: asString(property?.schemaId),
       enumValues,
       itemsType: asString(items?.type),
@@ -306,6 +306,10 @@ export function isFileProperty(property: JsonSchemaProperty) {
   return property.format === "file"
 }
 
+export function isFileArrayProperty(property: JsonSchemaProperty) {
+  return isFileProperty(property) && property.type === "array"
+}
+
 export function isForeignProperty(property: JsonSchemaProperty) {
   return property.format === "foreign"
 }
@@ -322,6 +326,18 @@ export function isAddressProperty(property: JsonSchemaProperty) {
   return property.format === "address"
 }
 
+export function fileIdsFromValue(value: JsonValue | undefined) {
+  if (typeof value === "string" && value) {
+    return [value]
+  }
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.filter(
+    (item): item is string => typeof item === "string" && item.length > 0
+  )
+}
+
 export function getRecordFileIds(
   data: JsonObject,
   properties: JsonSchemaProperty[]
@@ -331,8 +347,7 @@ export function getRecordFileIds(
       return []
     }
 
-    const value = data[property.name]
-    return typeof value === "string" && value ? [value] : []
+    return fileIdsFromValue(data[property.name])
   })
 }
 

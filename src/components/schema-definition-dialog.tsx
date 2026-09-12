@@ -439,6 +439,7 @@ function toSchemaInput(properties: PropertyDraft[]) {
     if (
       property.format &&
       (property.type === "string" ||
+        (property.type === "array" && property.format === "file") ||
         (property.type === "object" && property.format === ADDRESS_FORMAT))
     ) {
       spec.format = property.format
@@ -449,7 +450,10 @@ function toSchemaInput(properties: PropertyDraft[]) {
     }
 
     if (property.type === "array") {
-      spec.items = { type: property.itemsType }
+      spec.items =
+        property.format === "file"
+          ? { type: "string", format: "file" }
+          : { type: property.itemsType }
     }
 
     const enumValues = property.enumValues
@@ -1406,7 +1410,8 @@ function PropertyRow({
     kind === "list" ||
     kind === "choices" ||
     kind === "address" ||
-    kind === "object"
+    kind === "object" ||
+    kind === "file"
 
   return (
     <tbody className={cn("group", focus && "bg-muted/30")}>
@@ -1606,6 +1611,22 @@ function PropertyRow({
                   placeholder="Type a value and press Enter"
                 />
               </div>
+            ) : null}
+            {kind === "file" ? (
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  id={`${property.key}-multiple`}
+                  checked={property.type === "array"}
+                  onCheckedChange={(checked) =>
+                    onUpdate({
+                      type: checked === true ? "array" : "string",
+                      format: "file",
+                      itemsType: "string",
+                    })
+                  }
+                />
+                Allow multiple files
+              </label>
             ) : null}
             {kind === "address" ? (
               <p className="text-xs text-muted-foreground">

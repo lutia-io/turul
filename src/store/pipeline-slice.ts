@@ -370,6 +370,20 @@ const pipelineApi = api.injectEndpoints({
       query: (id) => `/pipeline/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Pipeline", id }],
     }),
+    retryPipeline: build.mutation<{ id: string }, string>({
+      query: (id) => ({
+        url: `/pipeline/${id}/retry`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, error, id) =>
+        error
+          ? []
+          : [
+              { type: "Pipeline", id },
+              { type: "Pipeline", id: "LIST" },
+              { type: "PipelineNode", id: `LIST-${id}` },
+            ],
+    }),
     createPipeline: build.mutation<{ id: string }, CreatePipelineRequest>({
       query: (body) => ({
         url: "/pipeline",
@@ -416,6 +430,7 @@ export const {
   useUpdatePipelineDefinitionMutation,
   useListPipelinesQuery,
   useGetPipelineQuery,
+  useRetryPipelineMutation,
   useCreatePipelineMutation,
   useListPipelineNodesQuery,
   useGetPipelineNodeQuery,

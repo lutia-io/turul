@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
+import { XIcon } from "lucide-react"
 
 import { CreateActorFields } from "@/components/create-actor-fields"
 import { propertyLabel } from "@/components/schema-records-table"
@@ -36,8 +37,10 @@ import {
 } from "@/lib/address"
 import {
   getJsonSchemaProperties,
+  fileIdsFromValue,
   hasSchemaDefault,
   isAddressProperty,
+  isFileArrayProperty,
   isFileProperty,
   isForeignProperty,
   isTemplateExpression,
@@ -103,7 +106,7 @@ export function CreateRecordDialog({
     useState("")
   const [selectedSchemaId, setSelectedSchemaId] = useState(schemaId ?? "")
   const [values, setValues] = useState<Record<string, string>>({})
-  const [uploads, setUploads] = useState<Record<string, File | undefined>>({})
+  const [uploads, setUploads] = useState<Record<string, File[]>>({})
   const [formError, setFormError] = useState<string>()
   const [createRecord, createState] = useCreateRecordMutation()
   const [updateRecord, updateState] = useUpdateRecordMutation()
@@ -320,13 +323,23 @@ export function CreateRecordDialog({
     try {
       const data: JsonObject = {}
       for (const property of properties) {
-        const uploaded = uploads[property.name]
-        if (isFileProperty(property) && uploaded) {
-          const created = await createFile({
-            file: uploaded,
-            organizationUserId: selectedOrganizationUserId,
-          }).unwrap()
-          data[property.name] = created.id
+        if (isFileProperty(property)) {
+          const ids = parseFileIds(values[property.name] ?? "")
+          for (const uploaded of uploads[property.name] ?? []) {
+            const created = await createFile({
+              file: uploaded,
+              organizationUserId: selectedOrganizationUserId,
+            }).unwrap()
+            ids.push(created.id)
+          }
+          if (ids.length === 0) {
+            if (inputRequired(property, editing)) {
+              setFormError(`${propertyLabel(property.name)} is required.`)
+              return
+            }
+            continue
+          }
+          data[property.name] = isFileArrayProperty(property) ? ids : ids[0]
           continue
         }
 
@@ -453,7 +466,7 @@ export function CreateRecordDialog({
                 networkId={selectedNetworkId}
                 organizationId={selectedOrganizationId}
                 value={values[property.name] ?? ""}
-                upload={uploads[property.name]}
+                uploads={uploads[property.name] ?? []}
                 editing={editing}
                 disabled={isLoading || !selectedOrganizationId}
                 onChange={(value) =>
@@ -462,10 +475,10 @@ export function CreateRecordDialog({
                     [property.name]: value,
                   }))
                 }
-                onUpload={(file) =>
+                onUploadsChange={(files) =>
                   setUploads((current) => ({
                     ...current,
-                    [property.name]: file,
+                    [property.name]: files,
                   }))
                 }
               />
@@ -550,6 +563,9 @@ function formValueFromData(
   property: JsonSchemaProperty,
   value: JsonValue | undefined
 ): string {
+  if (isFileProperty(property)) {
+    return serializeFileIds(fileIdsFromValue(value), isFileArrayProperty(property))
+  }
   if (value == null || value === "") {
     return ""
   }
@@ -643,6 +659,31 @@ function coercePropertyValue(
   return trimmed || undefined
 }
 
+function parseFileIds(raw: string) {
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (item): item is string => typeof item === "string" && item.length > 0
+      )
+    }
+  } catch {
+    // Single file IDs are stored as plain strings.
+  }
+  return [trimmed]
+}
+
+function serializeFileIds(ids: string[], multiple: boolean) {
+  if (multiple) {
+    return JSON.stringify(ids)
+  }
+  return ids[0] ?? ""
+}
+
 function RecordPropertyField({
   formId,
   property,
@@ -650,11 +691,11 @@ function RecordPropertyField({
   networkId,
   organizationId,
   value,
-  upload,
+  uploads,
   editing,
   disabled,
   onChange,
-  onUpload,
+  onUploadsChange,
 }: {
   formId: string
   property: JsonSchemaProperty
@@ -662,11 +703,11 @@ function RecordPropertyField({
   networkId: string
   organizationId: string
   value: string
-  upload?: File
+  uploads: File[]
   editing?: boolean
   disabled?: boolean
   onChange: (value: string) => void
-  onUpload: (file?: File) => void
+  onUploadsChange: (files: File[]) => void
 }) {
   const id = `${formId}-${property.name}`
   const label = propertyLabel(property.name)
@@ -683,10 +724,11 @@ function RecordPropertyField({
         networkId={networkId}
         organizationId={organizationId}
         value={value}
-        upload={upload}
+        uploads={uploads}
+        multiple={isFileArrayProperty(property)}
         disabled={disabled}
         onChange={onChange}
-        onUpload={onUpload}
+        onUploadsChange={onUploadsChange}
       />
     )
   }
@@ -961,10 +1003,11 @@ function RecordFileField({
   networkId,
   organizationId,
   value,
-  upload,
+  uploads,
+  multiple,
   disabled,
   onChange,
-  onUpload,
+  onUploadsChange,
 }: {
   id: string
   label: string
@@ -973,10 +1016,11 @@ function RecordFileField({
   networkId: string
   organizationId: string
   value: string
-  upload?: File
+  uploads: File[]
+  multiple: boolean
   disabled?: boolean
   onChange: (value: string) => void
-  onUpload: (file?: File) => void
+  onUploadsChange: (files: File[]) => void
 }) {
   const { data, isFetching } = useListFilesQuery(
     {
@@ -992,27 +1036,103 @@ function RecordFileField({
     () => (data?.items ?? []).map(workspaceFileFromApi),
     [data]
   )
+  const selectedIds = parseFileIds(value)
+  const availableFiles = files.filter((file) => !selectedIds.includes(file.id))
+
+  function setSelectedIds(ids: string[]) {
+    onChange(serializeFileIds(ids, multiple))
+  }
+
+  function removeSelected(fileId: string) {
+    setSelectedIds(selectedIds.filter((id) => id !== fileId))
+  }
+
+  function removeUpload(index: number) {
+    onUploadsChange(uploads.filter((_, itemIndex) => itemIndex !== index))
+  }
 
   return (
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      {multiple && (selectedIds.length > 0 || uploads.length > 0) ? (
+        <div className="flex flex-col gap-1">
+          {selectedIds.map((fileId) => {
+            const file = files.find((item) => item.id === fileId)
+            return (
+              <div
+                key={fileId}
+                className="flex min-w-0 items-center gap-2 rounded-lg border bg-background px-2 py-1.5"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {file?.filename ?? fileId}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={disabled}
+                  onClick={() => removeSelected(fileId)}
+                  aria-label={`Remove ${file?.filename ?? "file"}`}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            )
+          })}
+          {uploads.map((file, index) => (
+            <div
+              key={`${file.name}-${file.size}-${index}`}
+              className="flex min-w-0 items-center gap-2 rounded-lg border bg-background px-2 py-1.5"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm">
+                Upload: {file.name}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                disabled={disabled}
+                onClick={() => removeUpload(index)}
+                aria-label={`Remove upload ${file.name}`}
+              >
+                <XIcon />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <NativeSelect
         id={id}
-        value={upload ? "" : value}
-        required={required && !upload}
+        value={multiple || uploads.length > 0 ? "" : (selectedIds[0] ?? "")}
+        required={required && selectedIds.length === 0 && uploads.length === 0}
         disabled={disabled || isFetching}
         onChange={(event) => {
-          onUpload(undefined)
-          onChange(event.target.value)
+          const next = event.target.value
+          if (!next) {
+            if (!multiple) {
+              setSelectedIds([])
+            }
+            return
+          }
+          onUploadsChange(multiple ? uploads : [])
+          setSelectedIds(multiple ? [...selectedIds, next] : [next])
         }}
       >
         <NativeSelectOption value="">
-          {upload ? `Upload: ${upload.name}` : "Select a file"}
+          {multiple
+            ? "Add a file"
+            : uploads.length > 0
+              ? `Upload: ${uploads[0]?.name}`
+              : "Select a file"}
         </NativeSelectOption>
-        {value && !upload && !files.some((file) => file.id === value) ? (
-          <NativeSelectOption value={value}>{value}</NativeSelectOption>
+        {!multiple &&
+        selectedIds[0] &&
+        !files.some((file) => file.id === selectedIds[0]) ? (
+          <NativeSelectOption value={selectedIds[0]}>
+            {selectedIds[0]}
+          </NativeSelectOption>
         ) : null}
-        {files.map((file) => (
+        {(multiple ? availableFiles : files).map((file) => (
           <NativeSelectOption key={file.id} value={file.id}>
             {file.filename}
           </NativeSelectOption>
@@ -1020,17 +1140,27 @@ function RecordFileField({
       </NativeSelect>
       <Input
         type="file"
+        multiple={multiple}
         disabled={disabled}
         onChange={(event) => {
-          const next = event.target.files?.[0]
-          onUpload(next)
-          if (next) {
-            onChange("")
+          const next = Array.from(event.target.files ?? [])
+          event.target.value = ""
+          if (next.length === 0) {
+            return
           }
+          if (multiple) {
+            onUploadsChange([...uploads, ...next])
+            return
+          }
+          setSelectedIds([])
+          onUploadsChange(next.slice(0, 1))
         }}
       />
       <FieldDescription>
-        {description ?? "Choose an existing file or upload a new one."}
+        {description ??
+          (multiple
+            ? "Choose existing files or upload new ones."
+            : "Choose an existing file or upload a new one.")}
       </FieldDescription>
     </Field>
   )
