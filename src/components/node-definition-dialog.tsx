@@ -85,6 +85,7 @@ import {
   type RecordDefinitionDraft,
 } from "@/lib/node-definition"
 import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
+import { mockTemplateGroup } from "@/lib/template-mock"
 import type { PipelineNodeConfig } from "@/lib/pipeline-definition"
 
 const CHOOSE_SCHEMA = "__choose_schema__"
@@ -185,12 +186,12 @@ function pipelineTemplateGroups(
   }
 
   if (context?.levelIndex === 0) {
-    return [common, named]
+    return [common, named, mockTemplateGroup]
   }
   if (context && context.levelIndex > 0) {
-    return [common, named, previous]
+    return [common, named, previous, mockTemplateGroup]
   }
-  return [common, named, previous]
+  return [common, named, previous, mockTemplateGroup]
 }
 
 function itemFieldToken(alias: string) {
@@ -1019,7 +1020,10 @@ export function NodeDefinitionDialog({
                             ...current.bulk,
                             operation: value,
                             records: current.bulk.records.map((record) => {
-                              if (value !== "UPSERT" || record.recordId.trim()) {
+                              if (
+                                value !== "UPSERT" ||
+                                record.recordId.trim()
+                              ) {
                                 return record
                               }
                               const alias = record.as.trim() || "item"
@@ -1049,170 +1053,149 @@ export function NodeDefinitionDialog({
                         : "Insert every item in each list as a new record."}
                     </FieldDescription>
                   </Field>
-                <Field>
-                  <FieldLabel>Record types</FieldLabel>
-                  <FieldDescription>
-                    Output is {'{ "created": [ ... ], "total": n }'}.
-                  </FieldDescription>
-                  <div className="mt-2 flex flex-col gap-3">
-                    {drafts.bulk.records.map((record, index) => {
-                      const alias = record.as.trim() || "item"
-                      const item = itemFieldToken(alias)
-                      const groups: TemplateVariableGroup[] = [
-                        ...templateGroups,
-                        {
-                          label: `Each ${alias}`,
-                          variables: [
-                            {
-                              label: `Current ${alias}`,
-                              token: listItemTemplate(alias),
-                              hint: "item",
-                            },
-                            {
-                              label: "Item field",
-                              token: item.token,
-                              caretOffset: item.caretOffset,
-                              hint: "item",
-                            },
-                          ],
-                        },
-                        ...(drafts.bulk.operation === "UPSERT"
-                          ? [
+                  <Field>
+                    <FieldLabel>Record types</FieldLabel>
+                    <FieldDescription>
+                      Output is {'{ "created": [ ... ], "total": n }'}.
+                    </FieldDescription>
+                    <div className="mt-2 flex flex-col gap-3">
+                      {drafts.bulk.records.map((record, index) => {
+                        const alias = record.as.trim() || "item"
+                        const item = itemFieldToken(alias)
+                        const groups: TemplateVariableGroup[] = [
+                          ...templateGroups,
+                          {
+                            label: `Each ${alias}`,
+                            variables: [
                               {
-                                label: "Existing record",
-                                variables: [
-                                  {
-                                    label: "Record ID",
-                                    token: "{{ .Context.id }}",
-                                    hint: "context",
-                                  },
-                                  {
-                                    label: "Record field",
-                                    token: "{{ .Context.data. }}",
-                                    caretOffset: "{{ .Context.data. }}".lastIndexOf(".") + 1,
-                                    hint: "context",
-                                  },
-                                ],
-                              } satisfies TemplateVariableGroup,
-                            ]
-                          : []),
-                      ]
-                      return (
-                        <div
-                          key={record.key}
-                          className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium">
-                              Record type {index + 1}
-                            </p>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              disabled={
-                                isLoading || drafts.bulk.records.length === 1
-                              }
-                              onClick={() =>
-                                setDrafts((current) => ({
-                                  ...current,
-                                  bulk: {
-                                    ...current.bulk,
-                                    records: current.bulk.records.filter(
-                                      (item) => item.key !== record.key
-                                    ),
-                                  },
-                                }))
-                              }
-                              aria-label={`Remove record type ${index + 1}`}
-                            >
-                              <Trash2Icon />
-                            </Button>
-                          </div>
-                          <Field>
-                            <FieldLabel htmlFor={`${formId}-bulk-schema-${record.key}`}>
-                              Record type
-                            </FieldLabel>
-                            {schemas.length > 0 ? (
-                              <Select
-                                value={
-                                  schemas.some(
-                                    (schema) => schema.id === record.schemaId
-                                  )
-                                    ? record.schemaId
-                                    : CHOOSE_SCHEMA
+                                label: `Current ${alias}`,
+                                token: listItemTemplate(alias),
+                                hint: "item",
+                              },
+                              {
+                                label: "Item field",
+                                token: item.token,
+                                caretOffset: item.caretOffset,
+                                hint: "item",
+                              },
+                            ],
+                          },
+                          ...(drafts.bulk.operation === "UPSERT"
+                            ? [
+                                {
+                                  label: "Existing record",
+                                  variables: [
+                                    {
+                                      label: "Record ID",
+                                      token: "{{ .Context.id }}",
+                                      hint: "context",
+                                    },
+                                    {
+                                      label: "Record field",
+                                      token: "{{ .Context.data. }}",
+                                      caretOffset:
+                                        "{{ .Context.data. }}".lastIndexOf(
+                                          "."
+                                        ) + 1,
+                                      hint: "context",
+                                    },
+                                  ],
+                                } satisfies TemplateVariableGroup,
+                              ]
+                            : []),
+                        ]
+                        return (
+                          <div
+                            key={record.key}
+                            className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-medium">
+                                Record type {index + 1}
+                              </p>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                disabled={
+                                  isLoading || drafts.bulk.records.length === 1
                                 }
-                                disabled={isLoading}
-                                modal={false}
-                                items={schemaItems}
-                                onValueChange={(value) => {
-                                  if (!value || value === CHOOSE_SCHEMA) {
-                                    return
-                                  }
+                                onClick={() =>
                                   setDrafts((current) => ({
                                     ...current,
                                     bulk: {
                                       ...current.bulk,
-                                      records: current.bulk.records.map(
-                                        (item) =>
-                                          item.key === record.key
-                                            ? { ...item, schemaId: value }
-                                            : item
+                                      records: current.bulk.records.filter(
+                                        (item) => item.key !== record.key
                                       ),
                                     },
                                   }))
-                                }}
+                                }
+                                aria-label={`Remove record type ${index + 1}`}
                               >
-                                <SelectTrigger
-                                  id={`${formId}-bulk-schema-${record.key}`}
-                                >
-                                  <SelectValue placeholder="Choose a record type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value={CHOOSE_SCHEMA}>
-                                    Choose a record type
-                                  </SelectItem>
-                                  {schemas.map((schema) => (
-                                    <SelectItem
-                                      key={schema.id}
-                                      value={schema.id}
-                                    >
-                                      {schema.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : null}
-                            <TemplateValueInput
-                              id={`${formId}-bulk-schema-id-${record.key}`}
-                              value={record.schemaId}
-                              onChange={(schemaId) =>
-                                setDrafts((current) => ({
-                                  ...current,
-                                  bulk: {
-                                    ...current.bulk,
-                                    records: current.bulk.records.map((item) =>
-                                      item.key === record.key
-                                        ? { ...item, schemaId }
-                                        : item
-                                    ),
-                                  },
-                                }))
-                              }
-                              groups={templateGroups}
-                              placeholder="{{ .Input.investorSchemaId }}"
-                              disabled={isLoading}
-                            />
-                          </Field>
-                          <div className="grid gap-4 sm:grid-cols-2">
+                                <Trash2Icon />
+                              </Button>
+                            </div>
                             <Field>
-                              <FieldLabel htmlFor={`${formId}-bulk-from-${record.key}`}>
-                                From
+                              <FieldLabel
+                                htmlFor={`${formId}-bulk-schema-${record.key}`}
+                              >
+                                Record type
                               </FieldLabel>
+                              {schemas.length > 0 ? (
+                                <Select
+                                  value={
+                                    schemas.some(
+                                      (schema) => schema.id === record.schemaId
+                                    )
+                                      ? record.schemaId
+                                      : CHOOSE_SCHEMA
+                                  }
+                                  disabled={isLoading}
+                                  modal={false}
+                                  items={schemaItems}
+                                  onValueChange={(value) => {
+                                    if (!value || value === CHOOSE_SCHEMA) {
+                                      return
+                                    }
+                                    setDrafts((current) => ({
+                                      ...current,
+                                      bulk: {
+                                        ...current.bulk,
+                                        records: current.bulk.records.map(
+                                          (item) =>
+                                            item.key === record.key
+                                              ? { ...item, schemaId: value }
+                                              : item
+                                        ),
+                                      },
+                                    }))
+                                  }}
+                                >
+                                  <SelectTrigger
+                                    id={`${formId}-bulk-schema-${record.key}`}
+                                  >
+                                    <SelectValue placeholder="Choose a record type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={CHOOSE_SCHEMA}>
+                                      Choose a record type
+                                    </SelectItem>
+                                    {schemas.map((schema) => (
+                                      <SelectItem
+                                        key={schema.id}
+                                        value={schema.id}
+                                      >
+                                        {schema.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : null}
                               <TemplateValueInput
-                                id={`${formId}-bulk-from-${record.key}`}
-                                value={record.from}
-                                onChange={(from) =>
+                                id={`${formId}-bulk-schema-id-${record.key}`}
+                                value={record.schemaId}
+                                onChange={(schemaId) =>
                                   setDrafts((current) => ({
                                     ...current,
                                     bulk: {
@@ -1220,29 +1203,124 @@ export function NodeDefinitionDialog({
                                       records: current.bulk.records.map(
                                         (item) =>
                                           item.key === record.key
-                                            ? { ...item, from }
+                                            ? { ...item, schemaId }
                                             : item
                                       ),
                                     },
                                   }))
                                 }
                                 groups={templateGroups}
-                                placeholder="{{ .Input.0.items }}"
-                                required
+                                placeholder="{{ .Input.investorSchemaId }}"
                                 disabled={isLoading}
                               />
-                              <FieldDescription>
-                                A list of items to insert as this record type.
-                              </FieldDescription>
                             </Field>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field>
+                                <FieldLabel
+                                  htmlFor={`${formId}-bulk-from-${record.key}`}
+                                >
+                                  From
+                                </FieldLabel>
+                                <TemplateValueInput
+                                  id={`${formId}-bulk-from-${record.key}`}
+                                  value={record.from}
+                                  onChange={(from) =>
+                                    setDrafts((current) => ({
+                                      ...current,
+                                      bulk: {
+                                        ...current.bulk,
+                                        records: current.bulk.records.map(
+                                          (item) =>
+                                            item.key === record.key
+                                              ? { ...item, from }
+                                              : item
+                                        ),
+                                      },
+                                    }))
+                                  }
+                                  groups={templateGroups}
+                                  placeholder="{{ .Input.0.items }}"
+                                  required
+                                  disabled={isLoading}
+                                />
+                                <FieldDescription>
+                                  A list of items to insert as this record type.
+                                </FieldDescription>
+                              </Field>
+                              <Field>
+                                <FieldLabel
+                                  htmlFor={`${formId}-bulk-as-${record.key}`}
+                                >
+                                  Item name
+                                </FieldLabel>
+                                <Input
+                                  id={`${formId}-bulk-as-${record.key}`}
+                                  value={record.as}
+                                  onChange={(event) =>
+                                    setDrafts((current) => ({
+                                      ...current,
+                                      bulk: {
+                                        ...current.bulk,
+                                        records: current.bulk.records.map(
+                                          (item) =>
+                                            item.key === record.key
+                                              ? {
+                                                  ...item,
+                                                  as: event.target.value,
+                                                }
+                                              : item
+                                        ),
+                                      },
+                                    }))
+                                  }
+                                  placeholder="item"
+                                  disabled={isLoading}
+                                />
+                                <FieldDescription>
+                                  Templates read each element as{" "}
+                                  {"{{ ." + alias + " }}"}.
+                                </FieldDescription>
+                              </Field>
+                            </div>
+                            {drafts.bulk.operation === "UPSERT" ? (
+                              <Field>
+                                <FieldLabel
+                                  htmlFor={`${formId}-bulk-record-id-${record.key}`}
+                                >
+                                  Record ID
+                                </FieldLabel>
+                                <TemplateValueInput
+                                  id={`${formId}-bulk-record-id-${record.key}`}
+                                  value={record.recordId}
+                                  onChange={(recordId) =>
+                                    setDrafts((current) => ({
+                                      ...current,
+                                      bulk: {
+                                        ...current.bulk,
+                                        records: current.bulk.records.map(
+                                          (item) =>
+                                            item.key === record.key
+                                              ? { ...item, recordId }
+                                              : item
+                                        ),
+                                      },
+                                    }))
+                                  }
+                                  groups={groups}
+                                  placeholder={`{{ .${alias}.id }}`}
+                                  disabled={isLoading}
+                                />
+                                <FieldDescription>
+                                  If this ID exists, that record is updated.
+                                  Otherwise a new record is created.
+                                </FieldDescription>
+                              </Field>
+                            ) : null}
                             <Field>
-                              <FieldLabel htmlFor={`${formId}-bulk-as-${record.key}`}>
-                                Item name
-                              </FieldLabel>
-                              <Input
-                                id={`${formId}-bulk-as-${record.key}`}
-                                value={record.as}
-                                onChange={(event) =>
+                              <FieldLabel>Record data</FieldLabel>
+                              <MappingFields
+                                entries={record.data}
+                                onChange={(data) =>
                                   setDrafts((current) => ({
                                     ...current,
                                     bulk: {
@@ -1250,108 +1328,45 @@ export function NodeDefinitionDialog({
                                       records: current.bulk.records.map(
                                         (item) =>
                                           item.key === record.key
-                                            ? {
-                                                ...item,
-                                                as: event.target.value,
-                                              }
-                                            : item
-                                      ),
-                                    },
-                                  }))
-                                }
-                                placeholder="item"
-                                disabled={isLoading}
-                              />
-                              <FieldDescription>
-                                Templates read each element as{" "}
-                                {"{{ ." + alias + " }}"}.
-                              </FieldDescription>
-                            </Field>
-                          </div>
-                          {drafts.bulk.operation === "UPSERT" ? (
-                            <Field>
-                              <FieldLabel
-                                htmlFor={`${formId}-bulk-record-id-${record.key}`}
-                              >
-                                Record ID
-                              </FieldLabel>
-                              <TemplateValueInput
-                                id={`${formId}-bulk-record-id-${record.key}`}
-                                value={record.recordId}
-                                onChange={(recordId) =>
-                                  setDrafts((current) => ({
-                                    ...current,
-                                    bulk: {
-                                      ...current.bulk,
-                                      records: current.bulk.records.map(
-                                        (item) =>
-                                          item.key === record.key
-                                            ? { ...item, recordId }
+                                            ? { ...item, data }
                                             : item
                                       ),
                                     },
                                   }))
                                 }
                                 groups={groups}
-                                placeholder={`{{ .${alias}.id }}`}
                                 disabled={isLoading}
+                                valuePlaceholder={`{{ .${alias}. }}`}
                               />
-                              <FieldDescription>
-                                If this ID exists, that record is updated.
-                                Otherwise a new record is created.
-                              </FieldDescription>
                             </Field>
-                          ) : null}
-                          <Field>
-                            <FieldLabel>Record data</FieldLabel>
-                            <MappingFields
-                              entries={record.data}
-                              onChange={(data) =>
-                                setDrafts((current) => ({
-                                  ...current,
-                                  bulk: {
-                                    ...current.bulk,
-                                    records: current.bulk.records.map((item) =>
-                                      item.key === record.key
-                                        ? { ...item, data }
-                                        : item
-                                    ),
-                                  },
-                                }))
-                              }
-                              groups={groups}
-                              disabled={isLoading}
-                              valuePlaceholder={`{{ .${alias}. }}`}
-                            />
-                          </Field>
-                        </div>
-                      )
-                    })}
-                    <button
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() =>
-                        setDrafts((current) => {
-                          const next = emptyBulkRecord()
-                          if (current.bulk.operation === "UPSERT") {
-                            next.recordId = `{{ .${next.as}.id }}`
-                          }
-                          return {
-                            ...current,
-                            bulk: {
-                              ...current.bulk,
-                              records: [...current.bulk.records, next],
-                            },
-                          }
-                        })
-                      }
-                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
-                    >
-                      <PlusIcon className="size-3.5" />
-                      Add record type
-                    </button>
-                  </div>
-                </Field>
+                          </div>
+                        )
+                      })}
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() =>
+                          setDrafts((current) => {
+                            const next = emptyBulkRecord()
+                            if (current.bulk.operation === "UPSERT") {
+                              next.recordId = `{{ .${next.as}.id }}`
+                            }
+                            return {
+                              ...current,
+                              bulk: {
+                                ...current.bulk,
+                                records: [...current.bulk.records, next],
+                              },
+                            }
+                          })
+                        }
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
+                      >
+                        <PlusIcon className="size-3.5" />
+                        Add record type
+                      </button>
+                    </div>
+                  </Field>
                 </>
               ) : null}
               {jsonError ? <FieldError>{jsonError}</FieldError> : null}
@@ -1363,10 +1378,7 @@ export function NodeDefinitionDialog({
             >
               Cancel
             </DialogClose>
-            <Button
-              type="submit"
-              disabled={Boolean(jsonError) || !name.trim()}
-            >
+            <Button type="submit" disabled={Boolean(jsonError) || !name.trim()}>
               {editing ? "Save node" : "Add node"}
             </Button>
           </DialogFooter>

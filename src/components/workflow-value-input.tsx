@@ -6,6 +6,7 @@ import {
   recordFieldTemplate,
   recordIDTemplate,
 } from "@/lib/workflow-definition"
+import { isMockTemplate, mockTokenForProperty } from "@/lib/template-mock"
 import {
   TemplateValueInput,
   type TemplateVariableGroup,
@@ -24,7 +25,8 @@ const CHOOSE_FIELD = "__choose_field__"
 const CHOOSE_VALUE = "__choose_value__"
 const RECORD_FIELD_RE = /^\{\{\s*\.Record\.data\.([A-Za-z0-9_]+)\s*\}\}$/
 
-type ValueSource = "literal" | "record-field" | "record-id" | "now" | "advanced"
+type ValueSource =
+  "literal" | "record-field" | "record-id" | "now" | "mock" | "advanced"
 type ValuePurpose = "value" | "record"
 
 function namedSchema(name?: string) {
@@ -43,6 +45,9 @@ function parseValueSource(value: string): {
   if (trimmed === nowTemplate) {
     return { source: "now" }
   }
+  if (isMockTemplate(trimmed)) {
+    return { source: "mock" }
+  }
   const recordField = trimmed.match(RECORD_FIELD_RE)
   if (recordField?.[1]) {
     return { source: "record-field", field: recordField[1] }
@@ -57,12 +62,14 @@ function sourceItems({
   fields,
   includeRecordId,
   includeNow,
+  includeMock,
   purpose,
   schemaName,
 }: {
   fields: JsonSchemaProperty[]
   includeRecordId: boolean
   includeNow: boolean
+  includeMock: boolean
   purpose: ValuePurpose
   schemaName?: string
 }) {
@@ -98,6 +105,7 @@ function sourceItems({
       : []),
     ...(includeRecordId ? [{ value: "record-id", label: startedId }] : []),
     ...(includeNow ? [{ value: "now", label: "Current time" }] : []),
+    ...(includeMock ? [{ value: "mock", label: "Generated sample" }] : []),
     { value: "advanced", label: "Advanced" },
   ]
 }
@@ -119,6 +127,9 @@ function sourceHelp({
   }
   if (source === "now") {
     return "Uses the time the workflow runs."
+  }
+  if (source === "mock") {
+    return "Fills this field with a new sample value each time the workflow runs."
   }
   if (source === "record-field" && purpose === "record") {
     return `Uses a field on the ${named} that started this to find which record to update.`
@@ -151,11 +162,13 @@ export function FriendlyValueInput({
   purpose?: ValuePurpose
   triggerSchemaName?: string
 }) {
+  const mockToken = mockTokenForProperty(targetField)
   const parsed = parseValueSource(value)
   const sources = sourceItems({
     fields: triggerFields,
     includeRecordId,
     includeNow,
+    includeMock: Boolean(mockToken),
     purpose,
     schemaName: triggerSchemaName,
   })
@@ -188,6 +201,10 @@ export function FriendlyValueInput({
     }
     if (next === "now") {
       onChange(nowTemplate)
+      return
+    }
+    if (next === "mock") {
+      onChange(mockToken ?? "")
       return
     }
     if (next === "record-field") {
@@ -273,8 +290,7 @@ export function FriendlyValueInput({
           value={value}
           field={targetField}
           placeholder={
-            placeholder ??
-            (purpose === "record" ? "Record ID" : undefined)
+            placeholder ?? (purpose === "record" ? "Record ID" : undefined)
           }
           onChange={onChange}
         />
@@ -286,15 +302,16 @@ export function FriendlyValueInput({
           onChange={onChange}
           groups={advancedGroups ?? []}
           placeholder={
-            placeholder ??
-            (purpose === "record" ? "Record ID" : "Value")
+            placeholder ?? (purpose === "record" ? "Record ID" : "Value")
           }
         />
       ) : null}
       {help ? (
         <p
           className={
-            selectedSource === "record-id" || selectedSource === "now"
+            selectedSource === "record-id" ||
+            selectedSource === "now" ||
+            selectedSource === "mock"
               ? "flex min-h-8 items-center text-sm text-muted-foreground"
               : "text-sm text-muted-foreground sm:col-span-2"
           }

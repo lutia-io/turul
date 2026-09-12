@@ -7,6 +7,7 @@ import {
   isAddressProperty,
   isFileProperty,
   isForeignProperty,
+  isPhoneProperty,
   type JsonObject,
   type JsonSchemaProperty,
   type JsonValue,
@@ -90,7 +91,8 @@ export function recordDisplayTitle(
     if (
       property.type !== "string" ||
       isFileProperty(property) ||
-      isForeignProperty(property)
+      isForeignProperty(property) ||
+      isPhoneProperty(property)
     ) {
       continue
     }

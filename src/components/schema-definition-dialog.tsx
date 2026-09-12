@@ -77,6 +77,7 @@ import {
 } from "@/lib/network-workspace"
 import { slugifyId, toFieldName } from "@/lib/slug"
 import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
+import { mockVariableForProperty } from "@/lib/template-mock"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import {
@@ -100,6 +101,7 @@ const formatOptions = [
   "date-time",
   "email",
   "uri",
+  "phone",
   "file",
   "foreign",
   "address",
@@ -114,6 +116,7 @@ const fieldKinds = [
   { value: "date", label: "Date" },
   { value: "datetime", label: "Date & time" },
   { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
   { value: "url", label: "URL" },
   { value: "file", label: "File" },
   { value: "address", label: "Address" },
@@ -140,6 +143,9 @@ function kindFromDraft(property: {
   }
   if (property.format === "email") {
     return "email"
+  }
+  if (property.format === "phone") {
+    return "phone"
   }
   if (property.format === "uri") {
     return "url"
@@ -192,6 +198,8 @@ function draftFromKind(
       }
     case "email":
       return { type: "string", format: "email", schemaId: "", enumValues: [] }
+    case "phone":
+      return { type: "string", format: "phone", schemaId: "", enumValues: [] }
     case "url":
       return { type: "string", format: "uri", schemaId: "", enumValues: [] }
     case "file":
@@ -302,12 +310,26 @@ const schemaDefaultTemplateGroups = [
   },
 ]
 
-function defaultTemplateGroups(type: PropertyType) {
-  if (type !== "integer" && type !== "number") {
-    return schemaDefaultTemplateGroups
+function defaultTemplateGroups(property: PropertyDraft) {
+  const mock = mockVariableForProperty(property)
+  const groups = [
+    ...schemaDefaultTemplateGroups,
+    ...(mock
+      ? [
+          {
+            label: "Sample data",
+            description:
+              "Fills this field with generated data when a record is created.",
+            variables: [mock],
+          },
+        ]
+      : []),
+  ]
+  if (property.type !== "integer" && property.type !== "number") {
+    return groups
   }
   return [
-    ...schemaDefaultTemplateGroups,
+    ...groups,
     {
       label: "Math",
       variables: arithmeticTemplateVariables.map((item) => ({
@@ -1480,7 +1502,7 @@ function PropertyRow({
             id={defaultId}
             value={property.defaultValue}
             onChange={(defaultValue) => onUpdate({ defaultValue })}
-            groups={defaultTemplateGroups(property.type)}
+            groups={defaultTemplateGroups(property)}
             options={
               kind === "choices" && property.enumValues.length > 0
                 ? property.enumValues.map((value) => ({ value, label: value }))

@@ -48,6 +48,7 @@ import {
   isEmailProperty,
   isFileProperty,
   isForeignProperty,
+  isPhoneProperty,
   isUriProperty,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
@@ -546,6 +547,7 @@ function SchemaRecordsDataTable({
               isFileProperty(property) ||
               isUriProperty(property) ||
               isEmailProperty(property) ||
+              isPhoneProperty(property) ||
               isAddressProperty(property)
                 ? 200
                 : 160,

@@ -6,6 +6,7 @@ import {
   GlobeIcon,
   Link2Icon,
   MailIcon,
+  PhoneIcon,
 } from "lucide-react"
 
 import { FileThumbnail } from "@/components/file-preview"
@@ -25,6 +26,7 @@ import {
   isEmailProperty,
   isFileProperty,
   isForeignProperty,
+  isPhoneProperty,
   isUriProperty,
   type JsonSchemaProperty,
   type JsonValue,
@@ -105,6 +107,10 @@ export function RecordCell({
 
   if (isEmailProperty(property) && typeof value === "string" && value) {
     return <EmailRecordLink value={value} />
+  }
+
+  if (isPhoneProperty(property) && typeof value === "string" && value) {
+    return <PhoneRecordLink value={value} />
   }
 
   const text = formatCellValue(value, property)
@@ -238,6 +244,34 @@ export function EmailRecordLink({ value }: { value: string }) {
           label={email}
           description="Compose an email to this address."
           action="Send email"
+        />
+      </HoverCardContent>
+    </HoverCard>
+  )
+}
+
+export function PhoneRecordLink({ value }: { value: string }) {
+  const phone = displayPhone(value)
+  const href = hrefForPhone(value)
+
+  return (
+    <HoverCard>
+      <HoverCardTrigger
+        delay={350}
+        closeDelay={150}
+        href={href}
+        className={linkChipClass}
+      >
+        <PhoneIcon className="size-3 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 truncate">{phone}</span>
+        <ArrowUpRightIcon className="size-3 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" className="w-80 p-0">
+        <ExternalLinkPreview
+          href={href}
+          label={phone}
+          description="Call this phone number."
+          action="Call"
         />
       </HoverCardContent>
     </HoverCard>
@@ -438,6 +472,9 @@ function previewFieldText(
   if (isEmailProperty(property) && typeof value === "string" && value) {
     return displayEmail(value)
   }
+  if (isPhoneProperty(property) && typeof value === "string" && value) {
+    return displayPhone(value)
+  }
   if (isUriProperty(property) && typeof value === "string" && value) {
     return displayUri(value)
   }
@@ -467,6 +504,14 @@ function hrefForEmail(value: string) {
 
 function displayEmail(value: string) {
   return value.replace(/^mailto:/i, "")
+}
+
+function hrefForPhone(value: string) {
+  return value.toLowerCase().startsWith("tel:") ? value : `tel:${value}`
+}
+
+function displayPhone(value: string) {
+  return value.replace(/^tel:/i, "")
 }
 
 function enumTone(value: string) {

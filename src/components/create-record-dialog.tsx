@@ -564,7 +564,10 @@ function formValueFromData(
   value: JsonValue | undefined
 ): string {
   if (isFileProperty(property)) {
-    return serializeFileIds(fileIdsFromValue(value), isFileArrayProperty(property))
+    return serializeFileIds(
+      fileIdsFromValue(value),
+      isFileArrayProperty(property)
+    )
   }
   if (value == null || value === "") {
     return ""
@@ -842,15 +845,17 @@ function RecordPropertyField({
   const inputType =
     property.format === "email"
       ? "email"
-      : property.format === "uri"
-        ? "url"
-        : property.format === "date"
-          ? "date"
-          : property.format === "date-time"
-            ? "datetime-local"
-            : property.type === "integer" || property.type === "number"
-              ? "number"
-              : "text"
+      : property.format === "phone"
+        ? "tel"
+        : property.format === "uri"
+          ? "url"
+          : property.format === "date"
+            ? "date"
+            : property.format === "date-time"
+              ? "datetime-local"
+              : property.type === "integer" || property.type === "number"
+                ? "number"
+                : "text"
 
   return (
     <Field>
@@ -861,6 +866,13 @@ function RecordPropertyField({
         value={value}
         required={required}
         disabled={disabled}
+        autoComplete={
+          property.format === "phone"
+            ? "tel"
+            : property.format === "email"
+              ? "email"
+              : undefined
+        }
         step={property.type === "integer" ? "1" : undefined}
         onChange={(event) => onChange(event.target.value)}
         placeholder={

@@ -245,9 +245,7 @@ export function getPipelineStages(definition: JsonObject) {
     return levels.map((level, index) => ({
       id: `level-${index}`,
       type: "level",
-      name: level
-        .map((node) => node.name.trim() || node.type)
-        .join(", "),
+      name: level.map((node) => node.name.trim() || node.type).join(", "),
       order: index + 1,
     }))
   }
@@ -320,6 +318,10 @@ export function isUriProperty(property: JsonSchemaProperty) {
 
 export function isEmailProperty(property: JsonSchemaProperty) {
   return property.format === "email"
+}
+
+export function isPhoneProperty(property: JsonSchemaProperty) {
+  return property.format === "phone"
 }
 
 export function isAddressProperty(property: JsonSchemaProperty) {

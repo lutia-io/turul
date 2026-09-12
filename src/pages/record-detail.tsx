@@ -17,6 +17,7 @@ import { useCreateEntity } from "@/components/create-entity"
 import {
   propertyLabel,
   EmailRecordLink,
+  PhoneRecordLink,
   RelatedRecordLink,
   UriRecordLink,
 } from "@/components/schema-records-table"
@@ -38,6 +39,7 @@ import {
   isEmailProperty,
   isFileProperty,
   isForeignProperty,
+  isPhoneProperty,
   isUriProperty,
   type JsonSchemaProperty,
   type JsonValue,
@@ -434,6 +436,10 @@ function FieldValue({
 
   if (isEmailProperty(property) && typeof value === "string" && value) {
     return <EmailRecordLink value={value} />
+  }
+
+  if (isPhoneProperty(property) && typeof value === "string" && value) {
+    return <PhoneRecordLink value={value} />
   }
 
   if (isAddressProperty(property) && typeof value === "object") {

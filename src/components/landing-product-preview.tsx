@@ -159,6 +159,12 @@ function propertyKind(property: JsonSchemaProperty) {
   if (property.format === "date-time") {
     return "Date & time"
   }
+  if (property.format === "email") {
+    return "Email"
+  }
+  if (property.format === "phone") {
+    return "Phone"
+  }
   if (property.format === "file") {
     return property.type === "array" ? "Files" : "File"
   }

@@ -34,6 +34,7 @@ import {
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
 import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
+import { mockTemplateGroup } from "@/lib/template-mock"
 import { cn } from "@/lib/utils"
 import {
   actionTypeDescriptions,
@@ -110,7 +111,9 @@ function recordTemplateGroups(
   const numeric = fields.filter(isNumericField)
   return [
     {
-      label: named ? `The ${named} that started this` : "The record that started this",
+      label: named
+        ? `The ${named} that started this`
+        : "The record that started this",
       description: "Values from the record that triggered this workflow.",
       variables: [
         {
@@ -145,6 +148,7 @@ function recordTemplateGroups(
         ...withMathHint(arithmeticTemplateVariables),
       ],
     },
+    mockTemplateGroup,
   ]
 }
 
@@ -380,9 +384,7 @@ function DataEntriesEditor({
                       </SelectItem>
                     ))}
                     {entry.name &&
-                    !targetFields.some(
-                      (field) => field.name === entry.name
-                    ) ? (
+                    !targetFields.some((field) => field.name === entry.name) ? (
                       <SelectItem value={entry.name}>{entry.name}</SelectItem>
                     ) : null}
                   </SelectContent>
@@ -422,13 +424,11 @@ function DataEntriesEditor({
                     : []),
                 ]}
                 placeholder={
-                  selectedField?.enumValues?.length
-                    ? "Choose a value"
-                    : "Value"
+                  selectedField?.enumValues?.length ? "Choose a value" : "Value"
                 }
               />
             </Field>
-            <div className="flex h-8 items-center opacity-100 sm:mt-6 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
+            <div className="flex h-8 items-center opacity-100 sm:mt-6 sm:opacity-0 sm:group-focus-within/row:opacity-100 sm:group-hover/row:opacity-100">
               <IconTooltipButton
                 label="Remove field"
                 disabled={visible.length === 1 && !entry.name && !entry.value}
@@ -512,8 +512,7 @@ function ActionEditor({
       onChange({ pipeline: selectedPipeline.id })
     }
   }, [action.pipeline, onChange, selectedPipeline])
-  const dataLabel =
-    action.type === "TRIGGER_PIPELINE" ? "Input" : "Fields"
+  const dataLabel = action.type === "TRIGGER_PIPELINE" ? "Input" : "Fields"
   const targetSchemaName = targetSchema?.name
   const triggerTemplateGroups = recordTemplateGroups(
     triggerFields,
@@ -540,7 +539,7 @@ function ActionEditor({
       </span>
       <div className={cn("min-w-0 flex-1", last ? "pb-0" : "pb-6")}>
         <div className="relative rounded-xl border bg-background p-4 shadow-xs">
-          <div className="absolute top-2 right-2 flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
+          <div className="absolute top-2 right-2 flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within/row:opacity-100 sm:group-hover/row:opacity-100">
             <IconTooltipButton
               label="Move up"
               disabled={!canMoveUp}
@@ -599,7 +598,10 @@ function ActionEditor({
                 })
               }}
             >
-              <SelectTrigger id={typeId} aria-label={`Action ${index + 1} type`}>
+              <SelectTrigger
+                id={typeId}
+                aria-label={`Action ${index + 1} type`}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
