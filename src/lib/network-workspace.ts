@@ -439,7 +439,10 @@ export function useWorkspaceWorkflows(options?: WorkspaceQueryOptions) {
 
 export function useWorkspaceWorkflowRuns(options?: WorkspaceQueryOptions) {
   const skip = useWorkspaceQuerySkip(options)
-  const query = useListWorkflowsQuery(undefined, { skip })
+  const query = useListWorkflowsQuery(
+    { page: 1, pageSize: 100, sort: "createdAt", order: "desc" },
+    { skip }
+  )
 
   return {
     ...query,
@@ -449,7 +452,10 @@ export function useWorkspaceWorkflowRuns(options?: WorkspaceQueryOptions) {
 
 export function useWorkspacePipelineRuns(options?: WorkspaceQueryOptions) {
   const skip = useWorkspaceQuerySkip(options)
-  const query = useListPipelinesQuery(undefined, { skip })
+  const query = useListPipelinesQuery(
+    { page: 1, pageSize: 100, sort: "createdAt", order: "desc" },
+    { skip }
+  )
 
   return {
     ...query,

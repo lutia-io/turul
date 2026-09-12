@@ -31,21 +31,41 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ActivityChart, RunStatusChart } from "@/components/workspace-charts"
+import {
+  ActivityChart,
+  RunStatusChart,
+  VolumeChart,
+  runStatusSlices,
+} from "@/components/workspace-charts"
+import {
+  DashboardHeader,
+  DashboardPage,
+  DashboardSection,
+  MetricStrip,
+  MetricStripSkeleton,
+  SnapshotChip,
+  countByStatus,
+} from "@/components/workspace-dashboard"
 import {
   ACTIVITY_DAYS,
   bucketActivity,
   summarizeActivity,
+  topVolumeRows,
 } from "@/lib/activity"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import {
   networkWorkspacePath,
   useWorkspaceFiles,
   useWorkspaceNetworksWithDefinitions,
+  useWorkspacePipelineRuns,
   useWorkspaceRecords,
   useWorkspaceWorkflowRuns,
 } from "@/lib/network-workspace"
-import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
+import {
+  apiWorkflowStatus,
+  countWorkflowRunStatuses,
+  formatRelativeTime,
+} from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage, useMeQuery } from "@/store/api"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -57,106 +77,18 @@ function greetingForHour(hour: number) {
   return "Good evening"
 }
 
-function countByStatus<T>(items: T[], statusOf: (item: T) => string) {
-  return items.reduce(
-    (counts, item) => {
-      if (statusOf(item) === "Draft") {
-        counts.draft += 1
-      } else {
-        counts.live += 1
-      }
-      return counts
-    },
-    { live: 0, draft: 0 }
-  )
-}
-
-function StatCard({
-  to,
-  label,
-  value,
-  detail,
-  color,
-  icon: Icon,
-}: {
-  to: string
-  label: string
-  value: number
-  detail: string
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
-
-  return (
-    <Link to={to} className="block min-w-0">
-      <Card size="sm" className="h-full transition-colors hover:bg-muted/50">
-        <CardHeader>
-          <CardDescription>{label}</CardDescription>
-          <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
-            {value}
-          </CardTitle>
-          <CardAction>
-            <div
-              className={cn(
-                "flex size-9 items-center justify-center rounded-lg",
-                tone.bg,
-                tone.text
-              )}
-            >
-              <Icon className="size-4" />
-            </div>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="text-xs text-muted-foreground">
-          {detail}
-        </CardFooter>
-      </Card>
-    </Link>
-  )
-}
-
-function StatCardSkeleton({
-  label,
-  color,
-  icon: Icon,
-}: {
-  label: string
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
-
-  return (
-    <Card size="sm" className="h-full">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl font-semibold tracking-tight">
-          <Skeleton className="h-8 w-14" />
-        </CardTitle>
-        <CardAction>
-          <div
-            className={cn(
-              "flex size-9 items-center justify-center rounded-lg",
-              tone.bg,
-              tone.text
-            )}
-          >
-            <Icon className="size-4" />
-          </div>
-        </CardAction>
-      </CardHeader>
-      <CardFooter>
-        <Skeleton className="h-3 w-32" />
-      </CardFooter>
-    </Card>
-  )
+function todayLabel(now = new Date()) {
+  return now.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  })
 }
 
 function NetworkCard({ network }: { network: Network }) {
   const tone = getBadgeColor(network.color)
   const networkPath = networkWorkspacePath({ networkId: network.id })
-  const previewOrgs = network.organizations.slice(0, 4)
+  const previewOrgs = network.organizations.slice(0, 3)
   const remaining = network.organizations.length - previewOrgs.length
   const counts = [
     {
@@ -184,20 +116,11 @@ function NetworkCard({ network }: { network: Network }) {
       icon: LayersIcon,
     },
   ]
-  const meta = [
-    network.industry,
-    network.headquarters,
-    network.organizations.length > 0
-      ? `${network.organizations.length} ${
-          network.organizations.length === 1 ? "organization" : "organizations"
-        }`
-      : null,
-  ].filter(Boolean)
 
   return (
-    <Card size="sm">
+    <Card size="sm" className="h-full">
       <CardHeader className="border-b">
-        <div className="flex min-w-0 items-start gap-3">
+        <Link to={networkPath} className="flex min-w-0 items-start gap-3">
           <div
             className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-lg",
@@ -207,35 +130,22 @@ function NetworkCard({ network }: { network: Network }) {
           >
             <GalleryVerticalEndIcon className="size-4" />
           </div>
-          <div className="min-w-0 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>{network.name}</CardTitle>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center gap-2">
+              <CardTitle className="min-w-0 truncate">{network.name}</CardTitle>
               <StatusBadge status={network.status} />
             </div>
-            {network.description || network.summary ? (
-              <CardDescription className="line-clamp-2 text-pretty">
-                {network.description || network.summary}
-              </CardDescription>
-            ) : null}
-            {meta.length > 0 ? (
-              <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-                {meta.map((item, index) => (
-                  <span
-                    key={item}
-                    className="inline-flex min-w-0 items-center gap-x-1.5"
-                  >
-                    {index > 0 ? (
-                      <span aria-hidden="true" className="text-border">
-                        ·
-                      </span>
-                    ) : null}
-                    <span className="min-w-0 truncate">{item}</span>
-                  </span>
-                ))}
-              </p>
-            ) : null}
+            <CardDescription className="line-clamp-2 text-pretty">
+              {network.description ||
+                network.summary ||
+                `${network.organizations.length} ${
+                  network.organizations.length === 1
+                    ? "organization"
+                    : "organizations"
+                }`}
+            </CardDescription>
           </div>
-        </div>
+        </Link>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="grid grid-cols-3 gap-2">
@@ -243,13 +153,13 @@ function NetworkCard({ network }: { network: Network }) {
             <Link
               key={item.label}
               to={item.to}
-              className="rounded-xl border bg-background px-3 py-2.5 shadow-xs transition-colors hover:bg-muted/50"
+              className="rounded-lg bg-muted/50 px-2.5 py-2 transition-colors hover:bg-muted"
             >
-              <div className="flex items-center gap-1.5 text-muted-foreground">
+              <div className="flex items-center gap-1 text-muted-foreground">
                 <item.icon className="size-3.5" />
-                <p className="truncate text-xs">{item.label}</p>
+                <p className="truncate text-[11px]">{item.label}</p>
               </div>
-              <p className="mt-1 text-lg font-semibold tracking-tight tabular-nums">
+              <p className="mt-1 text-base font-semibold tracking-tight tabular-nums">
                 {item.value}
               </p>
             </Link>
@@ -290,7 +200,7 @@ function NetworkCard({ network }: { network: Network }) {
           to={networkPath}
           className={buttonVariants({ variant: "ghost", size: "sm" })}
         >
-          View network
+          Open
           <ArrowRightIcon />
         </Link>
       </CardFooter>
@@ -320,16 +230,16 @@ function AttentionCard({
   return (
     <Link
       to={to}
-      className="group flex min-h-[64px] items-center gap-3 rounded-xl bg-card px-3 py-2 ring-1 ring-foreground/10 transition-colors hover:bg-muted/50"
+      className="group flex min-h-[56px] items-center gap-3 px-3 py-2 transition-colors hover:bg-muted/50"
     >
       <div
         className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-lg",
+          "flex size-8 shrink-0 items-center justify-center rounded-lg",
           tone.bg,
           tone.text
         )}
       >
-        <Icon className="size-4" />
+        <Icon className="size-3.5" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
@@ -348,18 +258,16 @@ function AttentionCard({
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCardSkeleton label="Networks" color="purple" icon={ListIcon} />
-        <StatCardSkeleton
-          label="Organizations"
-          color="cyan"
-          icon={Building2Icon}
-        />
-        <StatCardSkeleton label="Records" color="blue" icon={TableIcon} />
-        <StatCardSkeleton label="Files" color="gray" icon={FileIcon} />
-        <StatCardSkeleton label="Workflows" color="teal" icon={WorkflowIcon} />
-      </div>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_22rem]">
+      <MetricStripSkeleton
+        items={[
+          { label: "Networks", color: "purple", icon: ListIcon },
+          { label: "Organizations", color: "cyan", icon: Building2Icon },
+          { label: "Records", color: "blue", icon: TableIcon },
+          { label: "Files", color: "gray", icon: FileIcon },
+          { label: "Workflow runs", color: "teal", icon: WorkflowIcon },
+        ]}
+      />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,22rem)]">
         <Card className="h-full">
           <CardHeader>
             <CardTitle>Workspace activity</CardTitle>
@@ -371,9 +279,6 @@ function DashboardSkeleton() {
           <CardContent>
             <Skeleton className="h-[220px] w-full rounded-lg" />
           </CardContent>
-          <CardFooter>
-            <Skeleton className="h-4 w-56" />
-          </CardFooter>
         </Card>
         <Card className="h-full">
           <CardHeader>
@@ -381,103 +286,20 @@ function DashboardSkeleton() {
             <CardDescription>Run status across the workspace.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col items-center justify-center">
-            <Skeleton className="size-[220px] rounded-full" />
+            <Skeleton className="size-[200px] rounded-full" />
           </CardContent>
-          <CardFooter className="flex-col items-stretch gap-2">
+          <CardFooter className="flex-col items-stretch gap-3">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between gap-3"
-              >
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-8" />
+              <div key={index} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-8" />
+                </div>
+                <Skeleton className="h-1.5 w-full rounded-full" />
               </div>
             ))}
           </CardFooter>
         </Card>
-      </div>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <section className="flex flex-col gap-3">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight">
-              Your networks
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Open a network to inspect organizations, schemas, and definitions.
-            </p>
-          </div>
-          <Card size="sm">
-            <CardHeader className="border-b">
-              <div className="flex items-start gap-3">
-                <Skeleton className="size-10 shrink-0 rounded-lg" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-4 w-full max-w-md" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <div className="grid grid-cols-3 gap-2">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <Skeleton key={index} className="h-16 rounded-xl" />
-                ))}
-              </div>
-              <Skeleton className="h-4 w-48" />
-            </CardContent>
-          </Card>
-        </section>
-        <aside className="flex flex-col gap-6">
-          <section className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold tracking-tight">
-                Needs attention
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Failed runs and unpublished definitions.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex min-h-[64px] items-center gap-3 rounded-xl bg-card px-3 py-2 ring-1 ring-foreground/10"
-                >
-                  <Skeleton className="size-9 shrink-0 rounded-lg" />
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-          <section className="flex flex-col gap-3">
-            <div>
-              <h2 className="text-base font-semibold tracking-tight">
-                Recent runs
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Latest workflow executions.
-              </p>
-            </div>
-            <Card size="sm">
-              <CardContent className="flex flex-col divide-y">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
-                  >
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <Skeleton className="h-4 w-40" />
-                      <Skeleton className="h-3 w-28" />
-                    </div>
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </section>
-        </aside>
       </div>
     </div>
   )
@@ -501,6 +323,7 @@ export default function Home() {
   const userName = me?.firstName.trim() || null
   const {
     networks,
+    isLoading: isNetworksLoading,
     isFetching: isNetworksFetching,
     isError: isNetworksError,
     error: networksError,
@@ -521,16 +344,28 @@ export default function Home() {
     refetch: refetchRuns,
     isFetching: isRunsFetching,
   } = useWorkspaceWorkflowRuns()
+  const {
+    runs: pipelineRuns,
+    refetch: refetchPipelineRuns,
+    isFetching: isPipelineRunsFetching,
+  } = useWorkspacePipelineRuns()
   const greeting = greetingForHour(new Date().getHours())
   const currentNetwork = networks[0]
   const isRefreshing =
-    isNetworksFetching || isRecordsFetching || isFilesFetching || isRunsFetching
+    isNetworksFetching ||
+    isRecordsFetching ||
+    isFilesFetching ||
+    isRunsFetching ||
+    isPipelineRunsFetching
+  const isInitialLoading =
+    isNetworksLoading && networks.length === 0 && !isNetworksError
 
   function refreshHome() {
     void refetchNetworks()
     void refetchRecords()
     void refetchFiles()
     void refetchRuns()
+    void refetchPipelineRuns()
   }
 
   const workspaceHref = (rest = "") =>
@@ -544,43 +379,51 @@ export default function Home() {
     organizations,
     (organization) => organization.status
   )
-  const runningWorkflows = workflowRuns.filter(
-    (run) => run.status === "running"
-  ).length
-  const queuedWorkflows = workflowRuns.filter(
-    (run) => run.status === "pending"
-  ).length
-  const failedWorkflows = workflowRuns.filter(
-    (run) => run.status === "failed"
-  ).length
-  const completedWorkflows = workflowRuns.filter(
-    (run) => run.status === "completed"
-  ).length
-
+  const allRuns = useMemo(
+    () => [...workflowRuns, ...pipelineRuns],
+    [pipelineRuns, workflowRuns]
+  )
+  const runCounts = useMemo(
+    () => countWorkflowRunStatuses(workflowRuns),
+    [workflowRuns]
+  )
+  const liveCounts = useMemo(() => countWorkflowRunStatuses(allRuns), [allRuns])
+  const pipelineCounts = useMemo(
+    () => countWorkflowRunStatuses(pipelineRuns),
+    [pipelineRuns]
+  )
   const activity = useMemo(
     () =>
       bucketActivity({
         records,
         files,
-        runs: workflowRuns,
+        runs: allRuns,
       }),
-    [files, records, workflowRuns]
+    [allRuns, files, records]
   )
   const activityTotals = useMemo(() => summarizeActivity(activity), [activity])
-
-  const runStatusData = useMemo(
-    () => [
-      { status: "running" as const, value: runningWorkflows },
-      { status: "pending" as const, value: queuedWorkflows },
-      { status: "completed" as const, value: completedWorkflows },
-      { status: "failed" as const, value: failedWorkflows },
-    ],
-    [completedWorkflows, failedWorkflows, queuedWorkflows, runningWorkflows]
+  const runStatusData = useMemo(() => runStatusSlices(runCounts), [runCounts])
+  const pipelineStatusData = useMemo(
+    () => runStatusSlices(pipelineCounts),
+    [pipelineCounts]
+  )
+  const volumeByNetwork = useMemo(
+    () =>
+      topVolumeRows(
+        networks.map((network) => ({
+          name: network.name,
+          records: records.filter((item) => item.networkId === network.id)
+            .length,
+          files: files.filter((item) => item.networkId === network.id).length,
+          runs: allRuns.filter((item) => item.networkId === network.id).length,
+        }))
+      ),
+    [allRuns, files, networks, records]
   )
 
   const attentionItems: AttentionItem[] = useMemo(() => {
     const failedRuns: AttentionItem[] = workflowRuns
-      .filter((run) => run.status === "failed")
+      .filter((run) => apiWorkflowStatus(run.status) === "Failed")
       .map((run) => {
         const network = networks.find((item) => item.id === run.networkId)
         const definition = network?.workflowDefinitions.find(
@@ -645,7 +488,7 @@ export default function Home() {
           new Date(right.createdAt).getTime() -
           new Date(left.createdAt).getTime()
       )
-      .slice(0, 5)
+      .slice(0, 6)
       .map((run) => {
         const definition = definitions.get(run.workflowDefinitionId)
 
@@ -660,53 +503,75 @@ export default function Home() {
   const subtitle = isNetworksError
     ? getHumaErrorMessage(networksError, "Failed to load networks")
     : currentNetwork
-      ? `${networks.length} network${networks.length === 1 ? "" : "s"} · ${organizations.length} organizations · ${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"} need attention.`
+      ? `${networks.length} network${networks.length === 1 ? "" : "s"} · ${organizations.length} organization${organizations.length === 1 ? "" : "s"}`
       : "Create a network to start collecting records, files, and runs."
 
   return (
-    <div className="flex flex-1 flex-col gap-6 bg-muted/40 p-4 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {userName ? `${greeting}, ${userName}` : greeting}
-          </h1>
-          {isRefreshing && !isNetworksError ? (
-            <Skeleton className="mt-1 h-5 w-80 max-w-full" />
+    <DashboardPage tone="workspace">
+      <DashboardHeader
+        eyebrow={todayLabel()}
+        title={userName ? `${greeting}, ${userName}` : greeting}
+        badges={
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            Workspace
+          </span>
+        }
+        description={
+          isInitialLoading ? (
+            <Skeleton className="h-5 w-72 max-w-full" />
           ) : (
-            <p
-              className={cn(
-                "mt-1 max-w-2xl text-sm",
-                isNetworksError ? "text-destructive" : "text-muted-foreground"
-              )}
-            >
+            <p className={isNetworksError ? "text-destructive" : undefined}>
               {subtitle}
             </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {networks.length > 0 ? (
-            <RefreshButton
-              onRefresh={refreshHome}
-              isRefreshing={isRefreshing}
-              size="icon"
-            />
-          ) : null}
-          <Button onClick={openCreateNetwork}>
-            <PlusIcon />
-            Create a network
-          </Button>
-        </div>
-      </div>
+          )
+        }
+        chips={
+          !isInitialLoading && !isNetworksError && networks.length > 0 ? (
+            <>
+              <SnapshotChip
+                kind="running"
+                value={liveCounts.running}
+                label="running"
+              />
+              <SnapshotChip
+                kind="failed"
+                value={liveCounts.failed}
+                label="failed"
+              />
+              <SnapshotChip
+                kind="attention"
+                value={attentionItems.length}
+                label="need attention"
+              />
+            </>
+          ) : null
+        }
+        actions={
+          <>
+            {networks.length > 0 || isRefreshing ? (
+              <RefreshButton
+                onRefresh={refreshHome}
+                isRefreshing={isRefreshing}
+                size="icon"
+              />
+            ) : null}
+            <Button onClick={openCreateNetwork}>
+              <PlusIcon />
+              Create a network
+            </Button>
+          </>
+        }
+      />
 
-      {isRefreshing ? (
+      {isInitialLoading ? (
         <DashboardSkeleton />
       ) : !isNetworksError && networks.length === 0 ? (
-        <Card className="items-center px-6 py-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-lg bg-violet-500 text-white">
-            <NetworkIcon className="size-5" />
+        <Card className="items-center px-6 py-16 text-center">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+            <NetworkIcon className="size-6" />
           </div>
           <div className="flex max-w-md flex-col items-center gap-1.5">
-            <CardTitle className="text-lg">No networks yet</CardTitle>
+            <CardTitle className="text-lg">Start with a network</CardTitle>
             <CardDescription className="text-pretty">
               A network is the workspace for organizations, schemas, records,
               and the workflows that run on them.
@@ -719,84 +584,96 @@ export default function Home() {
         </Card>
       ) : (
         <div className="flex flex-col gap-6">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard
-              to="/app/networks"
-              label="Networks"
-              value={networks.length}
-              detail={
-                networkCounts.draft > 0
-                  ? `${networkCounts.live} active · ${networkCounts.draft} draft`
-                  : `${networkCounts.live} active`
-              }
-              color="purple"
-              icon={ListIcon}
-            />
-            <StatCard
-              to={workspaceHref()}
-              label="Organizations"
-              value={organizations.length}
-              detail={
-                organizationCounts.draft > 0
-                  ? `${organizationCounts.live} active · ${organizationCounts.draft} draft`
-                  : `${organizationCounts.live} members`
-              }
-              color="cyan"
-              icon={Building2Icon}
-            />
-            <StatCard
-              to={workspaceHref("records")}
-              label="Records"
-              value={records.length}
-              detail={`${activityTotals.recordsThisWeek} created this week`}
-              color="blue"
-              icon={TableIcon}
-            />
-            <StatCard
-              to={workspaceHref("files")}
-              label="Files"
-              value={files.length}
-              detail={`${activityTotals.filesThisWeek} uploaded this week`}
-              color="gray"
-              icon={FileIcon}
-            />
-            <StatCard
-              to={workspaceHref("workflows")}
-              label="Workflows"
-              value={workflowRuns.length}
-              detail={
-                failedWorkflows > 0
-                  ? `${runningWorkflows} running · ${failedWorkflows} failed`
-                  : queuedWorkflows > 0
-                    ? `${runningWorkflows} running · ${queuedWorkflows} queued`
-                    : `${runningWorkflows} running`
-              }
-              color="teal"
-              icon={WorkflowIcon}
-            />
-          </div>
+          <MetricStrip
+            items={[
+              {
+                to: "/app/networks",
+                label: "Networks",
+                value: networks.length,
+                detail:
+                  networkCounts.draft > 0
+                    ? `${networkCounts.live} active · ${networkCounts.draft} draft`
+                    : `${networkCounts.live} active`,
+                color: "purple",
+                icon: ListIcon,
+              },
+              {
+                to: workspaceHref(),
+                label: "Organizations",
+                value: organizations.length,
+                detail:
+                  organizationCounts.draft > 0
+                    ? `${organizationCounts.live} active · ${organizationCounts.draft} draft`
+                    : `${organizationCounts.live} active`,
+                color: "cyan",
+                icon: Building2Icon,
+              },
+              {
+                to: workspaceHref("records"),
+                label: "Records",
+                value: records.length,
+                detail: `${activityTotals.recordsThisWeek} created this week`,
+                color: "blue",
+                icon: TableIcon,
+              },
+              {
+                to: workspaceHref("files"),
+                label: "Files",
+                value: files.length,
+                detail: `${activityTotals.filesThisWeek} uploaded this week`,
+                color: "gray",
+                icon: FileIcon,
+              },
+              {
+                to: workspaceHref("workflows"),
+                label: "Workflow runs",
+                value: workflowRuns.length,
+                detail:
+                  runCounts.failed > 0
+                    ? `${runCounts.running} running · ${runCounts.failed} failed`
+                    : runCounts.pending > 0
+                      ? `${runCounts.running} running · ${runCounts.pending} queued`
+                      : `${runCounts.running} running`,
+                color: "teal",
+                icon: WorkflowIcon,
+              },
+            ]}
+          />
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_22rem]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,22rem)]">
             <ActivityChart
               data={activity}
               total={activityTotals.total}
               change={activityTotals.change}
             />
-            <RunStatusChart data={runStatusData} total={workflowRuns.length} />
+            <RunStatusChart
+              data={runStatusData}
+              total={workflowRuns.length}
+              description="Workflow executions across every network."
+            />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-            <section className="flex flex-col gap-3">
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold tracking-tight">
-                    Your networks
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Open a network to inspect organizations, schemas, and
-                    definitions.
-                  </p>
-                </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <VolumeChart
+              data={volumeByNetwork}
+              title="Volume by network"
+              description="Records, files, and runs compared across workspaces."
+              emptyLabel="No records, files, or runs to compare yet."
+            />
+            <RunStatusChart
+              data={pipelineStatusData}
+              total={pipelineRuns.length}
+              title="Pipeline health"
+              description="Ingest and pipeline executions across the workspace."
+              emptyHint="No pipeline runs yet. Status will fill in as ingest starts."
+            />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+            <DashboardSection
+              title="Your networks"
+              description="Organizations, schemas, and automations in each workspace."
+              action={
                 <Link
                   to="/app/networks"
                   className={cn(
@@ -807,84 +684,81 @@ export default function Home() {
                   View all
                   <ArrowRightIcon />
                 </Link>
-              </div>
-              <div className="flex flex-col gap-3">
-                {isNetworksError ? (
-                  <p className="text-sm text-destructive">
-                    {getHumaErrorMessage(
-                      networksError,
-                      "Failed to load networks"
-                    )}
-                  </p>
-                ) : (
-                  networks.map((network) => (
+              }
+            >
+              {isNetworksError ? (
+                <p className="text-sm text-destructive">
+                  {getHumaErrorMessage(
+                    networksError,
+                    "Failed to load networks"
+                  )}
+                </p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {networks.map((network) => (
                     <NetworkCard key={network.id} network={network} />
-                  ))
-                )}
-              </div>
-            </section>
+                  ))}
+                </div>
+              )}
+            </DashboardSection>
 
-            <aside className="flex flex-col gap-6">
-              <section className="flex flex-col gap-3">
-                <div>
-                  <h2 className="text-base font-semibold tracking-tight">
-                    Needs attention
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
+            <aside className="flex min-w-0 flex-col gap-4">
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle>Needs attention</CardTitle>
+                  <CardDescription>
                     Failed runs and unpublished definitions.
-                  </p>
-                </div>
-                {attentionItems.length > 0 ? (
-                  <div className="flex flex-col gap-2">
-                    {attentionItems.slice(0, 6).map((item) => (
-                      <AttentionCard
-                        key={item.id}
-                        to={item.to}
-                        name={item.name}
-                        kind={item.kind}
-                        networkName={item.networkName}
-                        color={item.color}
-                        icon={item.icon}
-                        status={item.status}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nothing waiting on review.
-                  </p>
-                )}
-              </section>
-
-              <section className="flex flex-col gap-3">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold tracking-tight">
-                      Recent runs
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Latest workflow executions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="-mx-3">
+                  {attentionItems.length > 0 ? (
+                    <div className="flex flex-col divide-y">
+                      {attentionItems.slice(0, 5).map((item) => (
+                        <AttentionCard
+                          key={item.id}
+                          to={item.to}
+                          name={item.name}
+                          kind={item.kind}
+                          networkName={item.networkName}
+                          color={item.color}
+                          icon={item.icon}
+                          status={item.status}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="px-3 pb-1 text-sm text-muted-foreground">
+                      Nothing waiting on review.
                     </p>
-                  </div>
-                  <Link
-                    to={workspaceHref("workflows")}
-                    className={cn(
-                      buttonVariants({ variant: "ghost", size: "sm" }),
-                      "shrink-0"
-                    )}
-                  >
-                    View
-                    <ArrowRightIcon />
-                  </Link>
-                </div>
-                {recentRuns.length > 0 ? (
-                  <Card size="sm">
-                    <CardContent className="flex flex-col divide-y">
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle>Recent runs</CardTitle>
+                  <CardDescription>Latest workflow executions.</CardDescription>
+                  <CardAction>
+                    <Link
+                      to={workspaceHref("workflows")}
+                      className={buttonVariants({
+                        variant: "ghost",
+                        size: "sm",
+                      })}
+                    >
+                      View
+                      <ArrowRightIcon />
+                    </Link>
+                  </CardAction>
+                </CardHeader>
+                <CardContent className="-mx-3">
+                  {recentRuns.length > 0 ? (
+                    <div className="flex flex-col divide-y">
                       {recentRuns.map(({ run, name, networkName }) => (
                         <Link
                           key={run.id}
                           to={`/app/networks/${run.networkId}/workflows/${run.id}`}
-                          className="flex items-center gap-3 py-2 transition-colors first:pt-0 last:pb-0 hover:bg-muted/60"
+                          className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50"
                         >
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">
@@ -900,18 +774,18 @@ export default function Home() {
                           />
                         </Link>
                       ))}
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No workflow runs yet.
-                  </p>
-                )}
-              </section>
+                    </div>
+                  ) : (
+                    <p className="px-3 pb-1 text-sm text-muted-foreground">
+                      No workflow runs yet.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </aside>
           </div>
         </div>
       )}
-    </div>
+    </DashboardPage>
   )
 }

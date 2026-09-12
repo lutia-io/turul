@@ -228,16 +228,41 @@ export function listPipelineRunViews({
 }
 
 export function apiWorkflowStatus(status: string): RunStatus {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case "running":
       return "Running"
     case "completed":
+    case "succeeded":
       return "Succeeded"
     case "failed":
       return "Failed"
     default:
       return "Queued"
   }
+}
+
+export function countWorkflowRunStatuses(runs: { status: string }[]) {
+  const counts = {
+    running: 0,
+    pending: 0,
+    completed: 0,
+    failed: 0,
+  }
+
+  for (const run of runs) {
+    const status = apiWorkflowStatus(run.status)
+    if (status === "Running") {
+      counts.running += 1
+    } else if (status === "Queued" || status === "Paused") {
+      counts.pending += 1
+    } else if (status === "Succeeded") {
+      counts.completed += 1
+    } else if (status === "Failed") {
+      counts.failed += 1
+    }
+  }
+
+  return counts
 }
 
 export function apiWorkflowSteps(
@@ -327,7 +352,10 @@ export function apiPipelineCurrentLevel(pipeline: {
 }
 
 export function matchesPipelineScope(
-  pipeline: Pick<{ networkId: string; organizationId: string }, "networkId" | "organizationId">,
+  pipeline: Pick<
+    { networkId: string; organizationId: string },
+    "networkId" | "organizationId"
+  >,
   networkId?: string,
   organizationId?: string
 ) {

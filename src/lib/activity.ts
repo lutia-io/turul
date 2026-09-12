@@ -96,3 +96,73 @@ export function summarizeActivity(activity: ActivityDay[]) {
     filesThisWeek: sum(recent, "files"),
   }
 }
+
+export type VolumeRow = {
+  name: string
+  records: number
+  files: number
+  runs: number
+}
+
+export function topVolumeRows(rows: VolumeRow[], limit = 6) {
+  return [...rows]
+    .filter((row) => row.records + row.files + row.runs > 0)
+    .sort(
+      (left, right) =>
+        right.records +
+        right.files +
+        right.runs -
+        (left.records + left.files + left.runs)
+    )
+    .slice(0, limit)
+}
+
+export type OutcomeDay = {
+  label: string
+  completed: number
+  failed: number
+}
+
+function outcomeBucket(status: string) {
+  const value = status.toLowerCase()
+  if (value === "completed" || value === "succeeded") {
+    return "completed" as const
+  }
+  if (value === "failed") {
+    return "failed" as const
+  }
+  return null
+}
+
+export function bucketRunOutcomes(
+  runs: { createdAt: string; status: string }[],
+  days = ACTIVITY_DAYS
+): OutcomeDay[] {
+  const window = lastNDays(days)
+  const counts = new Map(
+    window.map((day) => [day.key, { completed: 0, failed: 0 }])
+  )
+
+  for (const run of runs) {
+    const bucket = counts.get(dayKeyFromIso(run.createdAt))
+    const key = outcomeBucket(run.status)
+    if (bucket && key) {
+      bucket[key] += 1
+    }
+  }
+
+  return window.map((day) => ({
+    label: day.label,
+    ...counts.get(day.key)!,
+  }))
+}
+
+export function summarizeOutcomes(outcomes: OutcomeDay[]) {
+  return outcomes.reduce(
+    (totals, day) => ({
+      completed: totals.completed + day.completed,
+      failed: totals.failed + day.failed,
+    }),
+    { completed: 0, failed: 0 }
+  )
+}
