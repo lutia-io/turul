@@ -17,9 +17,22 @@ import { formatRelativeTime } from "@/lib/runs"
 import { userDisplayName, userInitials, type UserRef } from "@/lib/user"
 import { cn } from "@/lib/utils"
 
-export function DefinitionPage({ children }: { children: ReactNode }) {
+export function DefinitionPage({
+  children,
+  fill = false,
+}: {
+  children: ReactNode
+  fill?: boolean
+}) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-8 overflow-x-hidden bg-muted/40 p-4 sm:p-6 lg:p-8">
+    <div
+      className={cn(
+        "flex min-w-0 flex-1 flex-col overflow-x-hidden bg-muted/40",
+        fill
+          ? "h-[calc(100svh-var(--app-header-height))] gap-0 overflow-hidden"
+          : "gap-8 p-4 sm:p-6 lg:p-8"
+      )}
+    >
       {children}
     </div>
   )

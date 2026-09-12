@@ -27,6 +27,7 @@ export type PipelineLevelDraft = {
 export type CreatePipelineNodeTarget =
   | { kind: "empty" }
   | { kind: "level"; levelKey: string }
+  | { kind: "after-level"; afterLevelKey: string }
 
 export type PipelineNodeEditorTarget = {
   levelKey: string
@@ -160,6 +161,13 @@ export function levelsToApi(
   return { nodes }
 }
 
+export function compactPipelineLevels(
+  levels: PipelineLevelDraft[]
+): PipelineLevelDraft[] {
+  const next = levels.filter((level) => level.nodes.length > 0)
+  return next.length > 0 ? next : emptyPipelineLevels()
+}
+
 export function insertCreatedNode(
   levels: PipelineLevelDraft[],
   node: PipelineNodeConfig,
@@ -178,6 +186,19 @@ export function insertCreatedNode(
     )
   }
 
+  if (target.kind === "after-level") {
+    const index = levels.findIndex(
+      (level) => level.key === target.afterLevelKey
+    )
+    const newLevel = { ...newPipelineLevel(levels), nodes: [nextNode] }
+    if (index < 0) {
+      return [...levels, newLevel]
+    }
+    const next = [...levels]
+    next.splice(index + 1, 0, newLevel)
+    return next
+  }
+
   if (!levels.some((level) => level.key === target.levelKey)) {
     return [...levels, { ...newPipelineLevel(levels), nodes: [nextNode] }]
   }
@@ -187,6 +208,77 @@ export function insertCreatedNode(
       ? { ...level, nodes: [...level.nodes, nextNode] }
       : level
   )
+}
+
+export function removePipelineNode(
+  levels: PipelineLevelDraft[],
+  levelKey: string,
+  nodeKey: string
+): PipelineLevelDraft[] {
+  return compactPipelineLevels(
+    levels.map((level) =>
+      level.key === levelKey
+        ? {
+            ...level,
+            nodes: level.nodes.filter((node) => node.key !== nodeKey),
+          }
+        : level
+    )
+  )
+}
+
+export function movePipelineNode(
+  levels: PipelineLevelDraft[],
+  nodeKey: string,
+  toLevelIndex: number,
+  toIndex: number
+): PipelineLevelDraft[] {
+  const fromLevelIndex = levels.findIndex((level) =>
+    level.nodes.some((node) => node.key === nodeKey)
+  )
+  const fromIndex =
+    fromLevelIndex >= 0
+      ? levels[fromLevelIndex].nodes.findIndex((node) => node.key === nodeKey)
+      : -1
+  const targetIndex = Math.max(0, toLevelIndex)
+  if (
+    fromLevelIndex >= 0 &&
+    fromIndex >= 0 &&
+    fromLevelIndex === Math.min(targetIndex, levels.length - 1) &&
+    targetIndex < levels.length &&
+    fromIndex === toIndex
+  ) {
+    return levels
+  }
+
+  let moving: PipelineNodeDraft | undefined
+  const without = levels.map((level) => {
+    const node = level.nodes.find((item) => item.key === nodeKey)
+    if (!node) {
+      return level
+    }
+    moving = node
+    return {
+      ...level,
+      nodes: level.nodes.filter((item) => item.key !== nodeKey),
+    }
+  })
+  if (!moving) {
+    return levels
+  }
+
+  const next = [...without]
+  if (targetIndex >= next.length) {
+    next.push({ ...newPipelineLevel(next), nodes: [] })
+  }
+
+  const levelIndex = Math.min(targetIndex, next.length - 1)
+  const level = next[levelIndex]
+  const insertAt = Math.max(0, Math.min(toIndex, level.nodes.length))
+  const nodes = [...level.nodes]
+  nodes.splice(insertAt, 0, moving)
+  next[levelIndex] = { ...level, nodes }
+  return compactPipelineLevels(next)
 }
 
 export function replacePipelineNode(

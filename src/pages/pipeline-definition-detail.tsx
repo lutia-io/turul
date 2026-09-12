@@ -5,19 +5,15 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type ReactNode,
 } from "react"
 import { Link, useParams, useSearchParams } from "react-router"
 import {
-  BoxIcon,
   Building2Icon,
-  FileJsonIcon,
   GalleryVerticalEndIcon,
   LayersIcon,
   Loader,
   PencilIcon,
   PlayIcon,
-  type LucideIcon,
 } from "lucide-react"
 
 import { CheckboxField } from "@/components/checkbox-field"
@@ -37,10 +33,15 @@ import {
 import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
 import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
+import { PipelineFlowCanvas } from "@/components/pipeline-flow"
 import {
-  PipelineLevelJoiner,
   PipelineLevelsEditor,
+  PipelineLevelsView,
 } from "@/components/pipeline-levels-editor"
+import {
+  PipelineViewMenu,
+  type PipelineView,
+} from "@/components/pipeline-view-menu"
 import { RunStatusPill } from "@/components/run-card"
 import { RunPipelineDialog } from "@/components/run-pipeline-dialog"
 import { Button } from "@/components/ui/button"
@@ -52,7 +53,6 @@ import {
   parseJsonObject,
   stringifyDefinition,
   type JsonObject,
-  type PipelineLevelNode,
 } from "@/lib/json-definition"
 import {
   useNetworkWorkspace,
@@ -60,19 +60,13 @@ import {
   useWorkspacePipelineRuns,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
-import {
-  nodeConfigSummary,
-  nodeTypeLabel,
-  pipelineTemplateContextForLevel,
-} from "@/lib/node-definition"
+import { pipelineTemplateContextForLevel } from "@/lib/node-definition"
 import {
   insertCreatedNode,
   levelsFromApi,
   levelsToApi,
   parsePipelineDefinition,
   pipelineDraftSentence,
-  pipelineLevelExplanation,
-  pipelineLevelTitle,
   pipelineNodeCount,
   pipelineSummary,
   replacePipelineNode,
@@ -90,8 +84,6 @@ import {
   useGetPipelineDefinitionQuery,
   useUpdatePipelineDefinitionMutation,
 } from "@/store/pipeline-slice"
-
-type PipelineView = "levels" | "json"
 
 function pipelineDefinitionError(text: string) {
   try {
@@ -150,6 +142,13 @@ export default function PipelineDefinitionDetail() {
   const summary = visiblePipeline
     ? pipelineSummary(visiblePipeline.definition)
     : ""
+  const viewLevels = useMemo(
+    () =>
+      visiblePipeline
+        ? levelsFromApi(parsePipelineDefinition(visiblePipeline.definition))
+        : [],
+    [visiblePipeline]
+  )
   const relatedRuns = visiblePipeline
     ? runs
         .filter(
@@ -298,15 +297,14 @@ export default function PipelineDefinitionDetail() {
         key={visiblePipeline.id}
         pipeline={visiblePipeline}
         href={href}
-        aside={aside}
         onCancel={() => setSearchParams({})}
       />
     )
   }
 
   return (
-    <DefinitionPage>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <DefinitionPage fill>
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 px-4 pt-5 sm:px-6 lg:px-8">
         <div className="min-w-0 space-y-1.5">
           <Link
             to={href("pipeline-definitions")}
@@ -328,17 +326,7 @@ export default function PipelineDefinitionDetail() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={pipelineView === "json" ? "secondary" : "outline"}
-            size="sm"
-            onClick={() =>
-              setPipelineView((view) => (view === "levels" ? "json" : "levels"))
-            }
-          >
-            <FileJsonIcon />
-            {pipelineView === "json" ? "Levels" : "JSON"}
-          </Button>
+          <PipelineViewMenu value={pipelineView} onChange={setPipelineView} />
           <Button
             variant="outline"
             size="sm"
@@ -359,43 +347,32 @@ export default function PipelineDefinitionDetail() {
         </div>
       </div>
 
-      <DefinitionColumns aside={aside}>
-        {pipelineView === "json" ? (
-          <JsonDefinitionCard
-            definition={visiblePipeline.definition}
-            label="JSONB definition"
-            description="Levels and node configs stored on this pipeline."
+      <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 pb-4 sm:px-6 lg:px-8">
+        {pipelineView === "canvas" ? (
+          <PipelineFlowCanvas
+            className="h-full min-h-0 flex-1"
+            levels={viewLevels}
+            sentence={summary}
+            details={<div className="flex flex-col gap-3">{aside}</div>}
           />
         ) : (
-          <DefinitionCard>
-            <SectionHeading
-              icon={LayersIcon}
-              title="Levels"
-              description="The pipeline runs one level at a time. Nodes in the same level run together. When a level finishes, the next level starts."
-            />
-            {levels.length === 0 ? (
-              <p className="mt-6 text-sm text-muted-foreground">
-                This pipeline does not have any levels yet.
-              </p>
-            ) : (
-              <div className="mt-6 flex flex-col">
-                {levels.map((level, levelIndex) => (
-                  <div key={`level-${levelIndex}`}>
-                    {levelIndex > 0 ? (
-                      <PipelineLevelJoiner nextLevel={levelIndex + 1} />
-                    ) : null}
-                    <LevelCard
-                      level={level}
-                      levelIndex={levelIndex}
-                      totalLevels={levels.length}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </DefinitionCard>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <DefinitionColumns aside={aside}>
+              {pipelineView === "json" ? (
+                <JsonDefinitionCard
+                  definition={visiblePipeline.definition}
+                  label="JSONB definition"
+                  description="Levels and node configs stored on this pipeline."
+                />
+              ) : (
+                <DefinitionCard>
+                  <PipelineLevelsView levels={levels} />
+                </DefinitionCard>
+              )}
+            </DefinitionColumns>
+          </div>
         )}
-      </DefinitionColumns>
+      </div>
 
       <RunPipelineDialog
         open={runOpen}
@@ -411,12 +388,10 @@ export default function PipelineDefinitionDetail() {
 function PipelineDefinitionEdit({
   pipeline,
   href,
-  aside,
   onCancel,
 }: {
   pipeline: PipelineDefinition
   href: (rest?: string) => string
-  aside: ReactNode
   onCancel: () => void
 }) {
   const formId = useId()
@@ -592,14 +567,14 @@ function PipelineDefinitionEdit({
   }
 
   return (
-    <DefinitionPage>
+    <DefinitionPage fill>
       <form
         id={formId}
         onSubmit={handleSubmit}
         autoComplete="off"
-        className="flex min-w-0 flex-1 flex-col gap-8"
+        className="flex min-h-0 min-w-0 flex-1 flex-col"
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 px-4 pt-5 sm:px-6 lg:px-8">
           <div className="min-w-0 flex-1 space-y-1.5">
             <Link
               to={href("pipeline-definitions")}
@@ -640,27 +615,15 @@ function PipelineDefinitionEdit({
                 disabled={isLoading}
               />
             </Field>
-            <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-              {pipelineDraftSentence(levels)}
-            </p>
             {error ? (
               <FieldError>{getHumaErrorMessage(error)}</FieldError>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant={definitionView === "json" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() =>
-                setDefinitionView((view) =>
-                  view === "levels" ? "json" : "levels"
-                )
-              }
-            >
-              <FileJsonIcon />
-              {definitionView === "json" ? "Levels" : "JSON"}
-            </Button>
+            <PipelineViewMenu
+              value={definitionView}
+              onChange={setDefinitionView}
+            />
             <Button
               type="button"
               variant="outline"
@@ -689,9 +652,9 @@ function PipelineDefinitionEdit({
           </div>
         </div>
 
-        <DefinitionColumns aside={aside}>
+        <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 pb-4 sm:px-6 lg:px-8">
           {definitionView === "json" ? (
-            <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
               <DefinitionJsonPane
                 id={`${formId}-json`}
                 title="JSON definition"
@@ -702,20 +665,33 @@ function PipelineDefinitionEdit({
                 error={jsonError}
               />
             </div>
+          ) : definitionView === "levels" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <DefinitionCard>
+                <PipelineLevelsEditor
+                  levels={levels}
+                  onChange={(next) => {
+                    markBuilderSource()
+                    setLevels(next)
+                  }}
+                  onCreateNode={openCreateNode}
+                  onEditNode={openEditNode}
+                />
+              </DefinitionCard>
+            </div>
           ) : (
-            <DefinitionCard>
-              <PipelineLevelsEditor
-                levels={levels}
-                onChange={(next) => {
-                  markBuilderSource()
-                  setLevels(next)
-                }}
-                onCreateNode={openCreateNode}
-                onEditNode={openEditNode}
-              />
-            </DefinitionCard>
+            <PipelineFlowCanvas
+              className="h-full min-h-0 flex-1"
+              levels={levels}
+              onChange={(next) => {
+                markBuilderSource()
+                setLevels(next)
+              }}
+              onEditNode={openEditNode}
+              sentence={pipelineDraftSentence(levels)}
+            />
           )}
-        </DefinitionColumns>
+        </div>
       </form>
       <NodeDefinitionDialog
         key={nodeDialogKey}
@@ -726,102 +702,5 @@ function PipelineDefinitionEdit({
         pipelineTemplateContext={nodeDialogContext}
       />
     </DefinitionPage>
-  )
-}
-
-function SectionHeading({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: LucideIcon
-  title: string
-  description: string
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
-        <Icon className="size-4" />
-      </span>
-      <div className="min-w-0">
-        <h2 className="text-sm font-medium">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  )
-}
-
-function LevelCard({
-  level,
-  levelIndex,
-  totalLevels,
-}: {
-  level: PipelineLevelNode[]
-  levelIndex: number
-  totalLevels: number
-}) {
-  const parallel = level.length > 1
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-l-4 border-l-violet-500 bg-muted/20">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-md bg-violet-500/10 px-2 py-0.5 font-mono text-xs font-semibold tracking-wider text-violet-800 dark:text-violet-300">
-              {pipelineLevelTitle(levelIndex).toUpperCase()}
-            </span>
-            {levelIndex === 0 ? (
-              <p className="text-sm font-medium">Runs first</p>
-            ) : (
-              <p className="text-sm font-medium">
-                After {pipelineLevelTitle(levelIndex - 1).toLowerCase()}
-              </p>
-            )}
-            {parallel ? (
-              <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                Same level · together
-              </span>
-            ) : null}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {pipelineLevelExplanation(levelIndex, totalLevels, parallel)}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground tabular-nums">
-            {level.length} {level.length === 1 ? "node" : "nodes"}
-          </p>
-        </div>
-      </div>
-      <div className="grid gap-2 p-3 sm:grid-cols-2">
-        {level.map((node, nodeIndex) => (
-          <NodeCard key={`${node.name}-${nodeIndex}`} node={node} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function NodeCard({ node }: { node: PipelineLevelNode }) {
-  const summary = nodeConfigSummary(node.type, node.definition)
-  return (
-    <div className="rounded-xl border bg-background p-4 shadow-xs">
-      <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300">
-          <BoxIcon className="size-3.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{node.name}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {nodeTypeLabel(node.type)}
-          </p>
-        </div>
-      </div>
-      {summary ? (
-        <p className="mt-3 truncate font-mono text-xs text-muted-foreground">
-          {summary}
-        </p>
-      ) : null}
-    </div>
   )
 }

@@ -7,12 +7,17 @@ import {
   type FormEvent,
 } from "react"
 import { useNavigate } from "react-router"
-import { FileJsonIcon, Loader } from "lucide-react"
+import { Loader } from "lucide-react"
 
 import { EnabledField } from "@/components/checkbox-field"
 import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
+import { PipelineFlowCanvas } from "@/components/pipeline-flow"
 import { PipelineLevelsEditor } from "@/components/pipeline-levels-editor"
+import {
+  PipelineViewMenu,
+  type PipelineView,
+} from "@/components/pipeline-view-menu"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -103,9 +108,7 @@ export function PipelineDefinitionDialog({
   const error = createState.error
   const lockNetwork = Boolean(networkId)
   const lockOrganization = Boolean(organizationId)
-  const [definitionView, setDefinitionView] = useState<"levels" | "json">(
-    "levels"
-  )
+  const [definitionView, setDefinitionView] = useState<PipelineView>("levels")
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? networks[0]?.id ?? ""
   )
@@ -352,7 +355,7 @@ export function PipelineDefinitionDialog({
     >
       <DialogContent
         size="full"
-        className="sm:inset-x-[8vw] lg:inset-x-16 xl:inset-x-[12vw]"
+        className="sm:inset-x-8 sm:inset-y-6 lg:inset-x-12 xl:inset-x-16"
       >
         <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -360,19 +363,10 @@ export function PipelineDefinitionDialog({
               <DialogTitle>Create a pipeline</DialogTitle>
               <DialogDescription>{sentence}</DialogDescription>
             </div>
-            <Button
-              type="button"
-              variant={definitionView === "json" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() =>
-                setDefinitionView((view) =>
-                  view === "levels" ? "json" : "levels"
-                )
-              }
-            >
-              <FileJsonIcon />
-              {definitionView === "json" ? "Levels" : "JSON"}
-            </Button>
+            <PipelineViewMenu
+              value={definitionView}
+              onChange={setDefinitionView}
+            />
           </div>
         </DialogHeader>
         <form
@@ -524,7 +518,7 @@ export function PipelineDefinitionDialog({
                   error={jsonError}
                 />
               </div>
-            ) : (
+            ) : definitionView === "levels" ? (
               <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
                 <div className="rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
                   <PipelineLevelsEditor
@@ -537,6 +531,19 @@ export function PipelineDefinitionDialog({
                     onEditNode={openEditNode}
                   />
                 </div>
+              </div>
+            ) : (
+              <div className="min-h-0 flex-1">
+                <PipelineFlowCanvas
+                  className="h-full min-h-[28rem]"
+                  levels={levels}
+                  onChange={(next) => {
+                    markBuilderSource()
+                    setLevels(next)
+                  }}
+                  onEditNode={openEditNode}
+                  sentence={sentence}
+                />
               </div>
             )}
           </div>

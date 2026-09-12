@@ -17,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { WorkflowSectionHeading } from "@/components/workflow-rule"
+import type { PipelineLevelNode } from "@/lib/json-definition"
 import { nodeConfigSummary, nodeTypeLabel } from "@/lib/node-definition"
 import {
   movePipelineLevel,
@@ -308,6 +309,118 @@ function NodeSlot({
           >
             <Trash2Icon />
           </IconTooltipButton>
+        </div>
+      </div>
+      {summary ? (
+        <p className="mt-3 truncate font-mono text-xs text-muted-foreground">
+          {summary}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+export function PipelineLevelsView({
+  levels,
+}: {
+  levels: PipelineLevelNode[][]
+}) {
+  return (
+    <>
+      <WorkflowSectionHeading
+        icon={LayersIcon}
+        title="Levels"
+        description="The pipeline runs one level at a time. Nodes in the same level run together. When a level finishes, the next level starts."
+      />
+      {levels.length === 0 ? (
+        <p className="mt-6 text-sm text-muted-foreground">
+          This pipeline does not have any levels yet.
+        </p>
+      ) : (
+        <div className="mt-6 flex flex-col">
+          {levels.map((level, levelIndex) => (
+            <div key={`level-${levelIndex}`}>
+              {levelIndex > 0 ? (
+                <PipelineLevelJoiner nextLevel={levelIndex + 1} />
+              ) : null}
+              <LevelViewCard
+                level={level}
+                levelIndex={levelIndex}
+                totalLevels={levels.length}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+function LevelViewCard({
+  level,
+  levelIndex,
+  totalLevels,
+}: {
+  level: PipelineLevelNode[]
+  levelIndex: number
+  totalLevels: number
+}) {
+  const parallel = level.length > 1
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-l-4 border-l-violet-500 bg-muted/20">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-md bg-violet-500/10 px-2 py-0.5 font-mono text-xs font-semibold tracking-wider text-violet-800 dark:text-violet-300">
+              {pipelineLevelTitle(levelIndex).toUpperCase()}
+            </span>
+            {levelIndex === 0 ? (
+              <p className="text-sm font-medium">Runs first</p>
+            ) : (
+              <p className="text-sm font-medium">
+                After {pipelineLevelTitle(levelIndex - 1).toLowerCase()}
+              </p>
+            )}
+            {parallel ? (
+              <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                Same level · together
+              </span>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {pipelineLevelExplanation(levelIndex, totalLevels, parallel)}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {level.length} {level.length === 1 ? "node" : "nodes"}
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-2 p-3 sm:grid-cols-2">
+        {level.map((node, nodeIndex) => (
+          <LevelViewNode key={`${node.name}-${nodeIndex}`} node={node} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LevelViewNode({ node }: { node: PipelineLevelNode }) {
+  const summary = nodeConfigSummary(node.type, node.definition)
+
+  return (
+    <div className="rounded-xl border bg-background p-4 shadow-xs">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300">
+          <BoxIcon className="size-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{node.name}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {nodeTypeLabel(node.type)}
+          </p>
         </div>
       </div>
       {summary ? (
