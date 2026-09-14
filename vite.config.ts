@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
 const humaProxy = {
-  target: "http://172.20.0.5:8000",
+  target: "http://172.20.0.4:8000",
   changeOrigin: true,
 }
 
