@@ -116,7 +116,7 @@ function NavCollapsibleItem({
       <CollapsibleContent>
         <SidebarMenuSub>
           {item.items.map((subItem) => (
-            <SidebarMenuSubItem key={subItem.title}>
+            <SidebarMenuSubItem key={subItem.url}>
               <SidebarMenuSubButton
                 isActive={
                   subItem.isActive ??
@@ -137,7 +137,7 @@ function NavCollapsibleItem({
 
 export function NavMain({
   items,
-  label = "Platform",
+  label,
 }: {
   items: NavItem[]
   label?: string
@@ -151,9 +151,13 @@ export function NavMain({
     }
   }
 
+  if (items.length === 0) {
+    return null
+  }
+
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>{label}</SidebarGroupLabel>
+      {label ? <SidebarGroupLabel>{label}</SidebarGroupLabel> : null}
       <SidebarMenu>
         {items.map((item) =>
           item.items && item.items.length > 0 ? (

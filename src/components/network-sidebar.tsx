@@ -9,13 +9,11 @@ import {
   FileIcon,
   FileJsonIcon,
   GalleryVerticalEndIcon,
-  LayersIcon,
   LayoutDashboardIcon,
   PlayIcon,
   ShieldIcon,
   TableIcon,
   UsersIcon,
-  WorkflowIcon,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -46,19 +44,14 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation()
   const [searchParams] = useSearchParams()
   const { isMobile, setOpenMobile } = useSidebar()
-  const { network, organizationId } = useNetworkWorkspace()
+  const { network, organizationId, href } = useNetworkWorkspace()
   const { networks } = useWorkspaceNetworkList()
   const { openCreateNetwork, openCreateOrganization } = useCreateEntity()
   const { isOrgUser } = useAuthorization()
   const parsed = parseNetworkPath(pathname)
   const rest = parsed?.rest ?? ""
-  const recordsUrl = network
-    ? networkWorkspacePath({
-        networkId: network.id,
-        organizationId,
-        rest: "records",
-      })
-    : "/app/networks"
+  const section = networkSectionRest(rest)
+  const recordsUrl = href("records")
   const recordsSchemaId = searchParams.get("schema") ?? network?.schemas[0]?.id
 
   const switcherNetworks =
@@ -92,30 +85,16 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
     })) ?? []),
   ]
 
-  const navMain = [
+  const overviewItems = [
     {
       title: "Overview",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-          })
-        : "/app/networks",
+      url: href(),
       icon: <LayoutDashboardIcon />,
       exact: true,
     },
-    {
-      title: "Organizations",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "organizations",
-          })
-        : "/app/networks",
-      icon: <Building2Icon />,
-      isActive: networkSectionRest(rest) === "organizations",
-    },
+  ]
+
+  const dataItems = [
     {
       title: "Records",
       url: recordsUrl,
@@ -129,95 +108,70 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
     },
     {
       title: "Files",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "files",
-          })
-        : "/app/networks",
+      url: href("files"),
       icon: <FileIcon />,
     },
     {
+      title: "Schemas",
+      url: href("schemas"),
+      icon: <FileJsonIcon />,
+    },
+  ]
+
+  const automationItems = [
+    {
       title: "Workflows",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "workflows",
-          })
-        : "/app/networks",
+      url: href("workflows"),
       icon: <PlayIcon />,
+      isActive: section === "workflows",
+      items: [
+        {
+          title: "Definitions",
+          url: href("workflow-definitions"),
+          isActive: section === "workflow-definitions",
+        },
+      ],
     },
     {
       title: "Pipelines",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "pipelines",
-          })
-        : "/app/networks",
+      url: href("pipelines"),
       icon: <ActivityIcon />,
+      isActive: section === "pipelines",
+      items: [
+        {
+          title: "Definitions",
+          url: href("pipeline-definitions"),
+          isActive: section === "pipeline-definitions",
+        },
+      ],
     },
+  ]
+
+  const peopleItems = [
+    ...(organizationId
+      ? []
+      : [
+          {
+            title: "Organizations",
+            url: href("organizations"),
+            icon: <Building2Icon />,
+            isActive: section === "organizations",
+          },
+        ]),
     {
-      title: "Organization Users",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "organization-users",
-          })
-        : "/app/networks",
+      title: "Users",
+      url: href("organization-users"),
       icon: <UsersIcon />,
     },
-    {
-      title: "Access",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "access",
-          })
-        : "/app/networks",
-      icon: <ShieldIcon />,
-    },
-  ].filter((item) => item.title !== "Access" || !isOrgUser)
-
-  const definitionItems = [
-    {
-      title: "Schemas",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "schemas",
-          })
-        : "/app/networks",
-      icon: <FileJsonIcon />,
-    },
-    {
-      title: "Workflow Definitions",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "workflow-definitions",
-          })
-        : "/app/networks",
-      icon: <WorkflowIcon />,
-    },
-    {
-      title: "Pipeline Definitions",
-      url: network
-        ? networkWorkspacePath({
-            networkId: network.id,
-            organizationId,
-            rest: "pipeline-definitions",
-          })
-        : "/app/networks",
-      icon: <LayersIcon />,
-    },
+    ...(isOrgUser
+      ? []
+      : [
+          {
+            title: "Access",
+            url: href("access"),
+            icon: <ShieldIcon />,
+          },
+        ]),
   ]
 
   function closeMobileSidebar() {
@@ -274,8 +228,10 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain label="Operations" items={navMain} />
-        <NavMain label="Definitions" items={definitionItems} />
+        <NavMain items={overviewItems} />
+        <NavMain label="Data" items={dataItems} />
+        <NavMain label="Automation" items={automationItems} />
+        <NavMain label="People" items={peopleItems} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
