@@ -18,7 +18,6 @@ export type ApiPipelineDefinition = {
   updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
-  deletedAt?: string | null
 }
 
 export type CreatePipelineDefinitionRequest = {

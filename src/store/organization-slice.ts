@@ -11,7 +11,6 @@ export type ApiOrganization = {
   updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
-  deletedAt?: string | null
 }
 
 export type CreateOrganizationRequest = {

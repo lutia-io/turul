@@ -9,7 +9,6 @@ export type ApiNetwork = {
   updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
-  deletedAt?: string | null
 }
 
 export type CreateNetworkRequest = {

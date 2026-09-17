@@ -15,7 +15,6 @@ export type ApiSchema = {
   updatedBy: ApiUserRef
   createdAt: string
   updatedAt: string
-  deletedAt?: string | null
 }
 
 export type CreateSchemaRequest = {

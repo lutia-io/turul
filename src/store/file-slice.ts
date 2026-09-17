@@ -12,7 +12,6 @@ export type ApiFile = {
   networkId: string
   createdAt: string
   updatedAt: string
-  deletedAt?: string | null
 }
 
 export type CreateFileRequest = {

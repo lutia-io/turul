@@ -17,7 +17,6 @@ export type ApiRecord = {
   networkId: string
   createdAt: string
   updatedAt: string
-  deletedAt?: string | null
   related?: Record<string, RelatedRecord>
 }
 

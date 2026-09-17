@@ -10,7 +10,6 @@ export type ApiOrganizationUser = {
   networkId: string
   createdAt: string
   updatedAt: string
-  deletedAt?: string | null
 }
 
 export type CreateOrganizationUserRequest = {
