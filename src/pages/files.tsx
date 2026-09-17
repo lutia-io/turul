@@ -41,6 +41,7 @@ import {
   useWorkspaceOrganizations,
   workspaceFileFromApi,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -105,6 +106,7 @@ export default function FilesPage() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organizationId } = useNetworkWorkspace()
   const { openCreateFile } = useCreateEntity()
+  const { canOrg, isOrgUser, data: authorization } = useAuthorization()
   const { organizations } = useWorkspaceOrganizations()
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
@@ -487,17 +489,21 @@ export default function FilesPage() {
       title="Files"
       description="Uploaded files referenced from record data. Click a file to preview it, or open the row for the full page."
       action={
-        <Button
-          onClick={() =>
-            openCreateFile({
-              networkId: network?.id,
-              organizationId,
-            })
-          }
-        >
-          <PlusIcon />
-          Upload file
-        </Button>
+        (isOrgUser
+          ? canOrg("file", "create")
+          : Boolean(authorization?.network?.member)) ? (
+          <Button
+            onClick={() =>
+              openCreateFile({
+                networkId: network?.id,
+                organizationId,
+              })
+            }
+          >
+            <PlusIcon />
+            Upload file
+          </Button>
+        ) : null
       }
     >
       <DataTableToolbar

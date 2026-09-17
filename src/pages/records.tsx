@@ -60,6 +60,7 @@ import {
   useWorkspaceOrganizations,
   workspaceRecordFromApi,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
@@ -212,6 +213,7 @@ export default function RecordsPage() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organizationId } = useNetworkWorkspace()
   const { openCreateRecord, openEditRecord } = useCreateEntity()
+  const { canOrg, isOrgUser, data: authorization } = useAuthorization()
   const {
     networks: workspaceNetworks,
     refetch: refetchNetworks,
@@ -266,18 +268,22 @@ export default function RecordsPage() {
       title="Records"
       description="Each schema is a table. Hover a related record, URL, or file for a preview, then click to open it."
       action={
-        <Button
-          onClick={() =>
-            openCreateRecord({
-              networkId: activeNetwork?.id,
-              organizationId,
-              schemaId: activeSchema?.id,
-            })
-          }
-        >
-          <PlusIcon />
-          Create record
-        </Button>
+        (isOrgUser
+          ? canOrg("record", "create")
+          : Boolean(authorization?.network?.member)) ? (
+          <Button
+            onClick={() =>
+              openCreateRecord({
+                networkId: activeNetwork?.id,
+                organizationId,
+                schemaId: activeSchema?.id,
+              })
+            }
+          >
+            <PlusIcon />
+            Create record
+          </Button>
+        ) : null
       }
     >
       {!network ? (

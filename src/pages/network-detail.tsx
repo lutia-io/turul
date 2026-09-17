@@ -9,6 +9,7 @@ import {
   PencilIcon,
   PlayIcon,
   PlusIcon,
+  ShieldIcon,
   TableIcon,
   UsersIcon,
   type LucideIcon,
@@ -30,6 +31,7 @@ import {
   DashboardPage,
 } from "@/components/workspace-dashboard"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
+import { useAuthorization } from "@/lib/authorization"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
@@ -81,6 +83,7 @@ export default function NetworkDetail() {
   } = useNetworkWorkspace()
   const { openCreateOrganization, openEditNetwork, openEditOrganization } =
     useCreateEntity()
+  const { canNetwork, isOrgUser } = useAuthorization()
 
   if (!network) {
     return (
@@ -146,18 +149,22 @@ export default function NetworkDetail() {
               isRefreshing={isWorkspaceFetching}
               size="icon"
             />
-            <Button
-              variant="outline"
-              onClick={() =>
-                organization
-                  ? openEditOrganization(organization.id)
-                  : openEditNetwork(network.id)
-              }
-            >
-              <PencilIcon />
-              {organization ? "Edit organization" : "Edit network"}
-            </Button>
-            {organization ? null : (
+            {(organization
+              ? canNetwork("organization", "update")
+              : canNetwork("network", "update")) ? (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  organization
+                    ? openEditOrganization(organization.id)
+                    : openEditNetwork(network.id)
+                }
+              >
+                <PencilIcon />
+                {organization ? "Edit organization" : "Edit network"}
+              </Button>
+            ) : null}
+            {organization || !canNetwork("organization", "create") ? null : (
               <Button onClick={() => openCreateOrganization(network.id)}>
                 <PlusIcon />
                 Add organization
@@ -211,6 +218,14 @@ export default function NetworkDetail() {
             label="Organizations"
             color="cyan"
             icon={Building2Icon}
+          />
+        )}
+        {isOrgUser ? null : (
+          <Shortcut
+            to={href("access")}
+            label="Access"
+            color="orange"
+            icon={ShieldIcon}
           />
         )}
       </div>

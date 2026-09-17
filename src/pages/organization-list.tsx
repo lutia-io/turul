@@ -34,6 +34,7 @@ import {
   networkWorkspacePath,
   useNetworkWorkspace,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 import { userDisplayName } from "@/lib/user"
 import { getHumaErrorMessage, type ApiUserRef } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
@@ -111,6 +112,7 @@ export default function OrganizationList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateOrganization, openEditOrganization } = useCreateEntity()
+  const { canNetwork } = useAuthorization()
   const [deleteTarget, setDeleteTarget] = useState<OrganizationRow | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [query, setQuery] = useState("")
@@ -386,10 +388,12 @@ export default function OrganizationList() {
             : "Organizations belong to a network. They can use shared network schemas and define their own."
       }
       action={
-        <Button onClick={() => openCreateOrganization(network?.id)}>
-          <PlusIcon />
-          Create organization
-        </Button>
+        canNetwork("organization", "create") ? (
+          <Button onClick={() => openCreateOrganization(network?.id)}>
+            <PlusIcon />
+            Create organization
+          </Button>
+        ) : null
       }
     >
       <DataTableToolbar

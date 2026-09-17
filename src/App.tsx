@@ -8,6 +8,8 @@ import {
   NetworkLayout,
   NetworkList,
   NetworkDetail,
+  AccessPage,
+  PlatformAccess,
   OrganizationList,
   OrganizationDetail,
   OrganizationUserList,
@@ -38,6 +40,7 @@ function networkWorkspaceRoutes() {
   return (
     <>
       <Route index element={<NetworkDetail />} />
+      <Route path="access" element={<AccessPage />} />
       <Route path="schemas" element={<SchemaList />} />
       <Route path="schemas/:schemaId" element={<SchemaDetail />} />
       <Route path="workflow-definitions" element={<WorkflowDefinitionList />} />
@@ -79,6 +82,7 @@ export function App() {
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
             <Route path="/app/home" element={<Home />} />
+            <Route path="/app/access" element={<PlatformAccess />} />
             <Route path="/app/networks" element={<NetworkList />} />
             <Route path="/app/account" element={<Account />} />
             <Route path="/app/billing" element={<Billing />} />

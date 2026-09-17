@@ -43,6 +43,7 @@ import {
   useWorkspaceSchemas,
   workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 import {
   parseWorkflowDefinition,
   workflowSummary,
@@ -102,6 +103,7 @@ export default function WorkflowDefinitionList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateWorkflow } = useCreateEntity()
+  const { canNetwork } = useAuthorization()
   const { schemas } = useWorkspaceSchemas()
   const { organizations } = useWorkspaceOrganizations()
   const { data: networks } = useListNetworksQuery(undefined, {
@@ -615,17 +617,19 @@ export default function WorkflowDefinitionList() {
             : "Workflows that run when their trigger fires."
       }
       action={
-        <Button
-          onClick={() =>
-            openCreateWorkflow({
-              networkId: network?.id,
-              organizationId,
-            })
-          }
-        >
-          <PlusIcon />
-          Create workflow definition
-        </Button>
+        canNetwork("workflow_definition", "create") ? (
+          <Button
+            onClick={() =>
+              openCreateWorkflow({
+                networkId: network?.id,
+                organizationId,
+              })
+            }
+          >
+            <PlusIcon />
+            Create workflow definition
+          </Button>
+        ) : null
       }
     >
       <DataTableToolbar

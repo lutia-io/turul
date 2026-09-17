@@ -137,6 +137,10 @@ export function networkSectionRest(rest: string) {
     return "schemas"
   }
 
+  if (rest === "access" || rest.startsWith("access/")) {
+    return "access"
+  }
+
   return ""
 }
 

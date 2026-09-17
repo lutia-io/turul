@@ -12,6 +12,7 @@ import {
   LayersIcon,
   LayoutDashboardIcon,
   PlayIcon,
+  ShieldIcon,
   TableIcon,
   UsersIcon,
   WorkflowIcon,
@@ -38,6 +39,7 @@ import {
   useNetworkWorkspace,
   useWorkspaceNetworkList,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 
 export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate()
@@ -47,6 +49,7 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { network, organizationId } = useNetworkWorkspace()
   const { networks } = useWorkspaceNetworkList()
   const { openCreateNetwork, openCreateOrganization } = useCreateEntity()
+  const { isOrgUser } = useAuthorization()
   const parsed = parseNetworkPath(pathname)
   const rest = parsed?.rest ?? ""
   const recordsUrl = network
@@ -168,7 +171,18 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         : "/app/networks",
       icon: <UsersIcon />,
     },
-  ]
+    {
+      title: "Access",
+      url: network
+        ? networkWorkspacePath({
+            networkId: network.id,
+            organizationId,
+            rest: "access",
+          })
+        : "/app/networks",
+      icon: <ShieldIcon />,
+    },
+  ].filter((item) => item.title !== "Access" || !isOrgUser)
 
   const definitionItems = [
     {

@@ -36,6 +36,7 @@ import {
   useWorkspaceOrganizations,
   workspaceOrganizationUserFromApi,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -92,6 +93,7 @@ export default function OrganizationUserList() {
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateOrganizationUser, openEditOrganizationUser } =
     useCreateEntity()
+  const { canNetwork, canOrg, isOrgUser } = useAuthorization()
   const { organizations } = useWorkspaceOrganizations()
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
@@ -407,17 +409,21 @@ export default function OrganizationUserList() {
             : "People who can sign in to an organization."
       }
       action={
-        <Button
-          onClick={() =>
-            openCreateOrganizationUser({
-              networkId: network?.id,
-              organizationId,
-            })
-          }
-        >
-          <PlusIcon />
-          Create organization user
-        </Button>
+        (isOrgUser
+          ? canOrg("organization_user", "create")
+          : canNetwork("organization_user", "create")) ? (
+          <Button
+            onClick={() =>
+              openCreateOrganizationUser({
+                networkId: network?.id,
+                organizationId,
+              })
+            }
+          >
+            <PlusIcon />
+            Create organization user
+          </Button>
+        ) : null
       }
     >
       <DataTableToolbar

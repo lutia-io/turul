@@ -40,6 +40,7 @@ import {
   useWorkspaceOrganizations,
   workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
@@ -84,6 +85,7 @@ export default function SchemaList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreateSchema, openEditSchema } = useCreateEntity()
+  const { canNetwork } = useAuthorization()
   const { organizations } = useWorkspaceOrganizations()
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
@@ -413,17 +415,19 @@ export default function SchemaList() {
             : "Data shapes used by records across your networks."
       }
       action={
-        <Button
-          onClick={() =>
-            openCreateSchema({
-              networkId: network?.id,
-              organizationId,
-            })
-          }
-        >
-          <PlusIcon />
-          Create schema
-        </Button>
+        canNetwork("schema", "create") ? (
+          <Button
+            onClick={() =>
+              openCreateSchema({
+                networkId: network?.id,
+                organizationId,
+              })
+            }
+          >
+            <PlusIcon />
+            Create schema
+          </Button>
+        ) : null
       }
     >
       <DataTableToolbar

@@ -42,6 +42,7 @@ import {
   useWorkspaceOrganizations,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
+import { useAuthorization } from "@/lib/authorization"
 import { pipelineSummary } from "@/lib/pipeline-definition"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
@@ -97,6 +98,7 @@ export default function PipelineDefinitionList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network, organization, organizationId } = useNetworkWorkspace()
   const { openCreatePipeline, openEditPipeline } = useCreateEntity()
+  const { canNetwork } = useAuthorization()
   const { organizations } = useWorkspaceOrganizations()
   const { data: networks } = useListNetworksQuery(undefined, {
     skip: !isAuthenticated || Boolean(network),
@@ -573,17 +575,19 @@ export default function PipelineDefinitionList() {
             : "Pipelines that run one level at a time, then the next."
       }
       action={
-        <Button
-          onClick={() =>
-            openCreatePipeline({
-              networkId: network?.id,
-              organizationId,
-            })
-          }
-        >
-          <PlusIcon />
-          Create pipeline definition
-        </Button>
+        canNetwork("pipeline_definition", "create") ? (
+          <Button
+            onClick={() =>
+              openCreatePipeline({
+                networkId: network?.id,
+                organizationId,
+              })
+            }
+          >
+            <PlusIcon />
+            Create pipeline definition
+          </Button>
+        ) : null
       }
     >
       <DataTableToolbar
