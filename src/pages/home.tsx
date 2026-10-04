@@ -138,6 +138,8 @@ export default function Home() {
   const greeting = greetingForHour(new Date().getHours())
   const organizations = networks.flatMap((network) => network.organizations)
   const isInitialLoading = isLoading && networks.length === 0 && !isError
+  const showHeaderCreate = isInitialLoading || isError || networks.length > 0
+  const showRefresh = networks.length > 0 || isFetching
   const subtitle = isError
     ? getHumaErrorMessage(error, "Failed to load networks")
     : networks.length > 0
@@ -159,19 +161,23 @@ export default function Home() {
           )
         }
         actions={
-          <>
-            {networks.length > 0 || isFetching ? (
-              <RefreshButton
-                onRefresh={() => void refetch()}
-                isRefreshing={isFetching}
-                size="icon"
-              />
-            ) : null}
-            <Button onClick={openCreateNetwork}>
-              <PlusIcon />
-              Create a network
-            </Button>
-          </>
+          showRefresh || showHeaderCreate ? (
+            <>
+              {showRefresh ? (
+                <RefreshButton
+                  onRefresh={() => void refetch()}
+                  isRefreshing={isFetching}
+                  size="icon"
+                />
+              ) : null}
+              {showHeaderCreate ? (
+                <Button onClick={openCreateNetwork}>
+                  <PlusIcon />
+                  Create a network
+                </Button>
+              ) : null}
+            </>
+          ) : null
         }
       />
 

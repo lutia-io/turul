@@ -421,6 +421,8 @@ export default function NetworkList() {
   const { openCreateNetwork } = useCreateEntity()
   const { networks, isLoading, isFetching, isError, error, refetch } =
     useWorkspaceNetworks()
+  const showHeaderCreate =
+    isLoading || isFetching || isError || networks.length > 0
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
@@ -434,19 +436,21 @@ export default function NetworkList() {
             collaborate.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {networks.length > 0 ? (
-            <RefreshButton
-              onRefresh={refetch}
-              isRefreshing={isFetching}
-              size="icon"
-            />
-          ) : null}
-          <Button onClick={openCreateNetwork}>
-            <PlusIcon />
-            Create a network
-          </Button>
-        </div>
+        {showHeaderCreate ? (
+          <div className="flex items-center gap-2">
+            {networks.length > 0 ? (
+              <RefreshButton
+                onRefresh={refetch}
+                isRefreshing={isFetching}
+                size="icon"
+              />
+            ) : null}
+            <Button onClick={openCreateNetwork}>
+              <PlusIcon />
+              Create a network
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {isLoading || isFetching ? (
