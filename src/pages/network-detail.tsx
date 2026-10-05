@@ -3,7 +3,6 @@ import {
   ArrowRightIcon,
   Building2Icon,
   FileIcon,
-  FileJsonIcon,
   GalleryVerticalEndIcon,
   LayersIcon,
   PencilIcon,
@@ -198,12 +197,6 @@ export default function NetworkDetail() {
           label="Pipelines"
           color="pink"
           icon={LayersIcon}
-        />
-        <Shortcut
-          to={href("schemas")}
-          label="Schemas"
-          color="purple"
-          icon={FileJsonIcon}
         />
         {organization ? (
           <Shortcut

@@ -15,7 +15,7 @@ import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
 import { useCreateEntity } from "@/components/create-entity"
 import {
-  propertyLabel,
+  columnLabel,
   EmailRecordLink,
   PhoneRecordLink,
   RelatedRecordLink,
@@ -155,7 +155,7 @@ export default function RecordDetail() {
         <div className="min-w-0 space-y-1.5">
           {schema ? (
             <Link
-              to={href(`schemas/${schema.id}`)}
+              to={recordsHref}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <span className={cn("size-1.5 rounded-full", tone.bg)} />
@@ -179,7 +179,7 @@ export default function RecordDetail() {
               }
             >
               <FileJsonIcon />
-              {dataView === "json" ? "Fields" : "JSON"}
+              {dataView === "json" ? "Columns" : "JSON"}
             </Button>
           ) : null}
           <Button
@@ -282,7 +282,7 @@ export default function RecordDetail() {
                     <RecordFileRow
                       key={`${property.name}-${fileId}`}
                       fileId={fileId}
-                      label={propertyLabel(property.name)}
+                      label={columnLabel(property)}
                       onPreview={() => setPreviewFileId(fileId)}
                     />
                   ))
@@ -382,7 +382,7 @@ function FieldItem({
       className={cn("min-w-0", isWideField(property, value) && "sm:col-span-2")}
     >
       <dt className="text-xs text-muted-foreground">
-        {propertyLabel(property.name)}
+        {columnLabel(property)}
       </dt>
       <dd className="mt-1.5 text-sm">
         <FieldValue
@@ -484,7 +484,7 @@ function FieldValue({
     <span
       className={cn(
         "break-words",
-        (property.type === "number" || property.type === "integer") &&
+        property.type === "number" &&
           "tabular-nums"
       )}
     >

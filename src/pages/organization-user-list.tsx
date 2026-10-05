@@ -184,7 +184,7 @@ export default function OrganizationUserList() {
             <DataTableColumnHeader
               title="Name"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -210,7 +210,7 @@ export default function OrganizationUserList() {
             <DataTableColumnHeader
               title="Email"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -242,7 +242,7 @@ export default function OrganizationUserList() {
                     <DataTableColumnHeader
                       title="Organization"
                       sorted={column.getIsSorted()}
-                      onSort={column.getToggleSortingHandler()}
+                      onSort={(descending) => column.toggleSorting(descending)}
                       pin={headerPin(column)}
                       filter={{
                         type: "text",
@@ -274,7 +274,7 @@ export default function OrganizationUserList() {
             <DataTableColumnHeader
               title="Created"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
             />
           ),

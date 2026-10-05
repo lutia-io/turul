@@ -61,7 +61,7 @@ export function AccessOutline({
             {row.resource.fields ? (
               <p className="text-xs text-muted-foreground">
                 {row.allFields
-                  ? `${schemaName(row.schemaId, schemas)} · All fields`
+                  ? `${schemaName(row.schemaId, schemas)} · All columns`
                   : `${schemaName(row.schemaId, schemas)} · ${row.fields
                       .map(
                         (field) =>
@@ -231,7 +231,7 @@ export function GrantEditor({
                   : "text-muted-foreground ring-foreground/15 hover:text-foreground"
               )}
             >
-              All fields
+              All columns
             </button>
             <button
               type="button"
@@ -254,7 +254,7 @@ export function GrantEditor({
                   : "text-muted-foreground ring-foreground/15 hover:text-foreground"
               )}
             >
-              Specific fields
+              Specific columns
             </button>
           </div>
           {limitFields ? (
@@ -291,7 +291,7 @@ export function GrantEditor({
               ) : null}
               {fieldNames.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No schema fields are available yet.
+                  No columns are available yet.
                 </p>
               ) : (
                 <ul className="divide-y rounded-lg ring-1 ring-foreground/10">

@@ -24,7 +24,7 @@ const steps = [
   },
   {
     title: "Agree on a shape",
-    body: "A schema is the shared form: fields, types, and what’s required.",
+    body: "A table is the shared form: columns, types, and what’s required.",
   },
   {
     title: "Keep data in shape",
@@ -55,8 +55,8 @@ const capabilities: {
     icon: Building2Icon,
   },
   {
-    title: "Schemas",
-    body: "The shared form: fields, types, and what’s required.",
+    title: "Tables",
+    body: "The shared form: columns, types, and what’s required.",
     color: "blue",
     icon: FileJsonIcon,
   },
@@ -231,7 +231,7 @@ export default function Landing() {
                 Put your teams on one shared shape.
               </h2>
               <p className="mt-3 text-muted-foreground">
-                Create a network, invite teams, agree on a schema. Lutia keeps
+                Create a network, invite teams, agree on tables. Lutia keeps
                 the rest in shape.
               </p>
             </div>

@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { propertyLabel } from "@/components/schema-records-table"
+import { columnLabel } from "@/components/schema-records-table"
 
 const CHOOSE_FIELD = "__choose_field__"
 const CHOOSE_VALUE = "__choose_value__"
@@ -255,7 +255,7 @@ export function FriendlyValueInput({
             { value: CHOOSE_FIELD, label: chooseFieldLabel },
             ...triggerFields.map((field) => ({
               value: field.name,
-              label: propertyLabel(field.name),
+              label: columnLabel(field),
             })),
           ]}
           onValueChange={(next) => {
@@ -278,7 +278,7 @@ export function FriendlyValueInput({
             <SelectItem value={CHOOSE_FIELD}>{chooseFieldLabel}</SelectItem>
             {triggerFields.map((field) => (
               <SelectItem key={field.name} value={field.name}>
-                {propertyLabel(field.name)}
+                {columnLabel(field)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -394,7 +394,7 @@ function LiteralValueInput({
     )
   }
 
-  const numeric = field?.type === "integer" || field?.type === "number"
+  const numeric = field?.type === "number"
 
   return (
     <Input

@@ -19,13 +19,15 @@ import {
   ArrowLeftToLineIcon,
   ArrowRightToLineIcon,
   ArrowUpIcon,
-  ChevronsUpDownIcon,
+  ChevronDownIcon,
   Columns3Icon,
   EyeIcon,
   EyeOffIcon,
   FilterIcon,
   MoreHorizontalIcon,
+  PencilIcon,
   PinOffIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react"
 
@@ -34,6 +36,12 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -147,57 +155,130 @@ export function DataTableColumnHeader({
   onSort,
   filter,
   pin,
+  onEdit,
+  onDelete,
+  onHide,
 }: {
   title: string
   sorted?: false | "asc" | "desc"
-  onSort?: (event: unknown) => void
+  onSort?: (descending: boolean) => void
   filter?: ColumnFilterConfig
   pin?: {
     position: ColumnPinPosition
     onPin: (position: ColumnPinPosition) => void
   }
+  onEdit?: () => void
+  onDelete?: () => void
+  onHide?: () => void
 }) {
-  const SortIcon =
-    sorted === "asc"
-      ? ArrowUpIcon
-      : sorted === "desc"
-        ? ArrowDownIcon
-        : ChevronsUpDownIcon
   const filterActive = isFilterActive(filter)
+  const hasMenu = Boolean(onSort || filter || pin || onEdit || onDelete || onHide)
+  const SortMark =
+    sorted === "asc" ? ArrowUpIcon : sorted === "desc" ? ArrowDownIcon : null
+
+  if (!hasMenu) {
+    return <span className="truncate px-0.5 font-medium">{title}</span>
+  }
+
+  const sections = [
+    onEdit ? (
+      <DropdownMenuItem key="edit" onClick={onEdit}>
+        <PencilIcon />
+        Edit column
+      </DropdownMenuItem>
+    ) : null,
+    onSort ? (
+      <DropdownMenuGroup key="sort">
+        <DropdownMenuItem
+          className={cn(sorted === "asc" && "font-medium")}
+          onClick={() => onSort(false)}
+        >
+          <ArrowDownIcon />
+          Sort A → Z
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={cn(sorted === "desc" && "font-medium")}
+          onClick={() => onSort(true)}
+        >
+          <ArrowUpIcon />
+          Sort Z → A
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+    ) : null,
+    filter ? (
+      <DropdownMenuSub key="filter">
+        <DropdownMenuSubTrigger>
+          <FilterIcon />
+          Filter by this column
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent className="w-64 p-2">
+          <ColumnFilterForm title={title} filter={filter} />
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+    ) : null,
+    pin ? (
+      <DropdownMenuGroup key="pin">
+        <DropdownMenuItem
+          className={cn(pin.position === "start" && "font-medium")}
+          onClick={() => pin.onPin(pin.position === "start" ? false : "start")}
+        >
+          <ArrowLeftToLineIcon />
+          Pin left
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={cn(pin.position === "end" && "font-medium")}
+          onClick={() => pin.onPin(pin.position === "end" ? false : "end")}
+        >
+          <ArrowRightToLineIcon />
+          Pin right
+        </DropdownMenuItem>
+        {pin.position ? (
+          <DropdownMenuItem onClick={() => pin.onPin(false)}>
+            <PinOffIcon />
+            Unpin
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuGroup>
+    ) : null,
+    onHide ? (
+      <DropdownMenuItem key="hide" onClick={onHide}>
+        <EyeOffIcon />
+        Hide column
+      </DropdownMenuItem>
+    ) : null,
+    onDelete ? (
+      <DropdownMenuItem key="delete" variant="destructive" onClick={onDelete}>
+        <Trash2Icon />
+        Delete column
+      </DropdownMenuItem>
+    ) : null,
+  ].filter((section) => section !== null)
 
   return (
-    <div className="flex min-w-0 items-center gap-0.5">
-      {onSort ? (
-        <button
-          type="button"
-          onClick={onSort}
-          className="inline-flex min-w-0 items-center gap-1 rounded-md px-0.5 font-medium hover:text-foreground"
+    <div className="flex min-w-0 items-center gap-1">
+      <span className="min-w-0 flex-1 truncate px-0.5 font-medium">{title}</span>
+      {SortMark ? <SortMark className="size-3.5 shrink-0" /> : null}
+      {filterActive ? (
+        <FilterIcon className="size-3 shrink-0 text-foreground" />
+      ) : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Open ${title} column menu`}
+          className="inline-flex size-5 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          <span className="truncate">{title}</span>
-          <SortIcon
-            className={cn(
-              "size-3.5 shrink-0",
-              sorted ? "opacity-100" : "opacity-40"
-            )}
-          />
-        </button>
-      ) : (
-        <span className="truncate px-0.5 font-medium">{title}</span>
-      )}
-      {filter ? (
-        <ColumnFilterButton
-          title={title}
-          filter={filter}
-          active={filterActive}
-        />
-      ) : null}
-      {pin ? (
-        <ColumnPinButton
-          title={title}
-          position={pin.position}
-          onPin={pin.onPin}
-        />
-      ) : null}
+          <ChevronDownIcon className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-max min-w-56">
+          {sections.flatMap((section, index) =>
+            index === 0
+              ? [section]
+              : [
+                  <DropdownMenuSeparator key={`divider-${index}`} />,
+                  section,
+                ]
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
@@ -210,125 +291,6 @@ function isFilterActive(filter?: ColumnFilterConfig) {
     return Boolean(filter.value)
   }
   return Boolean(filter.value)
-}
-
-function ColumnFilterButton({
-  title,
-  filter,
-  active,
-}: {
-  title: string
-  filter: ColumnFilterConfig
-  active: boolean
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className={cn(active && "text-foreground")}
-          />
-        }
-      >
-        <FilterIcon
-          className={cn(
-            "size-3",
-            active ? "text-foreground" : "text-muted-foreground"
-          )}
-        />
-        <span className="sr-only">Filter {title}</span>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2">
-        <ColumnFilterForm title={title} filter={filter} />
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function ColumnPinButton({
-  title,
-  position,
-  onPin,
-}: {
-  title: string
-  position: ColumnPinPosition
-  onPin: (position: ColumnPinPosition) => void
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className={cn(position && "text-foreground")}
-          />
-        }
-      >
-        {position === "start" ? (
-          <ArrowLeftToLineIcon className="size-3" />
-        ) : position === "end" ? (
-          <ArrowRightToLineIcon className="size-3" />
-        ) : (
-          <PinOffIcon className="size-3 text-muted-foreground" />
-        )}
-        <span className="sr-only">Pin {title}</span>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-44 p-1">
-        <p className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
-          Pin {title}
-        </p>
-        <ColumnPinMenu position={position} onPin={onPin} />
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function ColumnPinMenu({
-  position,
-  onPin,
-}: {
-  position: ColumnPinPosition
-  onPin: (position: ColumnPinPosition) => void
-}) {
-  return (
-    <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => onPin(position === "start" ? false : "start")}
-        className={cn(
-          "flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-muted",
-          position === "start" && "bg-muted font-medium"
-        )}
-      >
-        <ArrowLeftToLineIcon className="size-3.5" />
-        Pin left
-      </button>
-      <button
-        type="button"
-        onClick={() => onPin(position === "end" ? false : "end")}
-        className={cn(
-          "flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-muted",
-          position === "end" && "bg-muted font-medium"
-        )}
-      >
-        <ArrowRightToLineIcon className="size-3.5" />
-        Pin right
-      </button>
-      {position ? (
-        <button
-          type="button"
-          onClick={() => onPin(false)}
-          className="flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm hover:bg-muted"
-        >
-          <PinOffIcon className="size-3.5" />
-          Unpin
-        </button>
-      ) : null}
-    </div>
-  )
 }
 
 function ColumnFilterForm({
@@ -695,11 +657,18 @@ function pinnedEdgeClass<TData extends Record<string, unknown>>(
   columnId: string
 ) {
   const start = table.getStartVisibleLeafColumns()
+  const center = table.getCenterVisibleLeafColumns()
   const end = table.getEndVisibleLeafColumns()
-  if (start[start.length - 1]?.id === columnId) {
+  if (
+    start[start.length - 1]?.id === columnId &&
+    (center.length > 0 || end.length > 0)
+  ) {
     return "shadow-[inset_-8px_0_8px_-8px_rgba(0,0,0,0.18)]"
   }
-  if (end[0]?.id === columnId) {
+  if (
+    end[0]?.id === columnId &&
+    (center.length > 0 || start.length > 0)
+  ) {
     return "shadow-[inset_8px_0_8px_-8px_rgba(0,0,0,0.18)]"
   }
   return undefined
@@ -739,7 +708,7 @@ export function DataTableView<TData extends Record<string, unknown>>({
                     <TableHead
                       key={header.id}
                       className={cn(
-                        "relative overflow-hidden",
+                        "relative overflow-hidden border-r border-border last:border-r-0",
                         pinned && "z-20 bg-muted/95",
                         pinnedEdgeClass(table, header.column.id)
                       )}
@@ -808,9 +777,11 @@ export function DataTableView<TData extends Record<string, unknown>>({
 export function DataTablePagination<TData extends Record<string, unknown>>({
   table,
   pageSizeOptions = [10, 20, 50],
+  summary,
 }: {
   table: ManagedTable<TData>
   pageSizeOptions?: number[]
+  summary?: string
 }) {
   const pageCount = Math.max(table.getPageCount(), 1)
   const pageIndex = table.state.pagination.pageIndex
@@ -836,7 +807,10 @@ export function DataTablePagination<TData extends Record<string, unknown>>({
           ))}
         </NativeSelect>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {summary ? (
+          <p className="text-sm text-muted-foreground tabular-nums">{summary}</p>
+        ) : null}
         <p className="text-sm text-muted-foreground tabular-nums">
           Page {pageIndex + 1} of {pageCount}
         </p>

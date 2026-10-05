@@ -241,7 +241,7 @@ export default function PipelineList() {
             <DataTableColumnHeader
               title="Pipeline"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -267,7 +267,7 @@ export default function PipelineList() {
             <DataTableColumnHeader
               title="Status"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "enum",
@@ -296,7 +296,7 @@ export default function PipelineList() {
                   <DataTableColumnHeader
                     title="Organization"
                     sorted={column.getIsSorted()}
-                    onSort={column.getToggleSortingHandler()}
+                    onSort={(descending) => column.toggleSorting(descending)}
                     pin={headerPin(column)}
                     filter={{
                       type: "text",
@@ -326,7 +326,7 @@ export default function PipelineList() {
             <DataTableColumnHeader
               title="Level"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
             />
           ),
@@ -348,7 +348,7 @@ export default function PipelineList() {
             <DataTableColumnHeader
               title="Progress"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
             />
           ),
@@ -390,7 +390,7 @@ export default function PipelineList() {
             <DataTableColumnHeader
               title="Started"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
             />
           ),

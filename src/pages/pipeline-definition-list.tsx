@@ -202,7 +202,7 @@ export default function PipelineDefinitionList() {
             <DataTableColumnHeader
               title="Name"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -233,7 +233,7 @@ export default function PipelineDefinitionList() {
             <DataTableColumnHeader
               title="Slug"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -262,7 +262,7 @@ export default function PipelineDefinitionList() {
               <DataTableColumnHeader
                 title="Scope"
                 sorted={column.getIsSorted()}
-                onSort={column.getToggleSortingHandler()}
+                onSort={(descending) => column.toggleSorting(descending)}
                 pin={headerPin(column)}
                 filter={{
                   type: "enum",
@@ -309,7 +309,7 @@ export default function PipelineDefinitionList() {
                     <DataTableColumnHeader
                       title="Network"
                       sorted={column.getIsSorted()}
-                      onSort={column.getToggleSortingHandler()}
+                      onSort={(descending) => column.toggleSorting(descending)}
                       pin={headerPin(column)}
                       filter={{
                         type: "text",
@@ -360,7 +360,7 @@ export default function PipelineDefinitionList() {
             <DataTableColumnHeader
               title="Levels"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "number",
@@ -389,7 +389,7 @@ export default function PipelineDefinitionList() {
             <DataTableColumnHeader
               title="Status"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "enum",

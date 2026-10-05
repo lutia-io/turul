@@ -7,7 +7,6 @@ import {
   ArrowLeftIcon,
   Building2Icon,
   FileIcon,
-  FileJsonIcon,
   GalleryVerticalEndIcon,
   LayoutDashboardIcon,
   PlayIcon,
@@ -110,11 +109,6 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       title: "Files",
       url: href("files"),
       icon: <FileIcon />,
-    },
-    {
-      title: "Schemas",
-      url: href("schemas"),
-      icon: <FileJsonIcon />,
     },
   ]
 

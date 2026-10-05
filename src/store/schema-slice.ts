@@ -30,8 +30,8 @@ export type CreateSchemaResponse = {
 
 export type UpdateSchemaRequest = {
   id: string
-  name: string
-  definition: JsonObject
+  name?: string
+  definition?: JsonObject
 }
 
 export type UpdateSchemaResponse = {
@@ -164,6 +164,23 @@ const schemaApi = api.injectEndpoints({
               { type: "Schema", id: "LIST" },
             ],
     }),
+    deleteSchema: build.mutation<void, string>({
+      query: (id) => ({
+        url: `/schema/${id}`,
+        method: "DELETE",
+        responseHandler: (response) => response.text(),
+      }),
+      invalidatesTags: (_result, error, id) =>
+        error
+          ? []
+          : [
+              { type: "Schema", id },
+              { type: "Schema", id: "LIST" },
+              { type: "Record", id: "LIST" },
+              { type: "WorkflowDefinition", id: "LIST" },
+              { type: "Workflow", id: "LIST" },
+            ],
+    }),
   }),
 })
 
@@ -172,4 +189,5 @@ export const {
   useGetSchemaQuery,
   useCreateSchemaMutation,
   useUpdateSchemaMutation,
+  useDeleteSchemaMutation,
 } = schemaApi

@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { WorkflowSectionHeading } from "@/components/workflow-rule"
-import { propertyLabel } from "@/components/schema-records-table"
+import { columnLabel } from "@/components/schema-records-table"
 import type { JsonSchemaProperty } from "@/lib/json-definition"
 import { cn } from "@/lib/utils"
 import {
@@ -124,14 +124,14 @@ export function WorkflowTriggerBuilder({
                           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                       )}
                     >
-                      {propertyLabel(field.name)}
+                      {columnLabel(field)}
                     </button>
                   )
                 })}
               </div>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
-                Pick a schema to choose fields.
+                Pick a table to choose columns.
               </p>
             )}
           </Field>

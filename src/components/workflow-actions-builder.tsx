@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/tooltip"
 import { FriendlyValueInput } from "@/components/workflow-value-input"
 import { WorkflowSectionHeading } from "@/components/workflow-rule"
-import { propertyLabel } from "@/components/schema-records-table"
+import { columnLabel } from "@/components/schema-records-table"
 import type { PipelineDefinition, Schema } from "@/data/networks"
 import {
   getJsonSchemaProperties,
@@ -88,7 +88,7 @@ function dataForSchema(schema: Schema | undefined, current: DataEntryDraft[]) {
 }
 
 function isNumericField(field: JsonSchemaProperty) {
-  return field.type === "integer" || field.type === "number"
+  return field.type === "number"
 }
 
 function namedSchema(name?: string) {
@@ -122,7 +122,7 @@ function recordTemplateGroups(
           hint,
         },
         ...fields.map((field) => ({
-          label: propertyLabel(field.name),
+          label: columnLabel(field),
           token: recordFieldTemplate(field.name),
           hint,
         })),
@@ -134,7 +134,7 @@ function recordTemplateGroups(
       variables: numeric.map((field) => {
         const token = addFieldTemplate(field.name)
         return {
-          label: propertyLabel(field.name),
+          label: columnLabel(field),
           token,
           caretOffset: token.length - "1 }}".length,
           hint,
@@ -174,7 +174,7 @@ function contextTemplateGroups(
           hint,
         },
         ...fields.map((field) => ({
-          label: propertyLabel(field.name),
+          label: columnLabel(field),
           token: contextFieldTemplate(field.name),
           hint,
         })),
@@ -188,7 +188,7 @@ function contextTemplateGroups(
       variables: numeric.map((field) => {
         const token = addContextFieldTemplate(field.name)
         return {
-          label: propertyLabel(field.name),
+          label: columnLabel(field),
           token,
           caretOffset: token.length - "1 }}".length,
           hint,
@@ -224,7 +224,7 @@ function addFromTriggerGroups(
         ? `Adds that number to this ${targetNamed} field.`
         : "Adds that number to this field.",
       variables: numericTrigger.map((field) => ({
-        label: propertyLabel(field.name),
+        label: columnLabel(field),
         token: addContextAndRecordTemplate(entryName, field.name),
         hint: named ?? "started this",
       })),
@@ -339,7 +339,7 @@ function DataEntriesEditor({
                     { value: CHOOSE_FIELD, label: "Choose a field" },
                     ...targetFields.map((field) => ({
                       value: field.name,
-                      label: propertyLabel(field.name),
+                      label: columnLabel(field),
                       disabled:
                         used.has(field.name) && field.name !== entry.name,
                     })),
@@ -380,7 +380,7 @@ function DataEntriesEditor({
                           used.has(field.name) && field.name !== entry.name
                         }
                       >
-                        {propertyLabel(field.name)}
+                        {columnLabel(field)}
                       </SelectItem>
                     ))}
                     {entry.name &&

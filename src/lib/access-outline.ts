@@ -53,7 +53,7 @@ export const NETWORK_ACCESS_CATALOG: AccessResource[] = [
   },
   {
     id: "schema",
-    label: "Schemas",
+    label: "Tables",
     actions: [
       ACCESS_ACTIONS.create,
       ACCESS_ACTIONS.read,

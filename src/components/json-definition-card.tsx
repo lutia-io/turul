@@ -298,7 +298,7 @@ export function WorkflowActionsList({
         const context = action.context ?? {}
         const detail =
           typeof context.schemaId === "string"
-            ? `Schema ${context.schemaId}`
+            ? `Table ${context.schemaId}`
             : typeof context.pipeline === "string"
               ? context.pipeline
               : typeof context.recordId === "string"

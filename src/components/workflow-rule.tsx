@@ -1,7 +1,7 @@
 import { type ReactNode } from "react"
 import { Link } from "react-router"
 import {
-  FileJsonIcon,
+  TableIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -288,13 +288,13 @@ export function WorkflowActionView({
           {hasMeta ? (
             <dl className="mt-4 space-y-3">
               {schemaId ? (
-                <ActionMeta label="Schema">
+                <ActionMeta label="Table">
                   {schema ? (
                     <Link
-                      to={href(`schemas/${schema.id}`)}
+                      to={`${href("records")}?schema=${schema.id}`}
                       className="inline-flex max-w-full items-center gap-1.5 hover:underline"
                     >
-                      <FileJsonIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <TableIcon className="size-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate">{schema.name}</span>
                     </Link>
                   ) : (

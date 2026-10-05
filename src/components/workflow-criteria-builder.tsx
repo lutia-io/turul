@@ -8,7 +8,7 @@ import {
   Trash2Icon,
 } from "lucide-react"
 
-import { propertyLabel } from "@/components/schema-records-table"
+import { columnLabel } from "@/components/schema-records-table"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -173,7 +173,6 @@ function ConditionValueInput({
   }
 
   const numeric =
-    field?.type === "integer" ||
     field?.type === "number" ||
     leaf.operator === "gt" ||
     leaf.operator === "gte" ||
@@ -189,7 +188,7 @@ function ConditionValueInput({
       placeholder={
         leaf.operator === "in"
           ? "draft, published"
-          : field?.type === "number" || field?.type === "integer"
+          : field?.type === "number"
             ? "0"
             : "Value"
       }
@@ -304,7 +303,7 @@ function LeafEditor({
                 { value: CHOOSE_FIELD, label: "Choose a field" },
                 ...fields.map((item) => ({
                   value: item.name,
-                  label: propertyLabel(item.name),
+                  label: columnLabel(item),
                 })),
                 { value: CUSTOM_FIELD, label: "Field not listed" },
               ]}
@@ -330,7 +329,7 @@ function LeafEditor({
                 <SelectItem value={CHOOSE_FIELD}>Choose a field</SelectItem>
                 {fields.map((item) => (
                   <SelectItem key={item.name} value={item.name}>
-                    {propertyLabel(item.name)}
+                    {columnLabel(item)}
                   </SelectItem>
                 ))}
                 <SelectItem value={CUSTOM_FIELD}>Field not listed</SelectItem>

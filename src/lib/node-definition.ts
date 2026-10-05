@@ -634,7 +634,7 @@ export function bulkDefinitionFromDraft(
   for (const [index, record] of draft.records.entries()) {
     const schemaId = record.schemaId.trim()
     if (!schemaId) {
-      return { error: `Record type ${index + 1} needs a schema` }
+      return { error: `Record type ${index + 1} needs a table` }
     }
     const from = record.from.trim()
     if (!from) {

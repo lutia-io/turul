@@ -5,6 +5,7 @@ export type JsonObject = { [key: string]: JsonValue }
 
 export type JsonSchemaProperty = {
   name: string
+  title?: string
   type: string
   required: boolean
   description?: string
@@ -31,6 +32,10 @@ function asObject(value: unknown): JsonObject | undefined {
 
 function asString(value: unknown) {
   return typeof value === "string" ? value : undefined
+}
+
+function numericType(type: string) {
+  return type === "integer" ? "number" : type
 }
 
 export function isTemplateExpression(value: string) {
@@ -67,13 +72,7 @@ export function parseJsonDefault(input: string, type: string): JsonValue {
     }
     return raw
   }
-  if (type === "integer") {
-    if (/^-?\d+$/.test(raw)) {
-      return Number.parseInt(raw, 10)
-    }
-    return raw
-  }
-  if (type === "number") {
+  if (type === "number" || type === "integer") {
     const parsed = Number(raw)
     if (raw !== "" && Number.isFinite(parsed)) {
       return parsed
@@ -143,13 +142,14 @@ export function getJsonSchemaProperties(
 
     return {
       name,
-      type: asString(property?.type) ?? "any",
+      title: asString(property?.title),
+      type: numericType(asString(property?.type) ?? "any"),
       required: required.has(name),
       description: asString(property?.description),
       format: asString(property?.format) ?? asString(items?.format),
       schemaId: asString(property?.schemaId),
       enumValues,
-      itemsType: asString(items?.type),
+      itemsType: numericType(asString(items?.type) ?? "") || undefined,
       defaultValue: hasDefault
         ? formatJsonDefault(property.default as JsonValue)
         : undefined,

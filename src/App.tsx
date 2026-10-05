@@ -1,7 +1,8 @@
-import { Route, Routes } from "react-router"
+import { Navigate, Route, Routes, useParams } from "react-router"
 
 import { CreateEntityProvider } from "@/components/create-entity"
 import { RequireAuth } from "@/components/require-auth"
+import { useNetworkWorkspace } from "@/lib/network-workspace"
 import {
   AppLayout,
   Landing,
@@ -14,8 +15,6 @@ import {
   OrganizationDetail,
   OrganizationUserList,
   OrganizationUserDetail,
-  SchemaList,
-  SchemaDetail,
   WorkflowDefinitionList,
   WorkflowDefinitionDetail,
   WorkflowList,
@@ -36,13 +35,23 @@ import {
   Notifications,
 } from "./pages"
 
+function RedirectSchemaToRecords() {
+  const { schemaId } = useParams()
+  const { href } = useNetworkWorkspace()
+  const records = href("records")
+  const target = schemaId
+    ? `${records}?schema=${encodeURIComponent(schemaId)}`
+    : records
+  return <Navigate to={target} replace />
+}
+
 function networkWorkspaceRoutes() {
   return (
     <>
       <Route index element={<NetworkDetail />} />
       <Route path="access" element={<AccessPage />} />
-      <Route path="schemas" element={<SchemaList />} />
-      <Route path="schemas/:schemaId" element={<SchemaDetail />} />
+      <Route path="schemas" element={<RedirectSchemaToRecords />} />
+      <Route path="schemas/:schemaId" element={<RedirectSchemaToRecords />} />
       <Route path="workflow-definitions" element={<WorkflowDefinitionList />} />
       <Route
         path="workflow-definitions/:workflowDefinitionId"

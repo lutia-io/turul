@@ -6,7 +6,6 @@ import type { JsonSchemaProperty } from "@/lib/json-definition"
 
 export const mockTextTemplate = "{{ mockText }}"
 export const mockNumberTemplate = "{{ mockNumber }}"
-export const mockIntegerTemplate = "{{ mockInteger }}"
 export const mockBooleanTemplate = "{{ mockBoolean }}"
 export const mockDateTemplate = "{{ mockDate }}"
 export const mockDateTimeTemplate = "{{ mockDateTime }}"
@@ -20,7 +19,6 @@ const MOCK_TOKEN_RE =
 export const mockTemplateVariables: TemplateVariable[] = [
   { label: "Mock text", token: mockTextTemplate, hint: "mock" },
   { label: "Mock number", token: mockNumberTemplate, hint: "mock" },
-  { label: "Mock whole number", token: mockIntegerTemplate, hint: "mock" },
   { label: "Mock yes / no", token: mockBooleanTemplate, hint: "mock" },
   { label: "Mock date", token: mockDateTemplate, hint: "mock" },
   { label: "Mock date & time", token: mockDateTimeTemplate, hint: "mock" },
@@ -98,14 +96,7 @@ export function mockVariableForProperty(
   if (property.type === "boolean") {
     return { label: "Mock yes / no", token: mockBooleanTemplate, hint: "mock" }
   }
-  if (property.type === "integer") {
-    return {
-      label: "Mock whole number",
-      token: mockIntegerTemplate,
-      hint: "mock",
-    }
-  }
-  if (property.type === "number") {
+  if (property.type === "number" || property.type === "integer") {
     return { label: "Mock number", token: mockNumberTemplate, hint: "mock" }
   }
   if (property.type === "array" || property.type === "object") {

@@ -153,7 +153,7 @@ export const networks: Record<string, Network> = {
           poNumber: { type: "string", description: "Purchase order number" },
           supplier: { type: "string", description: "Supplier name" },
           sku: { type: "string", description: "Ordered SKU" },
-          quantity: { type: "integer", description: "Units ordered" },
+          quantity: { type: "number", description: "Units ordered" },
           status: {
             type: "string",
             enum: ["open", "confirmed", "received"],
@@ -189,7 +189,7 @@ export const networks: Record<string, Network> = {
             description: "Shipment status",
           },
           pieces: {
-            type: "integer",
+            type: "number",
             description: "Number of pieces",
           },
           weightKg: {
@@ -449,7 +449,7 @@ export const networks: Record<string, Network> = {
             description: "Menu category",
           },
           priceCents: {
-            type: "integer",
+            type: "number",
             description: "Base price in cents",
           },
           available: {
@@ -506,7 +506,7 @@ export const networks: Record<string, Network> = {
             enum: ["earn", "redeem", "adjust"],
             description: "Transaction type",
           },
-          points: { type: "integer", description: "Points delta" },
+          points: { type: "number", description: "Points delta" },
           locationId: {
             type: "string",
             description: "Location where the transaction occurred",
@@ -974,7 +974,7 @@ export const networks: Record<string, Network> = {
             description: "CDT procedure codes",
           },
           estimatedCostCents: {
-            type: "integer",
+            type: "number",
             description: "Estimated patient cost in cents",
           },
           status: {
@@ -1001,7 +1001,7 @@ export const networks: Record<string, Network> = {
           patientId: { type: "string", description: "Patient identifier" },
           payerId: { type: "string", description: "Insurance payer" },
           amountCents: {
-            type: "integer",
+            type: "number",
             description: "Billed amount in cents",
           },
           status: {
@@ -1239,8 +1239,8 @@ export const networks: Record<string, Network> = {
           title: { type: "string", description: "Course title" },
           teacher: { type: "string", description: "Teacher name" },
           campusId: { type: "string", description: "Campus" },
-          period: { type: "integer", description: "Bell period" },
-          seats: { type: "integer", description: "Available seats" },
+          period: { type: "number", description: "Bell period" },
+          seats: { type: "number", description: "Available seats" },
         },
       }),
     ],
@@ -1400,7 +1400,7 @@ export const networks: Record<string, Network> = {
           expenseId: { type: "string", description: "Expense identifier" },
           merchant: { type: "string", description: "Payee or merchant" },
           amountCents: {
-            type: "integer",
+            type: "number",
             description: "Amount in cents",
           },
           category: {
@@ -1486,7 +1486,7 @@ export const networks: Record<string, Network> = {
           },
           vendor: { type: "string", description: "Service vendor" },
           amountCents: {
-            type: "integer",
+            type: "number",
             description: "Recurring amount in cents",
           },
           cadence: {
@@ -1680,7 +1680,7 @@ export const networks: Record<string, Network> = {
         properties: {
           fundId: { type: "string", description: "Fund identifier" },
           name: { type: "string", description: "Fund display name" },
-          vintageYear: { type: "integer", description: "Vintage year" },
+          vintageYear: { type: "number", description: "Vintage year" },
           status: {
             type: "string",
             enum: ["investing", "harvesting", "closed"],
@@ -1703,7 +1703,7 @@ export const networks: Record<string, Network> = {
           investorId: { type: "string", description: "Investor identifier" },
           fundId: { type: "string", description: "Fund the investor is in" },
           commitmentCents: {
-            type: "integer",
+            type: "number",
             description: "Committed capital in cents",
           },
           status: {
@@ -1733,7 +1733,7 @@ export const networks: Record<string, Network> = {
             description: "Asset status",
           },
           salePriceCents: {
-            type: "integer",
+            type: "number",
             description: "Sale price in cents",
           },
           soldOn: {
@@ -1768,7 +1768,7 @@ export const networks: Record<string, Network> = {
             description: "Investor receiving the notice",
           },
           amountCents: {
-            type: "integer",
+            type: "number",
             description: "Distribution amount in cents",
           },
           status: {
@@ -2003,7 +2003,7 @@ export function createNetwork(input: CreateNetworkInput): Network {
     summary: input.summary?.trim() || "New partner network",
     description:
       input.description?.trim() ||
-      `${name} network for partner organizations, shared schemas, and definitions.`,
+      `${name} network for partner organizations, shared tables, and definitions.`,
     industry: input.industry?.trim() || "General",
     headquarters: input.headquarters?.trim() || "—",
     coverage: input.coverage?.trim() || "—",
@@ -2105,7 +2105,7 @@ export function createSchema(
     name,
     slug,
     color: input.color ?? "purple",
-    description: input.description?.trim() || `${name} schema.`,
+    description: input.description?.trim() || `${name} table.`,
     properties: input.properties,
     required: input.required,
     internal: input.internal ?? false,
@@ -2122,7 +2122,7 @@ export function updateSchema(
 ): Schema {
   const result = getSchema(schemaId)
   if (!result) {
-    throw new Error(`Schema ${schemaId} was not found.`)
+    throw new Error(`Table ${schemaId} was not found.`)
   }
 
   const updated = defineSchema({
@@ -2134,7 +2134,7 @@ export function updateSchema(
       input.description?.trim() ||
       (typeof result.schema.definition.description === "string"
         ? result.schema.definition.description
-        : `${input.name.trim()} schema.`),
+        : `${input.name.trim()} table.`),
     properties: input.properties,
     required: input.required,
     internal: input.internal ?? result.schema.internal,

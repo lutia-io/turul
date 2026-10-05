@@ -92,7 +92,7 @@ export default function OrganizationAccess() {
     <AccessWorkspace
       kind="organization"
       title={organization.name}
-      description="Everyone is already in this organization. Tighten records, files, and field access by attaching permissions to groups."
+      description="Everyone is already in this organization. Tighten records, files, and column access by attaching permissions to groups."
       groups={groupsQuery.data ?? []}
       permissions={permissionsQuery.data ?? []}
       canManage

@@ -214,7 +214,7 @@ export default function WorkflowDefinitionList() {
             <DataTableColumnHeader
               title="Name"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -245,7 +245,7 @@ export default function WorkflowDefinitionList() {
             <DataTableColumnHeader
               title="Slug"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -274,7 +274,7 @@ export default function WorkflowDefinitionList() {
               <DataTableColumnHeader
                 title="Scope"
                 sorted={column.getIsSorted()}
-                onSort={column.getToggleSortingHandler()}
+                onSort={(descending) => column.toggleSorting(descending)}
                 pin={headerPin(column)}
                 filter={{
                   type: "enum",
@@ -321,7 +321,7 @@ export default function WorkflowDefinitionList() {
                     <DataTableColumnHeader
                       title="Network"
                       sorted={column.getIsSorted()}
-                      onSort={column.getToggleSortingHandler()}
+                      onSort={(descending) => column.toggleSorting(descending)}
                       pin={headerPin(column)}
                       filter={{
                         type: "text",
@@ -358,7 +358,7 @@ export default function WorkflowDefinitionList() {
               <DataTableColumnHeader
                 title="Starts from"
                 sorted={column.getIsSorted()}
-                onSort={column.getToggleSortingHandler()}
+                onSort={(descending) => column.toggleSorting(descending)}
                 pin={headerPin(column)}
                 filter={{
                   type: "text",
@@ -388,7 +388,7 @@ export default function WorkflowDefinitionList() {
             <DataTableColumnHeader
               title="Definition"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "number",
@@ -417,7 +417,7 @@ export default function WorkflowDefinitionList() {
             <DataTableColumnHeader
               title="Status"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "enum",

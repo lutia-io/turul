@@ -7,7 +7,7 @@ import type {
 } from "@/lib/workflow-definition"
 
 export type JsonSchemaPropertySpec = {
-  type: "string" | "number" | "integer" | "boolean" | "array" | "object"
+  type: "string" | "number" | "boolean" | "array" | "object"
   description: string
   format?: string
   schemaId?: string

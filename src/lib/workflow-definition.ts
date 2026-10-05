@@ -463,14 +463,10 @@ function coerceScalar(raw: string, field?: JsonSchemaProperty): unknown {
     return value === "true"
   }
   if (
-    field?.type === "integer" ||
     field?.type === "number" ||
     (!field && value !== "" && Number.isFinite(Number(value)))
   ) {
-    const parsed =
-      field?.type === "integer"
-        ? Number.parseInt(value, 10)
-        : Number.parseFloat(value)
+    const parsed = Number.parseFloat(value)
     if (!Number.isNaN(parsed)) {
       return parsed
     }

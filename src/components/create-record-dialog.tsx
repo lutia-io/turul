@@ -3,7 +3,7 @@ import { useNavigate } from "react-router"
 import { XIcon } from "lucide-react"
 
 import { CreateActorFields } from "@/components/create-actor-fields"
-import { propertyLabel } from "@/components/schema-records-table"
+import { columnLabel } from "@/components/schema-records-table"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -334,7 +334,7 @@ export function CreateRecordDialog({
           }
           if (ids.length === 0) {
             if (inputRequired(property, editing)) {
-              setFormError(`${propertyLabel(property.name)} is required.`)
+              setFormError(`${columnLabel(property)} is required.`)
               return
             }
             continue
@@ -349,7 +349,7 @@ export function CreateRecordDialog({
         )
         if (coerced === undefined) {
           if (inputRequired(property, editing)) {
-            setFormError(`${propertyLabel(property.name)} is required.`)
+            setFormError(`${columnLabel(property)} is required.`)
             return
           }
           continue
@@ -401,7 +401,7 @@ export function CreateRecordDialog({
           <DialogDescription>
             {editing
               ? "Update the values stored on this record."
-              : "Records follow a schema and are created as an organization user."}
+              : "Records belong to a table and are created as an organization user."}
           </DialogDescription>
         </DialogHeader>
         <form id={formId} onSubmit={handleSubmit} autoComplete="off">
@@ -425,7 +425,7 @@ export function CreateRecordDialog({
                 />
                 {availableSchemas.length > 0 ? (
                   <Field>
-                    <FieldLabel htmlFor={`${formId}-schema`}>Schema</FieldLabel>
+                    <FieldLabel htmlFor={`${formId}-schema`}>Table</FieldLabel>
                     <NativeSelect
                       id={`${formId}-schema`}
                       value={selectedSchemaId}
@@ -444,7 +444,7 @@ export function CreateRecordDialog({
                   </Field>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Create a schema in this network first.
+                    Add a table on the records page first.
                   </p>
                 )}
               </>
@@ -619,14 +619,11 @@ function coercePropertyValue(
     }
     return undefined
   }
-  if (property.type === "integer" || property.type === "number") {
+  if (property.type === "number") {
     if (!trimmed) {
       return undefined
     }
-    const parsed =
-      property.type === "integer"
-        ? Number.parseInt(trimmed, 10)
-        : Number(trimmed)
+    const parsed = Number(trimmed)
     return Number.isFinite(parsed) ? parsed : undefined
   }
   if (isAddressProperty(property)) {
@@ -713,7 +710,7 @@ function RecordPropertyField({
   onUploadsChange: (files: File[]) => void
 }) {
   const id = `${formId}-${property.name}`
-  const label = propertyLabel(property.name)
+  const label = columnLabel(property)
   const required = inputRequired(property, editing)
   const hint = editing ? undefined : defaultHint(property)
 
@@ -853,7 +850,7 @@ function RecordPropertyField({
             ? "date"
             : property.format === "date-time"
               ? "datetime-local"
-              : property.type === "integer" || property.type === "number"
+              : property.type === "number"
                 ? "number"
                 : "text"
 
@@ -873,7 +870,6 @@ function RecordPropertyField({
               ? "email"
               : undefined
         }
-        step={property.type === "integer" ? "1" : undefined}
         onChange={(event) => onChange(event.target.value)}
         placeholder={
           property.defaultValue && isTemplateExpression(property.defaultValue)

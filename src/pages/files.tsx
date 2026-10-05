@@ -224,7 +224,7 @@ export default function FilesPage() {
             <DataTableColumnHeader
               title="Filename"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -255,7 +255,7 @@ export default function FilesPage() {
             <DataTableColumnHeader
               title="Type"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "enum",
@@ -284,7 +284,7 @@ export default function FilesPage() {
             <DataTableColumnHeader
               title="Size"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "number",
@@ -319,7 +319,7 @@ export default function FilesPage() {
                     <DataTableColumnHeader
                       title="Organization"
                       sorted={column.getIsSorted()}
-                      onSort={column.getToggleSortingHandler()}
+                      onSort={(descending) => column.toggleSorting(descending)}
                       pin={headerPin(column)}
                       filter={{
                         type: "text",
@@ -351,7 +351,7 @@ export default function FilesPage() {
             <DataTableColumnHeader
               title="Created"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
             />
           ),

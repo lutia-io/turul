@@ -594,7 +594,7 @@ function SchemaSelect({
   const chooseSchemaValue = "__choose_schema__"
   return (
     <Field className="gap-1">
-      <FieldLabel htmlFor={`${formId}-schema`}>Schema</FieldLabel>
+      <FieldLabel htmlFor={`${formId}-schema`}>Table</FieldLabel>
       {schemas.length > 0 ? (
         <Select
           value={schemaId || chooseSchemaValue}
@@ -602,7 +602,7 @@ function SchemaSelect({
           required
           modal={false}
           items={[
-            { value: chooseSchemaValue, label: "Choose a schema" },
+            { value: chooseSchemaValue, label: "Choose a table" },
             ...schemas.map((schema) => ({
               value: schema.id,
               label: schema.name,
@@ -620,7 +620,7 @@ function SchemaSelect({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={chooseSchemaValue}>Choose a schema</SelectItem>
+            <SelectItem value={chooseSchemaValue}>Choose a table</SelectItem>
             {schemas.map((schema) => (
               <SelectItem key={schema.id} value={schema.id}>
                 {schema.name}
@@ -630,7 +630,7 @@ function SchemaSelect({
         </Select>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Create a schema in this network before adding a workflow.
+          Add a table on the records page before adding a workflow.
         </p>
       )}
     </Field>

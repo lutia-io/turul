@@ -53,7 +53,7 @@ const navItems: {
 }[] = [
   { id: "network", label: "Network", icon: ListIcon },
   { id: "organizations", label: "Organizations", icon: Building2Icon },
-  { id: "schema", label: "Schemas", icon: FileJsonIcon },
+  { id: "schema", label: "Tables", icon: FileJsonIcon },
   { id: "records", label: "Records", icon: TableIcon },
   { id: "workflow", label: "Workflows", icon: WorkflowIcon },
   { id: "pipeline", label: "Pipelines", icon: LayersIcon },
@@ -177,7 +177,7 @@ function propertyKind(property: JsonSchemaProperty) {
   if (property.type === "boolean") {
     return "Yes / no"
   }
-  if (property.type === "integer" || property.type === "number") {
+  if (property.type === "number") {
     return "Number"
   }
   return "Text"
@@ -672,7 +672,7 @@ function NetworkPane({
           [
             {
               view: "schema" as const,
-              label: "Schemas",
+              label: "Tables",
               value: schemas.length,
               color: "blue" as const,
               icon: FileJsonIcon,
@@ -854,9 +854,9 @@ function SchemaPane({
         <div className="flex items-center gap-3">
           <ToneIcon color="blue" icon={FileJsonIcon} />
           <div>
-            <h3 className="text-sm font-semibold">Schemas</h3>
+            <h3 className="text-sm font-semibold">Tables</h3>
             <p className="text-xs text-muted-foreground">
-              {example.schemas.length} shared forms
+              {example.schemas.length} tables
             </p>
           </div>
         </div>
@@ -884,7 +884,7 @@ function SchemaPane({
                 </p>
               </div>
               <p className="text-[11px] text-muted-foreground tabular-nums">
-                {jsonSchemaPropertyCount(item.schema.definition)} fields ·{" "}
+                {jsonSchemaPropertyCount(item.schema.definition)} columns ·{" "}
                 {item.recordCount} rows
               </p>
             </button>
@@ -1085,7 +1085,7 @@ function WorkflowPane({
                   </Pill>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  {item.schema?.name ?? "Schema"} · {item.steps.length}{" "}
+                  {item.schema?.name ?? "Table"} · {item.steps.length}{" "}
                   {item.steps.length === 1 ? "step" : "steps"}
                 </p>
               </div>
@@ -1108,7 +1108,7 @@ function WorkflowPane({
                   {watchedSchema.name}
                 </TextLink>
               ) : (
-                "a schema"
+                "a table"
               )}{" "}
               · {eventLabel(selected.trigger)}
             </p>
@@ -1194,7 +1194,7 @@ function PipelinePane({
         />
         <p className="mt-3 text-xs text-muted-foreground">
           Then Lutia checks the matching{" "}
-          <TextLink onClick={() => onOpen("schema")}>schema</TextLink> before a
+          <TextLink onClick={() => onOpen("schema")}>table</TextLink> before a
           row is saved.
         </p>
       </div>
@@ -1299,7 +1299,7 @@ export function LandingProductPreview() {
   const loop = [
     { id: "network" as const, label: "Network" },
     { id: "organizations" as const, label: "Organizations" },
-    { id: "schema" as const, label: "Schemas" },
+    { id: "schema" as const, label: "Tables" },
     { id: "records" as const, label: "Records" },
     { id: "workflow" as const, label: "Workflows" },
     { id: "pipeline" as const, label: "Pipelines" },

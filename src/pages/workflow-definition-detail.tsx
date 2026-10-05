@@ -11,6 +11,7 @@ import { Link, useParams, useSearchParams } from "react-router"
 import {
   ClockIcon,
   FileJsonIcon,
+  TableIcon,
   FilterIcon,
   GalleryVerticalEndIcon,
   Building2Icon,
@@ -216,13 +217,13 @@ export default function WorkflowDefinitionDetail() {
               {visibleWorkflow.slug}
             </span>
           </AsideRow>
-          <AsideRow label="Schema">
+          <AsideRow label="Table">
             {schema ? (
               <Link
-                to={href(`schemas/${schema.id}`)}
+                to={`${href("records")}?schema=${schema.id}`}
                 className="inline-flex max-w-full items-center gap-1.5 hover:underline"
               >
-                <FileJsonIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                <TableIcon className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{schema.name}</span>
               </Link>
             ) : (

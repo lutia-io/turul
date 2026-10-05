@@ -13,7 +13,6 @@ import { CreateOrganizationDialog } from "@/components/create-organization-dialo
 import { CreateOrganizationUserDialog } from "@/components/create-organization-user-dialog"
 import { CreateRecordDialog } from "@/components/create-record-dialog"
 import { PipelineDefinitionDialog } from "@/components/pipeline-definition-dialog"
-import { SchemaDefinitionDialog } from "@/components/schema-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
 import { networkWorkspacePath, parseNetworkPath } from "@/lib/network-workspace"
 
@@ -25,12 +24,6 @@ type CreateState =
       networkId?: string
       organizationId?: string
       organizationUserId?: string
-    }
-  | {
-      kind: "schema"
-      networkId?: string
-      organizationId?: string
-      schemaId?: string
     }
   | { kind: "workflow"; networkId?: string; organizationId?: string }
   | { kind: "pipeline"; networkId?: string; organizationId?: string }
@@ -50,7 +43,6 @@ const initialDialogKeys: Record<DialogKind, number> = {
   network: 0,
   organization: 0,
   organizationUser: 0,
-  schema: 0,
   workflow: 0,
   pipeline: 0,
   record: 0,
@@ -67,11 +59,6 @@ type CreateEntityContextValue = {
     organizationId?: string
   }) => void
   openEditOrganizationUser: (organizationUserId: string) => void
-  openCreateSchema: (scope?: {
-    networkId?: string
-    organizationId?: string
-  }) => void
-  openEditSchema: (schemaId: string) => void
   openCreateWorkflow: (scope?: {
     networkId?: string
     organizationId?: string
@@ -129,12 +116,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
       },
       openEditOrganizationUser(organizationUserId) {
         open({ kind: "organizationUser", organizationUserId })
-      },
-      openCreateSchema(scope) {
-        open({ kind: "schema", ...scope })
-      },
-      openEditSchema(schemaId) {
-        open({ kind: "schema", schemaId })
       },
       openCreateWorkflow(scope) {
         open({ kind: "workflow", ...scope })
@@ -229,20 +210,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
             ? state.organizationUserId
             : undefined
         }
-      />
-      <SchemaDefinitionDialog
-        key={`schema-${dialogKeys.schema}`}
-        open={state?.kind === "schema"}
-        onOpenChange={(open) => {
-          if (!open) {
-            close()
-          }
-        }}
-        networkId={state?.kind === "schema" ? state.networkId : undefined}
-        organizationId={
-          state?.kind === "schema" ? state.organizationId : undefined
-        }
-        schemaId={state?.kind === "schema" ? state.schemaId : undefined}
       />
       <WorkflowDefinitionDialog
         key={`workflow-${dialogKeys.workflow}`}

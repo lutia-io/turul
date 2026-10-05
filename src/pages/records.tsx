@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router"
 import { PencilIcon, PlusIcon, TableIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
+import { AddTableDialog } from "@/components/add-table-dialog"
+import { TableSheetMenu } from "@/components/table-sheet-menu"
 import { useCreateEntity } from "@/components/create-entity"
 import { FilePreviewDialog } from "@/components/file-preview"
 import {
@@ -14,11 +16,9 @@ import {
 import {
   createManagedColumnHelper,
   DataTableActiveFilters,
-  DataTableColumnHeader,
   DataTablePagination,
   DataTableRowActions,
   DataTableView,
-  DataTableViewOptions,
   managedTableFeatures,
   emptyFilterValue,
   numberFilterChipValue,
@@ -32,14 +32,18 @@ import {
   type StringFilterOp,
 } from "@/components/data-table-view"
 import {
-  propertyLabel,
+  columnLabel,
   RecordCell,
   SchemaSheetTabs,
 } from "@/components/schema-records-table"
+import {
+  AddColumnButton,
+  ColumnHeaderMenu,
+} from "@/components/table-column-editor"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import type { StoredFile, StoredRecord } from "@/data/files"
-import type { Network, Organization, Schema } from "@/data/networks"
+import type { Network, Schema } from "@/data/networks"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor } from "@/lib/badge"
 import {
@@ -57,7 +61,6 @@ import {
   useNetworkWorkspace,
   useWorkspaceFiles,
   useWorkspaceNetworksWithDefinitions,
-  useWorkspaceOrganizations,
   workspaceRecordFromApi,
 } from "@/lib/network-workspace"
 import { useAuthorization } from "@/lib/authorization"
@@ -80,11 +83,8 @@ type FieldFilter =
   | { type: "enum"; value: string }
 
 type RecordColumnFilters = {
-  organization?: { op: StringFilterOp; value: string }
   fields: Record<string, FieldFilter>
 }
-
-const reservedSorts = ["organization", "createdAt"] as const
 
 function headerPin(column: {
   getIsPinned: () => false | "start" | "end"
@@ -96,20 +96,8 @@ function headerPin(column: {
   }
 }
 
-function formatCreatedAt(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value))
-}
-
-function isRecordSort(value: string, properties: JsonSchemaProperty[]) {
-  return (
-    reservedSorts.includes(value as (typeof reservedSorts)[number]) ||
-    properties.some((property) => property.name === value)
-  )
+function isPropertySort(value: string, properties: JsonSchemaProperty[]) {
+  return properties.some((property) => property.name === value)
 }
 
 function fieldFilterParams(
@@ -170,7 +158,7 @@ function propertyFilterConfig(
     }
   }
 
-  if (property.type === "number" || property.type === "integer") {
+  if (property.type === "number") {
     return {
       type: "number",
       value:
@@ -211,15 +199,20 @@ function fieldFilterChip(filter: FieldFilter): string {
 
 export default function RecordsPage() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const { network, organizationId } = useNetworkWorkspace()
+  const {
+    network,
+    organizationId,
+    isFetching: isWorkspaceFetching,
+  } = useNetworkWorkspace()
   const { openCreateRecord, openEditRecord } = useCreateEntity()
-  const { canOrg, isOrgUser, data: authorization } = useAuthorization()
+  const { canOrg, canNetwork, isOrgUser, data: authorization } =
+    useAuthorization()
+  const [addTableOpen, setAddTableOpen] = useState(false)
   const {
     networks: workspaceNetworks,
     refetch: refetchNetworks,
     isFetching: isNetworksFetching,
   } = useWorkspaceNetworksWithDefinitions()
-  const { organizations } = useWorkspaceOrganizations()
   const {
     files,
     refetch: refetchFiles,
@@ -234,18 +227,17 @@ export default function RecordsPage() {
     networks[0]
   const schemas = activeNetwork?.schemas ?? []
   const requestedSchemaId = params.get("schema")
+  const requestedSchema = schemas.find((item) => item.id === requestedSchemaId)
+  const schemaListSettling =
+    Boolean(requestedSchemaId) &&
+    !requestedSchema &&
+    (network ? isWorkspaceFetching : isNetworksFetching)
   const activeSchema =
-    schemas.find((item) => item.id === requestedSchemaId) ?? schemas[0]
+    requestedSchema ?? (schemaListSettling ? undefined : schemas[0])
+  const canCreateTable = canNetwork("schema", "create") && Boolean(activeNetwork)
   const filesById = useMemo(
     () => new Map(files.map((file) => [file.id, file])),
     [files]
-  )
-  const organizationsById = useMemo(
-    () =>
-      new Map(
-        organizations.map((organization) => [organization.id, organization])
-      ),
-    [organizations]
   )
 
   function setWorkbook(next: { networkId?: string; schemaId?: string }) {
@@ -266,7 +258,7 @@ export default function RecordsPage() {
   return (
     <DataTablePage
       title="Records"
-      description="Each schema is a table. Hover a related record, URL, or file for a preview, then click to open it."
+      description="Each table is one kind of record. Hover a related record, URL, or file for a preview, then click to open it."
       action={
         (isOrgUser
           ? canOrg("record", "create")
@@ -299,23 +291,68 @@ export default function RecordsPage() {
         </div>
       ) : null}
 
-      {schemas.length > 0 ? (
+      {schemas.length > 0 || canCreateTable ? (
         <SchemaSheetTabs
           schemas={schemas}
           activeId={activeSchema?.id}
           onSelect={(schemaId) => setWorkbook({ schemaId })}
+          renderMenu={(schema) => {
+            const canEdit = canNetwork("schema", "update") && !schema.internal
+            const canDelete = canNetwork("schema", "delete") && !schema.internal
+            if (!canEdit && !canDelete) {
+              return null
+            }
+            return (
+              <TableSheetMenu
+                schema={schema}
+                canEdit={canEdit}
+                canDelete={canDelete}
+                onDeleted={(schemaId) => {
+                  if (activeSchema?.id !== schemaId) {
+                    return
+                  }
+                  const remaining = schemas.filter((item) => item.id !== schemaId)
+                  const nextParams = new URLSearchParams(params)
+                  if (remaining[0]) {
+                    nextParams.set("schema", remaining[0].id)
+                  } else {
+                    nextParams.delete("schema")
+                  }
+                  setParams(nextParams, { replace: true })
+                }}
+              />
+            )
+          }}
+          trailing={
+            canCreateTable ? (
+              <button
+                type="button"
+                onClick={() => setAddTableOpen(true)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              >
+                <PlusIcon className="size-3.5" />
+                Add table
+              </button>
+            ) : null
+          }
         />
       ) : null}
 
-      {activeSchema && activeNetwork ? (
+      {schemaListSettling ? (
+        <div className="flex flex-1 items-center justify-center rounded-xl border bg-background text-sm text-muted-foreground">
+          Loading table...
+        </div>
+      ) : activeSchema && activeNetwork ? (
         <SchemaRecordsDataTable
           key={activeSchema.id}
           schema={activeSchema}
           network={activeNetwork}
           organizationId={organizationId}
-          organizationsById={organizationsById}
           filesById={filesById}
           isAuthenticated={isAuthenticated}
+          canEditColumns={
+            canNetwork("schema", "update") && !activeSchema.internal
+          }
           onEdit={openEditRecord}
           onRefreshRelated={() => {
             void refetchFiles()
@@ -324,11 +361,31 @@ export default function RecordsPage() {
           isRelatedRefreshing={isFilesFetching || isNetworksFetching}
         />
       ) : (
-        <div className="flex flex-1 items-center justify-center rounded-xl border bg-background text-sm text-muted-foreground">
-          <TableIcon className="mr-2 size-4" />
-          No schemas in this network.
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border bg-background text-sm text-muted-foreground">
+          <span className="inline-flex items-center">
+            <TableIcon className="mr-2 size-4" />
+            No tables yet.
+          </span>
+          {canCreateTable ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAddTableOpen(true)}
+            >
+              <PlusIcon />
+              Add table
+            </Button>
+          ) : null}
         </div>
       )}
+      <AddTableDialog
+        open={addTableOpen}
+        onOpenChange={setAddTableOpen}
+        networkId={activeNetwork?.id}
+        organizationId={organizationId}
+        onCreated={(schemaId) => setWorkbook({ schemaId })}
+      />
     </DataTablePage>
   )
 }
@@ -337,9 +394,9 @@ function SchemaRecordsDataTable({
   schema,
   network,
   organizationId,
-  organizationsById,
   filesById,
   isAuthenticated,
+  canEditColumns,
   onEdit,
   onRefreshRelated,
   isRelatedRefreshing,
@@ -347,9 +404,9 @@ function SchemaRecordsDataTable({
   schema: Schema
   network: Network
   organizationId?: string
-  organizationsById: Map<string, Organization>
   filesById: Map<string, StoredFile>
   isAuthenticated: boolean
+  canEditColumns: boolean
   onEdit: (recordId: string) => void
   onRefreshRelated: () => void
   isRelatedRefreshing: boolean
@@ -364,9 +421,7 @@ function SchemaRecordsDataTable({
     fields: {},
   })
   const [previewFileId, setPreviewFileId] = useState<string>()
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "createdAt", desc: true },
-  ])
+  const [sorting, setSorting] = useState<SortingState>([])
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -388,13 +443,17 @@ function SchemaRecordsDataTable({
       page: pagination.pageIndex + 1,
       pageSize: pagination.pageSize,
       q: debouncedQuery.trim() || undefined,
-      sort: sort && isRecordSort(sort.id, properties) ? sort.id : "createdAt",
-      order: sort?.desc ? "desc" : "asc",
+      sort:
+        sort && isPropertySort(sort.id, properties) ? sort.id : "createdAt",
+      order:
+        sort && isPropertySort(sort.id, properties)
+          ? sort.desc
+            ? "desc"
+            : "asc"
+          : "desc",
       schemaId: schema.id,
       networkId: network.id,
       organizationId,
-      organization: columnFilters.organization?.value,
-      organizationOp: columnFilters.organization?.op,
       fields: fieldFilterParams(columnFilters.fields),
     }
   }, [
@@ -424,9 +483,7 @@ function SchemaRecordsDataTable({
   )
   const total = list?.total ?? 0
   const filtersActive =
-    query.trim().length > 0 ||
-    Boolean(columnFilters.organization) ||
-    Object.keys(columnFilters.fields).length > 0
+    query.trim().length > 0 || Object.keys(columnFilters.fields).length > 0
 
   const hrefFor = useCallback(
     (record: StoredRecord) => {
@@ -466,6 +523,19 @@ function SchemaRecordsDataTable({
     [network.id, organizationId]
   )
 
+  const relatedTables = useMemo(
+    () => network.schemas.map((item) => ({ id: item.id, name: item.name })),
+    [network.schemas]
+  )
+  const tableRef = useMemo(
+    () => ({
+      id: schema.id,
+      name: schema.name,
+      definition: schema.definition,
+    }),
+    [schema.definition, schema.id, schema.name]
+  )
+
   const setFieldFilter = useCallback((name: string, value?: FieldFilter) => {
     setColumnFilters((current) => {
       const fields = { ...current.fields }
@@ -481,54 +551,24 @@ function SchemaRecordsDataTable({
   const columns = useMemo(
     () =>
       helper.columns([
-        ...(!organizationId
-          ? [
-              helper.accessor(
-                (record) =>
-                  organizationsById.get(record.organizationId)?.name ??
-                  record.organizationId,
-                {
-                  id: "organization",
-                  header: ({ column }) => (
-                    <DataTableColumnHeader
-                      title="Organization"
-                      sorted={column.getIsSorted()}
-                      onSort={column.getToggleSortingHandler()}
-                      pin={headerPin(column)}
-                      filter={{
-                        type: "text",
-                        value: columnFilters.organization,
-                        onChange: (value) =>
-                          setColumnFilters((current) => ({
-                            ...current,
-                            organization: value,
-                          })),
-                      }}
-                    />
-                  ),
-                  cell: ({ row }) => (
-                    <DataTableCellLink
-                      to={hrefFor(row.original)}
-                      className="text-muted-foreground"
-                    >
-                      {organizationsById.get(row.original.organizationId)
-                        ?.name ?? row.original.organizationId}
-                    </DataTableCellLink>
-                  ),
-                  size: 180,
-                }
-              ),
-            ]
-          : []),
         ...properties.map((property) =>
           helper.accessor((record) => record.data[property.name], {
             id: property.name,
             header: ({ column }) => (
-              <DataTableColumnHeader
-                title={propertyLabel(property.name)}
+              <ColumnHeaderMenu
+                table={tableRef}
+                tables={relatedTables}
+                property={property}
+                canEdit={canEditColumns}
+                title={columnLabel(property)}
                 sorted={column.getIsSorted()}
-                onSort={column.getToggleSortingHandler()}
+                onSort={(descending) => column.toggleSorting(descending)}
                 pin={headerPin(column)}
+                onHide={
+                  column.getCanHide()
+                    ? () => column.toggleVisibility(false)
+                    : undefined
+                }
                 filter={propertyFilterConfig(
                   property,
                   columnFilters.fields[property.name],
@@ -559,25 +599,6 @@ function SchemaRecordsDataTable({
                 : 160,
           })
         ),
-        helper.accessor("createdAt", {
-          header: ({ column }) => (
-            <DataTableColumnHeader
-              title="Created"
-              sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
-              pin={headerPin(column)}
-            />
-          ),
-          cell: ({ row }) => (
-            <DataTableCellLink
-              to={hrefFor(row.original)}
-              className="whitespace-nowrap text-muted-foreground"
-            >
-              {formatCreatedAt(row.original.createdAt)}
-            </DataTableCellLink>
-          ),
-          size: 160,
-        }),
         helper.display({
           id: "actions",
           enableSorting: false,
@@ -586,6 +607,10 @@ function SchemaRecordsDataTable({
           size: 52,
           minSize: 52,
           maxSize: 52,
+          header: () =>
+            canEditColumns ? (
+              <AddColumnButton table={tableRef} tables={relatedTables} />
+            ) : null,
           cell: ({ row }) => (
             <DataTableRowActions
               items={
@@ -607,18 +632,18 @@ function SchemaRecordsDataTable({
         }),
       ]),
     [
+      canEditColumns,
       columnFilters.fields,
-      columnFilters.organization,
       filesById,
       hrefFor,
       hrefForRelated,
       network.schemas,
       onEdit,
-      organizationId,
-      organizationsById,
       properties,
       relatedById,
+      relatedTables,
       setFieldFilter,
+      tableRef,
     ]
   )
 
@@ -655,26 +680,18 @@ function SchemaRecordsDataTable({
     },
     onColumnVisibilityChange: setColumnVisibility,
     onColumnSizingChange: setColumnSizing,
-    onColumnPinningChange: setColumnPinning,
+    onColumnPinningChange: (updater) => {
+      setColumnPinning((current) => {
+        const next = typeof updater === "function" ? updater(current) : updater
+        const end = (next.end ?? []).filter((id) => id !== "actions")
+        end.push("actions")
+        return { ...next, end }
+      })
+    },
   })
 
   const activeFilters = useMemo<DataTableActiveFilter[]>(() => {
     const chips: DataTableActiveFilter[] = []
-    if (columnFilters.organization) {
-      chips.push({
-        id: "organization",
-        label: "Organization",
-        value: stringFilterChipValue(
-          columnFilters.organization.op,
-          columnFilters.organization.value
-        ),
-        onRemove: () =>
-          setColumnFilters((current) => ({
-            ...current,
-            organization: undefined,
-          })),
-      })
-    }
     for (const property of properties) {
       const filter = columnFilters.fields[property.name]
       if (!filter) {
@@ -682,7 +699,7 @@ function SchemaRecordsDataTable({
       }
       chips.push({
         id: property.name,
-        label: propertyLabel(property.name),
+        label: columnLabel(property),
         value: fieldFilterChip(filter),
         onRemove: () => setFieldFilter(property.name),
       })
@@ -700,15 +717,6 @@ function SchemaRecordsDataTable({
         searchPlaceholder="Search records..."
         searchClassName="sm:max-w-3xl"
         chips={<DataTableActiveFilters filters={activeFilters} />}
-        trailing={<DataTableViewOptions table={table} />}
-        count={dataTablePageSummary({
-          isLoading,
-          loadingLabel: "Loading records...",
-          pageIndex: pagination.pageIndex,
-          pageSize: pagination.pageSize,
-          total,
-          singular: "record",
-        })}
         onRefresh={() => {
           void refetch()
           onRefreshRelated()
@@ -732,7 +740,17 @@ function SchemaRecordsDataTable({
                   : "No records yet."
             }
           />
-          <DataTablePagination table={table} />
+          <DataTablePagination
+            table={table}
+            summary={dataTablePageSummary({
+              isLoading,
+              loadingLabel: "Loading records...",
+              pageIndex: pagination.pageIndex,
+              pageSize: pagination.pageSize,
+              total,
+              singular: "record",
+            })}
+          />
         </>
       )}
       <FilePreviewDialog

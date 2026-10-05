@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Link } from "react-router"
 import {
   ArrowUpRightIcon,
@@ -124,7 +124,7 @@ export function RecordCell({
       to={href}
       className={cn(
         "block max-w-[18rem] min-w-[6rem] truncate",
-        property.type === "number" || property.type === "integer"
+        property.type === "number"
           ? "text-right font-medium tabular-nums"
           : null
       )}
@@ -285,6 +285,14 @@ export function propertyLabel(name: string) {
     .replace(/^./, (letter) => letter.toUpperCase())
 }
 
+export function columnLabel(property: { name: string; title?: string }) {
+  const title = property.title?.trim()
+  if (title) {
+    return title
+  }
+  return propertyLabel(property.name)
+}
+
 function FileRecordCell({
   fileId,
   file,
@@ -396,7 +404,7 @@ function RelatedRecordPreview({
             return (
               <div key={property.name} className="contents">
                 <dt className="max-w-[7rem] truncate text-xs text-muted-foreground">
-                  {propertyLabel(property.name)}
+                  {columnLabel(property)}
                 </dt>
                 <dd className="truncate text-xs font-medium">
                   {text || (
@@ -549,34 +557,50 @@ export function SchemaSheetTabs({
   schemas,
   activeId,
   onSelect,
+  trailing,
+  renderMenu,
 }: {
   schemas: Schema[]
   activeId?: string
   onSelect: (schemaId: string) => void
+  trailing?: ReactNode
+  renderMenu?: (schema: Schema) => ReactNode
 }) {
   return (
-    <div className="flex min-w-0 gap-1 overflow-x-auto">
-      {schemas.map((schema) => {
-        const tone = getBadgeColor(schema.color)
-        const active = schema.id === activeId
+    <div className="flex min-w-0 items-center gap-1">
+      <div className="flex min-w-0 gap-1 overflow-x-auto">
+        {schemas.map((schema) => {
+          const tone = getBadgeColor(schema.color)
+          const active = schema.id === activeId
+          const menu = renderMenu?.(schema)
 
-        return (
-          <button
-            key={schema.id}
-            type="button"
-            onClick={() => onSelect(schema.id)}
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
-              active
-                ? "border-foreground/15 bg-background font-medium shadow-xs"
-                : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-            )}
-          >
-            <span className={cn("size-2 rounded-full", tone.bg)} />
-            {schema.name}
-          </button>
-        )
-      })}
+          return (
+            <div
+              key={schema.id}
+              className={cn(
+                "inline-flex shrink-0 items-center rounded-full border text-sm transition-colors",
+                active
+                  ? "border-foreground/15 bg-background font-medium shadow-xs"
+                  : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => onSelect(schema.id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 py-1 pl-3",
+                  menu ? "pr-1" : "pr-3"
+                )}
+              >
+                <span className={cn("size-2 rounded-full", tone.bg)} />
+                {schema.name}
+              </button>
+              {menu}
+            </div>
+          )
+        })}
+      </div>
+      {trailing}
     </div>
   )
 }

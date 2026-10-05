@@ -197,7 +197,7 @@ export default function OrganizationList() {
             <DataTableColumnHeader
               title="Name"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -223,7 +223,7 @@ export default function OrganizationList() {
             <DataTableColumnHeader
               title="Slug"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
               filter={{
                 type: "text",
@@ -248,7 +248,7 @@ export default function OrganizationList() {
             <DataTableColumnHeader
               title="Created"
               sorted={column.getIsSorted()}
-              onSort={column.getToggleSortingHandler()}
+              onSort={(descending) => column.toggleSorting(descending)}
               pin={headerPin(column)}
             />
           ),
@@ -384,8 +384,8 @@ export default function OrganizationList() {
         organization
           ? `Organizations in ${network?.name ?? "this network"}. You are currently viewing ${organization.name}.`
           : network
-            ? `Organizations that belong to ${network.name}. They can use shared network schemas and define their own.`
-            : "Organizations belong to a network. They can use shared network schemas and define their own."
+            ? `Organizations that belong to ${network.name}. They can use shared network tables and define their own.`
+            : "Organizations belong to a network. They can use shared network tables and define their own."
       }
       action={
         canNetwork("organization", "create") ? (

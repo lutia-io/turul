@@ -178,7 +178,7 @@ export function DataTableToolbar({
   filters?: ReactNode
   chips?: ReactNode
   trailing?: ReactNode
-  count: string
+  count?: string
   onRefresh?: () => void
   isRefreshing?: boolean
 }) {
@@ -222,7 +222,9 @@ export function DataTableToolbar({
               size="icon"
             />
           ) : null}
-          <p className="text-sm text-muted-foreground tabular-nums">{count}</p>
+          {count ? (
+            <p className="text-sm text-muted-foreground tabular-nums">{count}</p>
+          ) : null}
         </div>
       </div>
       {chips}
