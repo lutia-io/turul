@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react"
+import { useId, useMemo, useRef, useState, type FormEvent } from "react"
 import { Link, useParams, useSearchParams } from "react-router"
 import {
   Building2Icon,
@@ -30,14 +23,13 @@ import {
   DefinitionStatusPage,
   PublicationPills,
 } from "@/components/definition-detail"
-import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
-import { NodeDefinitionDialog } from "@/components/node-definition-dialog"
-import { PipelineFlowCanvas } from "@/components/pipeline-flow"
 import {
-  PipelineLevelsEditor,
-  PipelineLevelsView,
-} from "@/components/pipeline-levels-editor"
+  PipelineDefinitionBuilder,
+  type PipelineDefinitionBuilderHandle,
+} from "@/components/pipeline-definition-builder"
+import { PipelineFlowCanvas } from "@/components/pipeline-flow"
+import { PipelineLevelsView } from "@/components/pipeline-levels-editor"
 import {
   PipelineViewMenu,
   type PipelineView,
@@ -48,33 +40,21 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import type { PipelineDefinition } from "@/data/networks"
-import {
-  getPipelineLevels,
-  parseJsonObject,
-  stringifyDefinition,
-  type JsonObject,
-} from "@/lib/json-definition"
+import { getPipelineLevels } from "@/lib/json-definition"
 import {
   useNetworkWorkspace,
   useWorkspaceOrganizations,
   useWorkspacePipelineRuns,
   workspacePipelineFromApi,
 } from "@/lib/network-workspace"
-import { pipelineTemplateContextForLevel } from "@/lib/node-definition"
 import {
-  insertCreatedNode,
   levelsFromApi,
   levelsToApi,
   parsePipelineDefinition,
   pipelineDraftSentence,
   pipelineNodeCount,
   pipelineSummary,
-  replacePipelineNode,
-  type CreatePipelineNodeTarget,
-  type PipelineDefinitionBody,
   type PipelineLevelDraft,
-  type PipelineNodeConfig,
-  type PipelineNodeEditorTarget,
 } from "@/lib/pipeline-definition"
 import { apiPipelineStatus, formatRelativeTime } from "@/lib/runs"
 import { getHumaErrorMessage, getHumaLoadErrorCopy } from "@/store/api"
@@ -84,21 +64,6 @@ import {
   useGetPipelineDefinitionQuery,
   useUpdatePipelineDefinitionMutation,
 } from "@/store/pipeline-slice"
-
-function pipelineDefinitionError(text: string) {
-  try {
-    const parsed = JSON.parse(text) as unknown
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return "JSON must be a pipeline definition object"
-    }
-    if (!parsePipelineDefinition(parsed as JsonObject)) {
-      return "JSON must include at least one level with a node"
-    }
-    return null
-  } catch {
-    return "Invalid JSON"
-  }
-}
 
 export default function PipelineDefinitionDetail() {
   const { pipelineDefinitionId } = useParams()
@@ -395,161 +360,33 @@ function PipelineDefinitionEdit({
   onCancel: () => void
 }) {
   const formId = useId()
+  const builderRef = useRef<PipelineDefinitionBuilderHandle>(null)
   const [updatePipeline, updateState] = useUpdatePipelineDefinitionMutation()
   const parsed = parsePipelineDefinition(pipeline.definition)
   const [definitionView, setDefinitionView] = useState<PipelineView>("levels")
+  const [nodeOpen, setNodeOpen] = useState(false)
   const [name, setName] = useState(pipeline.name)
   const [description, setDescription] = useState(pipeline.description ?? "")
   const [active, setActive] = useState(pipeline.active)
   const [levels, setLevels] = useState<PipelineLevelDraft[]>(() =>
     levelsFromApi(parsed)
   )
-  const [jsonText, setJsonText] = useState("")
   const [jsonError, setJsonError] = useState<string | null>(null)
-  const jsonSourceRef = useRef<"builder" | "json">("builder")
-  const [nodeDialogOpen, setNodeDialogOpen] = useState(false)
-  const [nodeDialogKey, setNodeDialogKey] = useState(0)
-  const [nodeDialogNode, setNodeDialogNode] = useState<PipelineNodeConfig>()
-  const [nodeDialogContext, setNodeDialogContext] = useState(
-    pipelineTemplateContextForLevel(0, [])
-  )
-  const createNodeTargetRef = useRef<PipelineNodeEditorTarget | null>(null)
   const isLoading = updateState.isLoading
   const error = updateState.error
 
   const definition = useMemo(() => levelsToApi(levels), [levels])
-  const generatedJson = stringifyDefinition(definition ?? { nodes: [] })
-
-  useEffect(() => {
-    if (jsonSourceRef.current === "json") {
-      return
-    }
-    setJsonText(generatedJson)
-    setJsonError(null)
-  }, [generatedJson])
-
-  function markBuilderSource() {
-    jsonSourceRef.current = "builder"
-  }
-
-  function applyPipelineDefinition(body: PipelineDefinitionBody) {
-    jsonSourceRef.current = "json"
-    setLevels(levelsFromApi(body))
-  }
-
-  function handleJsonChange(text: string) {
-    jsonSourceRef.current = "json"
-    setJsonText(text)
-    const parsedJson = parseJsonObject(text)
-    if (!parsedJson) {
-      setJsonError(pipelineDefinitionError(text))
-      return
-    }
-    const body = parsePipelineDefinition(parsedJson)
-    if (!body) {
-      setJsonError("JSON must include at least one level with a node")
-      return
-    }
-    setJsonError(null)
-    applyPipelineDefinition(body)
-  }
-
-  function handleJsonBlur() {
-    if (!jsonText.trim()) {
-      jsonSourceRef.current = "builder"
-      setJsonText(generatedJson)
-      setJsonError(null)
-      return
-    }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parsePipelineDefinition(parsedJson) : undefined
-    if (!parsedJson || !body) {
-      setJsonError(pipelineDefinitionError(jsonText))
-      return
-    }
-    jsonSourceRef.current = "json"
-    setJsonError(null)
-    applyPipelineDefinition(body)
-    setJsonText(stringifyDefinition(parsedJson))
-  }
-
-  function templateContextForLevelIndex(levelIndex: number) {
-    const index = Math.max(0, levelIndex)
-    return pipelineTemplateContextForLevel(
-      index,
-      levels[index - 1]?.nodes ?? []
-    )
-  }
-
-  function openNodeDialog(options: {
-    node?: PipelineNodeConfig
-    levelIndex: number
-    target: PipelineNodeEditorTarget
-  }) {
-    createNodeTargetRef.current = options.target
-    setNodeDialogNode(options.node)
-    setNodeDialogContext(templateContextForLevelIndex(options.levelIndex))
-    setNodeDialogKey((key) => key + 1)
-    setNodeDialogOpen(true)
-  }
-
-  function openCreateNode(target: CreatePipelineNodeTarget) {
-    const levelIndex =
-      target.kind === "level"
-        ? levels.findIndex((level) => level.key === target.levelKey)
-        : 0
-    const level = levels[Math.max(0, levelIndex)]
-    openNodeDialog({
-      levelIndex,
-      target: {
-        levelKey:
-          level?.key ??
-          (target.kind === "level" ? target.levelKey : (levels[0]?.key ?? "")),
-      },
-    })
-  }
-
-  function openEditNode(nodeKey: string, levelKey: string) {
-    const levelIndex = levels.findIndex((level) => level.key === levelKey)
-    const node = levels[levelIndex]?.nodes.find((item) => item.key === nodeKey)
-    openNodeDialog({
-      node,
-      levelIndex,
-      target: { levelKey, nodeKey },
-    })
-  }
-
-  function handleNodeSave(node: PipelineNodeConfig) {
-    const target = createNodeTargetRef.current
-    createNodeTargetRef.current = null
-    if (!target) {
-      return
-    }
-    markBuilderSource()
-    if (target.nodeKey) {
-      setLevels((current) =>
-        replacePipelineNode(current, target.levelKey, target.nodeKey!, node)
-      )
-      return
-    }
-    setLevels((current) =>
-      insertCreatedNode(current, node, {
-        kind: "level",
-        levelKey: target.levelKey,
-      })
-    )
-  }
-
-  const canSubmit = Boolean(name.trim()) && Boolean(definition) && !jsonError
+  const canSubmit =
+    Boolean(name.trim()) && !jsonError && (Boolean(definition) || nodeOpen)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!canSubmit || !definition) {
+    const committed = builderRef.current?.commitOpenNode()
+    if (!committed?.ok) {
       return
     }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parsePipelineDefinition(parsedJson) : definition
-    if (!body) {
+    const body = levelsToApi(committed.levels)
+    if (!name.trim() || !body || jsonError) {
       return
     }
     try {
@@ -620,10 +457,12 @@ function PipelineDefinitionEdit({
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <PipelineViewMenu
-              value={definitionView}
-              onChange={setDefinitionView}
-            />
+            {nodeOpen ? null : (
+              <PipelineViewMenu
+                value={definitionView}
+                onChange={setDefinitionView}
+              />
+            )}
             <Button
               type="button"
               variant="outline"
@@ -653,54 +492,18 @@ function PipelineDefinitionEdit({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 pb-4 sm:px-6 lg:px-8">
-          {definitionView === "json" ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
-              <DefinitionJsonPane
-                id={`${formId}-json`}
-                title="JSON definition"
-                description="Updates as you edit. Paste a definition to fill the builder."
-                value={jsonText}
-                onChange={handleJsonChange}
-                onBlur={handleJsonBlur}
-                error={jsonError}
-              />
-            </div>
-          ) : definitionView === "levels" ? (
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <DefinitionCard>
-                <PipelineLevelsEditor
-                  levels={levels}
-                  onChange={(next) => {
-                    markBuilderSource()
-                    setLevels(next)
-                  }}
-                  onCreateNode={openCreateNode}
-                  onEditNode={openEditNode}
-                />
-              </DefinitionCard>
-            </div>
-          ) : (
-            <PipelineFlowCanvas
-              className="h-full min-h-0 flex-1"
-              levels={levels}
-              onChange={(next) => {
-                markBuilderSource()
-                setLevels(next)
-              }}
-              onEditNode={openEditNode}
-              sentence={pipelineDraftSentence(levels)}
-            />
-          )}
+          <PipelineDefinitionBuilder
+            ref={builderRef}
+            levels={levels}
+            onChange={setLevels}
+            view={definitionView}
+            sentence={pipelineDraftSentence(levels)}
+            jsonInputId={`${formId}-json`}
+            onNodeSessionChange={setNodeOpen}
+            onJsonErrorChange={setJsonError}
+          />
         </div>
       </form>
-      <NodeDefinitionDialog
-        key={nodeDialogKey}
-        open={nodeDialogOpen}
-        onOpenChange={setNodeDialogOpen}
-        node={nodeDialogNode}
-        onSave={handleNodeSave}
-        pipelineTemplateContext={nodeDialogContext}
-      />
     </DefinitionPage>
   )
 }

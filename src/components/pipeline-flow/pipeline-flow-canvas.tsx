@@ -90,6 +90,7 @@ function clampZoom(value: number) {
 export function PipelineFlowCanvas({
   levels,
   onChange,
+  onCreateNode,
   onEditNode,
   details,
   sentence,
@@ -97,6 +98,7 @@ export function PipelineFlowCanvas({
 }: {
   levels: PipelineLevelDraft[]
   onChange?: (levels: PipelineLevelDraft[]) => void
+  onCreateNode?: (target: CreatePipelineNodeTarget, type: NodeType) => void
   onEditNode?: (nodeKey: string, levelKey: string) => void
   details?: ReactNode
   sentence?: string
@@ -252,6 +254,11 @@ export function PipelineFlowCanvas({
 
   const createNode = useCallback(
     (target: CreatePipelineNodeTarget, type: NodeType) => {
+      if (onCreateNode) {
+        onCreateNode(target, type)
+        setPicker(null)
+        return
+      }
       if (!onChange) {
         return
       }
@@ -269,7 +276,7 @@ export function PipelineFlowCanvas({
       )
       setPicker(null)
     },
-    [onChange]
+    [onChange, onCreateNode]
   )
 
   const requestCreate = useCallback(
