@@ -283,7 +283,7 @@ const workflowApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const workflow of data.items) {
             dispatch(
-              api.util.upsertQueryData(
+              workflowApi.util.upsertQueryData(
                 "getWorkflowDefinition",
                 workflow.id,
                 workflow
@@ -350,7 +350,11 @@ const workflowApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const workflow of data.items) {
             dispatch(
-              api.util.upsertQueryData("getWorkflow", workflow.id, workflow)
+              workflowApi.util.upsertQueryData(
+                "getWorkflow",
+                workflow.id,
+                workflow
+              )
             )
           }
         } catch {
@@ -393,7 +397,11 @@ const workflowApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const action of data) {
             dispatch(
-              api.util.upsertQueryData("getWorkflowAction", action.id, action)
+              workflowApi.util.upsertQueryData(
+                "getWorkflowAction",
+                action.id,
+                action
+              )
             )
           }
         } catch {

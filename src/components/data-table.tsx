@@ -76,14 +76,14 @@ export function matchesQuery(
 
 export function dataTableCount({
   isLoading,
-  loadingLabel,
+  loadingLabel = "Loading...",
   visible,
   total,
   singular,
   plural,
 }: {
   isLoading?: boolean
-  loadingLabel: string
+  loadingLabel?: string
   visible: number
   total: number
   singular: string
@@ -186,7 +186,9 @@ export function DataTableToolbar({
     <div className="flex shrink-0 flex-col gap-2">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-          <div className={cn("relative w-full", searchClassName ?? "sm:max-w-sm")}>
+          <div
+            className={cn("relative w-full", searchClassName ?? "sm:max-w-sm")}
+          >
             <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
@@ -223,7 +225,9 @@ export function DataTableToolbar({
             />
           ) : null}
           {count ? (
-            <p className="text-sm text-muted-foreground tabular-nums">{count}</p>
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {count}
+            </p>
           ) : null}
         </div>
       </div>

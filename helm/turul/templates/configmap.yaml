@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-nginx
+  namespace: {{ .Release.Namespace }}
+data:
+  default.conf: |
+    server {
+        listen {{ .Values.deployment.container.port }};
+        listen [::]:{{ .Values.deployment.container.port }};
+        server_name _;
+
+        client_max_body_size 32m;
+
+        location = /healthz {
+            access_log off;
+            default_type text/plain;
+            return 200 "ok\n";
+        }
+
+        location ~ ^/(auth|user|network-group|network-permission|network-member|network|organization-user|organization-group|organization-permission|organization|authorization|schema|workflow-definition|workflow-action|workflow|pipeline-definition|pipeline-node|pipeline|record|file)(/|$) {
+            proxy_pass {{ .Values.api.upstream }};
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Authorization $http_authorization;
+        }
+
+        location / {
+            root /usr/share/nginx/html;
+            try_files $uri $uri/ /index.html;
+        }
+    }

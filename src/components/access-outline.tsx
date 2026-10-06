@@ -99,10 +99,12 @@ export function GrantEditor({
   )
   const records = recordGrant(grants)
   const limitFields = Boolean(records?.fields?.length)
-  const selectedSchema = schemas.find((schema) => schema.id === records?.schemaId)
-  const fieldNames =
-    selectedSchema?.properties ??
-    [...new Set(schemas.flatMap((schema) => schema.properties))]
+  const selectedSchema = schemas.find(
+    (schema) => schema.id === records?.schemaId
+  )
+  const fieldNames = selectedSchema?.properties ?? [
+    ...new Set(schemas.flatMap((schema) => schema.properties)),
+  ]
 
   function fieldAccess(name: string): "hidden" | "read" | "write" {
     const field = records?.fields?.find((item) => item.name === name)
@@ -117,22 +119,18 @@ export function GrantEditor({
     const next: OutlineField[] =
       access === "hidden"
         ? current.filter((field) => field.name !== name)
-        : [
-            ...current.filter((field) => field.name !== name),
-            { name, access },
-          ]
+        : [...current.filter((field) => field.name !== name), { name, access }]
     onChange(
       setRecordGrant(grants, {
         fields: next,
         allFields: false,
-        actions:
-          records?.actions?.length
-            ? records.actions
-            : access === "hidden"
-              ? ["read"]
-              : access === "write"
-                ? ["read", "update"]
-                : ["read"],
+        actions: records?.actions?.length
+          ? records.actions
+          : access === "hidden"
+            ? ["read"]
+            : access === "write"
+              ? ["read", "update"]
+              : ["read"],
       })
     )
   }
@@ -214,15 +212,17 @@ export function GrantEditor({
           <div>
             <p className="text-sm font-medium">Record fields</p>
             <p className="text-xs text-muted-foreground">
-              Leave this open for every field, or choose which fields this
-              group can view and edit.
+              Leave this open for every field, or choose which fields this group
+              can view and edit.
             </p>
           </div>
           <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() =>
-                onChange(setRecordGrant(grants, { allFields: true, fields: [] }))
+                onChange(
+                  setRecordGrant(grants, { allFields: true, fields: [] })
+                )
               }
               className={cn(
                 "rounded-full px-3 py-1 text-xs font-medium ring-1 transition-colors",
@@ -268,20 +268,23 @@ export function GrantEditor({
                         schemaId: event.target.value,
                         allFields: false,
                         fields: (
-                          schemas.find((schema) => schema.id === event.target.value)
-                            ?.properties ?? fieldNames
-                        ).map((name) => ({
-                          name,
-                          access:
-                            fieldAccess(name) === "hidden"
-                              ? "read"
-                              : fieldAccess(name),
-                        })),
+                          schemas.find(
+                            (schema) => schema.id === event.target.value
+                          )?.properties ?? fieldNames
+                        ).map((name) => {
+                          const access = fieldAccess(name)
+                          return {
+                            name,
+                            access: access === "hidden" ? "read" : access,
+                          }
+                        }),
                       })
                     )
                   }
                 >
-                  <NativeSelectOption value="">All record types</NativeSelectOption>
+                  <NativeSelectOption value="">
+                    All record types
+                  </NativeSelectOption>
                   {schemas.map((schema) => (
                     <NativeSelectOption key={schema.id} value={schema.id}>
                       {schema.name}

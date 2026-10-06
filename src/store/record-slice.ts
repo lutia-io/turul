@@ -41,7 +41,8 @@ export type UpdateRecordResponse = {
 
 export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
-export type RecordListSort = "organization" | "createdAt" | "updatedAt" | (string & {})
+export type RecordListSort =
+  "organization" | "createdAt" | "updatedAt" | (string & {})
 
 export type RecordFieldFilter = {
   name: string
@@ -133,7 +134,10 @@ const recordApi = api.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.items.map(({ id }) => ({ type: "Record" as const, id })),
+              ...result.items.map(({ id }) => ({
+                type: "Record" as const,
+                id,
+              })),
               { type: "Record", id: "LIST" },
             ]
           : [{ type: "Record", id: "LIST" }],
@@ -148,7 +152,7 @@ const recordApi = api.injectEndpoints({
               }
             }
             dispatch(
-              api.util.upsertQueryData("getRecord", record.id, {
+              recordApi.util.upsertQueryData("getRecord", record.id, {
                 ...record,
                 related,
               })

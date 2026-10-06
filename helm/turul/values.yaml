@@ -1,0 +1,16 @@
+deployment:
+  replicas: 1
+  image:
+    repository: turul
+    tag: latest
+    pullPolicy: IfNotPresent
+  container:
+    name: turul
+    port: 80
+
+service:
+  type: LoadBalancer
+  port: 80
+
+api:
+  upstream: http://api.huma.svc.cluster.local:8000

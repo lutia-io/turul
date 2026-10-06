@@ -218,28 +218,32 @@ export function defaultDefinition(type: NodeType): JsonObject {
   }
 }
 
-export function isNodeType(value: string): value is NodeType {
-  return nodeTypes.includes(value as NodeType)
+export function isNodeType(value: string | null): value is NodeType {
+  return value != null && nodeTypes.includes(value as NodeType)
 }
 
-export function isHttpMethod(value: string): value is HttpMethod {
-  return httpMethods.includes(value as HttpMethod)
+export function isHttpMethod(value: string | null): value is HttpMethod {
+  return value != null && httpMethods.includes(value as HttpMethod)
 }
 
-export function isFileOperation(value: string): value is FileOperation {
-  return fileOperations.includes(value as FileOperation)
+export function isFileOperation(value: string | null): value is FileOperation {
+  return value != null && fileOperations.includes(value as FileOperation)
 }
 
-export function isRecordOperation(value: string): value is RecordOperation {
-  return recordOperations.includes(value as RecordOperation)
+export function isRecordOperation(
+  value: string | null
+): value is RecordOperation {
+  return value != null && recordOperations.includes(value as RecordOperation)
 }
 
-export function isBulkOperation(value: string): value is BulkOperation {
-  return bulkOperations.includes(value as BulkOperation)
+export function isBulkOperation(value: string | null): value is BulkOperation {
+  return value != null && bulkOperations.includes(value as BulkOperation)
 }
 
-export function isRecordFilterOp(value: string): value is RecordFilterOp {
-  return recordFilterOps.includes(value as RecordFilterOp)
+export function isRecordFilterOp(
+  value: string | null
+): value is RecordFilterOp {
+  return value != null && recordFilterOps.includes(value as RecordFilterOp)
 }
 
 export function nodeTypeLabel(type: string) {
@@ -300,8 +304,7 @@ export function nodeConfigSummary(type: string, definition: JsonObject) {
     const records = Array.isArray(definition.records)
       ? definition.records.length
       : 0
-    const types =
-      records === 1 ? "1 record type" : `${records} record types`
+    const types = records === 1 ? "1 record type" : `${records} record types`
     return `${operation} · ${types}`
   }
   return nodeTypeLabel(type)
@@ -608,8 +611,7 @@ export function bulkDraftFromDefinition(
           typeof record.as === "string" && record.as.trim()
             ? record.as.trim()
             : "item",
-        recordId:
-          typeof record.recordId === "string" ? record.recordId : "",
+        recordId: typeof record.recordId === "string" ? record.recordId : "",
         data: mappingEntriesFromObject(asObject(record.data)),
       })
     }
@@ -624,9 +626,10 @@ export function bulkDraftFromDefinition(
   }
 }
 
-export function bulkDefinitionFromDraft(
-  draft: BulkDefinitionDraft
-): { definition?: JsonObject; error?: string } {
+export function bulkDefinitionFromDraft(draft: BulkDefinitionDraft): {
+  definition?: JsonObject
+  error?: string
+} {
   if (draft.records.length === 0) {
     return { error: "Add at least one record type" }
   }
@@ -642,7 +645,9 @@ export function bulkDefinitionFromDraft(
     }
     const alias = record.as.trim() || "item"
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
-      return { error: `Record type ${index + 1} item name must be an identifier` }
+      return {
+        error: `Record type ${index + 1} item name must be an identifier`,
+      }
     }
     if (alias === "Record" || alias === "Context" || alias === "Input") {
       return { error: `Record type ${index + 1} item name is reserved` }

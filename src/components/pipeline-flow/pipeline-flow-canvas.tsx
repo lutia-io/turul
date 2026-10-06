@@ -220,12 +220,13 @@ export function PipelineFlowCanvas({
     if (!el) {
       return
     }
+    const viewport = el
     function onWheel(event: WheelEvent) {
       event.preventDefault()
       const currentPan = panRef.current
       const currentZoom = zoomRef.current
       if (event.ctrlKey || event.metaKey) {
-        const rect = el.getBoundingClientRect()
+        const rect = viewport.getBoundingClientRect()
         const nextZoom = clampZoom(
           currentZoom * (event.deltaY < 0 ? 1.08 : 0.92)
         )

@@ -44,7 +44,7 @@ const networkApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const network of data) {
             dispatch(
-              api.util.upsertQueryData("getNetwork", network.id, network)
+              networkApi.util.upsertQueryData("getNetwork", network.id, network)
             )
           }
         } catch {

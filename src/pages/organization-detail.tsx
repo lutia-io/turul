@@ -170,11 +170,14 @@ export default function OrganizationDetail() {
                   </span>
                 </Link>
               </AsideRow>
-              <AsideRow label="Created">
-                {formatRelativeTime(visibleOrganization.createdAt)}
-              </AsideRow>
-              {visibleOrganization.updatedAt !==
-              visibleOrganization.createdAt ? (
+              {visibleOrganization.createdAt ? (
+                <AsideRow label="Created">
+                  {formatRelativeTime(visibleOrganization.createdAt)}
+                </AsideRow>
+              ) : null}
+              {visibleOrganization.updatedAt &&
+              visibleOrganization.updatedAt !==
+                visibleOrganization.createdAt ? (
                 <AsideRow label="Updated">
                   {formatRelativeTime(visibleOrganization.updatedAt)}
                 </AsideRow>

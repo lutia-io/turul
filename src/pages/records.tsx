@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useSearchParams } from "react-router"
-import { PencilIcon, PlusIcon, TableIcon, ViewIcon, WorkflowIcon } from "lucide-react"
+import {
+  PencilIcon,
+  PlusIcon,
+  TableIcon,
+  ViewIcon,
+  WorkflowIcon,
+} from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import { AddTableDialog } from "@/components/add-table-dialog"
@@ -8,7 +14,6 @@ import { TableSheetMenu } from "@/components/table-sheet-menu"
 import { useCreateEntity } from "@/components/create-entity"
 import { FilePreviewDialog } from "@/components/file-preview"
 import {
-  DataTableCellLink,
   DataTablePage,
   DataTableToolbar,
   dataTablePageSummary,
@@ -206,8 +211,12 @@ export default function RecordsPage() {
     isFetching: isWorkspaceFetching,
   } = useNetworkWorkspace()
   const { openCreateRecord, openEditRecord } = useCreateEntity()
-  const { canOrg, canNetwork, isOrgUser, data: authorization } =
-    useAuthorization()
+  const {
+    canOrg,
+    canNetwork,
+    isOrgUser,
+    data: authorization,
+  } = useAuthorization()
   const [addTableOpen, setAddTableOpen] = useState(false)
   const {
     networks: workspaceNetworks,
@@ -235,7 +244,8 @@ export default function RecordsPage() {
     (network ? isWorkspaceFetching : isNetworksFetching)
   const activeSchema =
     requestedSchema ?? (schemaListSettling ? undefined : schemas[0])
-  const canCreateTable = canNetwork("schema", "create") && Boolean(activeNetwork)
+  const canCreateTable =
+    canNetwork("schema", "create") && Boolean(activeNetwork)
   const filesById = useMemo(
     () => new Map(files.map((file) => [file.id, file])),
     [files]
@@ -276,10 +286,7 @@ export default function RecordsPage() {
         canViewWorkflows || canCreateRecord ? (
           <div className="flex items-center gap-2">
             {canViewWorkflows ? (
-              <Button
-                variant="outline"
-                render={<Link to={workflowsHref} />}
-              >
+              <Button variant="outline" render={<Link to={workflowsHref} />}>
                 <WorkflowIcon />
                 Workflows
               </Button>
@@ -338,7 +345,9 @@ export default function RecordsPage() {
                   if (activeSchema?.id !== schemaId) {
                     return
                   }
-                  const remaining = schemas.filter((item) => item.id !== schemaId)
+                  const remaining = schemas.filter(
+                    (item) => item.id !== schemaId
+                  )
                   const nextParams = new URLSearchParams(params)
                   if (remaining[0]) {
                     nextParams.set("schema", remaining[0].id)
@@ -470,8 +479,7 @@ function SchemaRecordsDataTable({
       page: pagination.pageIndex + 1,
       pageSize: pagination.pageSize,
       q: debouncedQuery.trim() || undefined,
-      sort:
-        sort && isPropertySort(sort.id, properties) ? sort.id : "createdAt",
+      sort: sort && isPropertySort(sort.id, properties) ? sort.id : "createdAt",
       order:
         sort && isPropertySort(sort.id, properties)
           ? sort.desc

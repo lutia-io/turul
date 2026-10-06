@@ -130,7 +130,9 @@ const schemaApi = api.injectEndpoints({
         try {
           const { data } = await queryFulfilled
           for (const schema of data.items) {
-            dispatch(api.util.upsertQueryData("getSchema", schema.id, schema))
+            dispatch(
+              schemaApi.util.upsertQueryData("getSchema", schema.id, schema)
+            )
           }
         } catch {
           // List failed; getSchema cache stays unchanged.

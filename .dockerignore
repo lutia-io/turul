@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-ssr
+.git
+.DS_Store
+*.local
+helm
+skaffold.yaml
+skaffold.env

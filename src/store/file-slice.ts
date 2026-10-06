@@ -99,7 +99,12 @@ function listFileQueryParams(params?: ListFilesParams) {
     query.contentType = params.contentType
   }
   setNumberFilterParam(query, "sizeBytes", params.sizeBytes, params.sizeBytesOp)
-  setStringFilterParam(query, "organization", params.organization, params.organizationOp)
+  setStringFilterParam(
+    query,
+    "organization",
+    params.organization,
+    params.organizationOp
+  )
 
   return query
 }
@@ -122,7 +127,7 @@ const fileApi = api.injectEndpoints({
         try {
           const { data } = await queryFulfilled
           for (const file of data.items) {
-            dispatch(api.util.upsertQueryData("getFile", file.id, file))
+            dispatch(fileApi.util.upsertQueryData("getFile", file.id, file))
           }
         } catch {
           // List failed; getFile cache stays unchanged.
@@ -156,7 +161,13 @@ const fileApi = api.injectEndpoints({
       },
     }),
     createFile: build.mutation<CreateFileResponse, CreateFileRequest>({
-      query: ({ file, filename, contentType, idempotencyKey, organizationUserId }) => {
+      query: ({
+        file,
+        filename,
+        contentType,
+        idempotencyKey,
+        organizationUserId,
+      }) => {
         const body = new FormData()
         body.append("file", file)
         if (filename) {

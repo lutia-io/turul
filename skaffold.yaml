@@ -1,0 +1,28 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: turul
+
+build:
+  artifacts:
+    - image: turul
+      docker:
+        dockerfile: Dockerfile
+        network: host
+
+deploy:
+  helm:
+    releases:
+      - name: app
+        chartPath: ./helm/turul
+        namespace: "{{.NAMESPACE}}"
+        createNamespace: true
+        skipBuildDependencies: true
+        setValueTemplates:
+          deployment.image.repository: "{{.IMAGE_REPO_turul}}"
+          deployment.image.tag: "{{.IMAGE_TAG_turul}}@{{.IMAGE_DIGEST_turul}}"
+          deployment.container.name: "{{.TURUL_CONTAINER_NAME}}"
+          deployment.container.port: "{{.TURUL_CONTAINER_PORT}}"
+          service.type: "{{.TURUL_SERVICE_TYPE}}"
+          service.port: "{{.TURUL_SERVICE_PORT}}"
+          api.upstream: "{{.TURUL_API_UPSTREAM}}"

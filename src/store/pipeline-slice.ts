@@ -290,7 +290,7 @@ const pipelineApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const pipeline of data.items) {
             dispatch(
-              api.util.upsertQueryData(
+              pipelineApi.util.upsertQueryData(
                 "getPipelineDefinition",
                 pipeline.id,
                 pipeline
@@ -357,7 +357,11 @@ const pipelineApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const pipeline of data.items) {
             dispatch(
-              api.util.upsertQueryData("getPipeline", pipeline.id, pipeline)
+              pipelineApi.util.upsertQueryData(
+                "getPipeline",
+                pipeline.id,
+                pipeline
+              )
             )
           }
         } catch {
@@ -408,7 +412,9 @@ const pipelineApi = api.injectEndpoints({
         try {
           const { data } = await queryFulfilled
           for (const node of data) {
-            dispatch(api.util.upsertQueryData("getPipelineNode", node.id, node))
+            dispatch(
+              pipelineApi.util.upsertQueryData("getPipelineNode", node.id, node)
+            )
           }
         } catch {
           // List failed; getPipelineNode cache stays unchanged.

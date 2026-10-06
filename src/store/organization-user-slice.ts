@@ -39,11 +39,7 @@ export type UpdateOrganizationUserResponse = {
 
 export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 export type OrganizationUserListSort =
-  | "name"
-  | "email"
-  | "organization"
-  | "createdAt"
-  | "updatedAt"
+  "name" | "email" | "organization" | "createdAt" | "updatedAt"
 
 export type ListOrganizationUsersParams = {
   page?: number
@@ -97,7 +93,12 @@ function listOrganizationUserQueryParams(params?: ListOrganizationUsersParams) {
   }
   setStringFilterParam(query, "name", params.name, params.nameOp)
   setStringFilterParam(query, "email", params.email, params.emailOp)
-  setStringFilterParam(query, "organization", params.organization, params.organizationOp)
+  setStringFilterParam(
+    query,
+    "organization",
+    params.organization,
+    params.organizationOp
+  )
 
   return query
 }
@@ -127,7 +128,7 @@ const organizationUserApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const organizationUser of data.items) {
             dispatch(
-              api.util.upsertQueryData(
+              organizationUserApi.util.upsertQueryData(
                 "getOrganizationUser",
                 organizationUser.id,
                 organizationUser

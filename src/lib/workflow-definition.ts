@@ -2,6 +2,7 @@ import {
   getJsonSchemaProperties,
   type JsonObject,
   type JsonSchemaProperty,
+  type JsonValue,
 } from "@/lib/json-definition"
 
 export const compareOperators = [
@@ -25,7 +26,7 @@ export type WorkflowCriteria = {
   conditions?: WorkflowCriteria[]
   field?: string
   operator?: CompareOperator
-  value?: unknown
+  value?: JsonValue
 }
 
 export const workflowActionTypes = [
@@ -39,7 +40,7 @@ export type WorkflowActionType = (typeof workflowActionTypes)[number]
 
 export type WorkflowAction = {
   type: WorkflowActionType
-  context: Record<string, unknown>
+  context: JsonObject
 }
 
 export type WorkflowDefinitionBody = {
@@ -233,17 +234,27 @@ function cronFromDraft(draft: TriggerDraft) {
   }
 }
 
-function draftFromCron(cron: string): Pick<
-  TriggerDraft,
-  "preset" | "hour" | "minute" | "cron"
-> {
+function draftFromCron(
+  cron: string
+): Pick<TriggerDraft, "preset" | "hour" | "minute" | "cron"> {
   const parts = cron.trim().split(/\s+/)
   if (parts.length === 5) {
     const [minute, hour, dayOfMonth, month, dayOfWeek] = parts
-    if (minute === "0" && hour === "*" && dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
+    if (
+      minute === "0" &&
+      hour === "*" &&
+      dayOfMonth === "*" &&
+      month === "*" &&
+      dayOfWeek === "*"
+    ) {
       return { preset: "hourly", hour: "09", minute: "00", cron }
     }
-    if (dayOfMonth === "*" && month === "*" && /^\d+$/.test(minute) && /^\d+$/.test(hour)) {
+    if (
+      dayOfMonth === "*" &&
+      month === "*" &&
+      /^\d+$/.test(minute) &&
+      /^\d+$/.test(hour)
+    ) {
       if (dayOfWeek === "*") {
         return {
           preset: "daily",
@@ -262,7 +273,12 @@ function draftFromCron(cron: string): Pick<
       }
     }
   }
-  return { preset: "custom", hour: "09", minute: "00", cron: cron.trim() || "0 9 * * *" }
+  return {
+    preset: "custom",
+    hour: "09",
+    minute: "00",
+    cron: cron.trim() || "0 9 * * *",
+  }
 }
 
 function asTriggerOn(value: unknown): TriggerOn | undefined {
@@ -271,7 +287,9 @@ function asTriggerOn(value: unknown): TriggerOn | undefined {
     : undefined
 }
 
-export function triggerFromApi(trigger: WorkflowTrigger | undefined): TriggerDraft {
+export function triggerFromApi(
+  trigger: WorkflowTrigger | undefined
+): TriggerDraft {
   const draft = emptyTrigger()
   if (!trigger) {
     return draft
@@ -296,9 +314,17 @@ export function triggerFromApi(trigger: WorkflowTrigger | undefined): TriggerDra
   }
   return {
     ...draft,
-    kind: hasCreated && hasUpdated ? "created_updated" : hasUpdated ? "updated" : "created",
+    kind:
+      hasCreated && hasUpdated
+        ? "created_updated"
+        : hasUpdated
+          ? "updated"
+          : "created",
     changed: Array.isArray(trigger.changed)
-      ? trigger.changed.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+      ? trigger.changed.filter(
+          (item): item is string =>
+            typeof item === "string" && item.trim() !== ""
+        )
       : [],
   }
 }
@@ -317,10 +343,9 @@ export function triggerToApi(draft: TriggerDraft): WorkflowTrigger {
       : draft.kind === "updated"
         ? ["updated"]
         : ["created"]
-  const changed =
-    on.includes("updated")
-      ? draft.changed.map((item) => item.trim()).filter(Boolean)
-      : []
+  const changed = on.includes("updated")
+    ? draft.changed.map((item) => item.trim()).filter(Boolean)
+    : []
   return changed.length > 0 ? { on, changed } : { on }
 }
 
@@ -337,7 +362,8 @@ function formatClock(hour: string, minute: string) {
 export function triggerSummary(trigger: WorkflowTrigger | undefined): string {
   const draft = triggerFromApi(trigger)
   if (draft.kind === "schedule") {
-    const zone = draft.timezone.split("/").at(-1)?.replaceAll("_", " ") ?? draft.timezone
+    const zone =
+      draft.timezone.split("/").at(-1)?.replaceAll("_", " ") ?? draft.timezone
     if (draft.preset === "hourly") {
       return "Every hour"
     }
@@ -395,14 +421,16 @@ export const actionTypeLabels: Record<WorkflowActionType, string> = {
 
 export const actionTypeDescriptions: Record<WorkflowActionType, string> = {
   CREATE_RECORD: "Make a new record when this workflow runs.",
-  UPDATE_RECORD: "Change fields on an existing record. You can read that record's current values while updating it.",
-  UPSERT_RECORD: "Update the record if it exists, otherwise create it. Updates can read the existing record's current values.",
+  UPDATE_RECORD:
+    "Change fields on an existing record. You can read that record's current values while updating it.",
+  UPSERT_RECORD:
+    "Update the record if it exists, otherwise create it. Updates can read the existing record's current values.",
   TRIGGER_PIPELINE: "Send data into a pipeline.",
 }
 
-function asObject(value: unknown): Record<string, unknown> | undefined {
+function asObject(value: unknown): JsonObject | undefined {
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as Record<string, unknown>
+    return value as JsonObject
   }
   return undefined
 }
@@ -446,7 +474,7 @@ function parseValue(
   raw: string,
   operator: CompareOperator,
   field?: JsonSchemaProperty
-): unknown {
+): JsonValue {
   if (operator === "in") {
     return raw
       .split(",")
@@ -457,7 +485,7 @@ function parseValue(
   return coerceScalar(raw, field)
 }
 
-function coerceScalar(raw: string, field?: JsonSchemaProperty): unknown {
+function coerceScalar(raw: string, field?: JsonSchemaProperty): JsonValue {
   const value = raw.trim()
   if (field?.type === "boolean") {
     return value === "true"
@@ -524,7 +552,7 @@ export function actionDataEntries(action: WorkflowAction): [string, unknown][] {
 export function criteriaFromApi(
   criteria: WorkflowCriteria | undefined
 ): CriteriaGroupDraft {
-  if (!hasCriteria(criteria)) {
+  if (!criteria || !hasCriteria(criteria)) {
     return emptyGroup()
   }
   const node = criteriaNodeFromApi(criteria)
@@ -633,8 +661,8 @@ function entriesFromRecord(record: unknown): DataEntryDraft[] {
   return entries.length > 0 ? entries : [emptyDataEntry()]
 }
 
-function recordFromEntries(entries: DataEntryDraft[]) {
-  const data: Record<string, unknown> = {}
+function recordFromEntries(entries: DataEntryDraft[]): JsonObject {
+  const data: JsonObject = {}
   for (const entry of entries) {
     const name = entry.name.trim()
     if (!name) {
@@ -668,7 +696,7 @@ export function actionsFromApi(
 }
 
 export function actionsToApi(actions: ActionDraft[]): WorkflowAction[] {
-  return actions.flatMap((action) => {
+  return actions.flatMap((action): WorkflowAction[] => {
     const data = recordFromEntries(action.data)
     switch (action.type) {
       case "CREATE_RECORD":

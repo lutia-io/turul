@@ -2,7 +2,6 @@ import { Link } from "react-router"
 import {
   ArrowRightIcon,
   Building2Icon,
-  FileIcon,
   FileJsonIcon,
   LayersIcon,
   ListIcon,
@@ -231,8 +230,8 @@ export default function Landing() {
                 Put your teams on one shared shape.
               </h2>
               <p className="mt-3 text-muted-foreground">
-                Create a network, invite teams, agree on tables. Lutia keeps
-                the rest in shape.
+                Create a network, invite teams, agree on tables. Lutia keeps the
+                rest in shape.
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-3">

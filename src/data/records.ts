@@ -9,11 +9,13 @@ function recordReady(hours: number, offsetHours: number) {
   ).toISOString()
 }
 
-const logisticsPurchaseOrders: StoredRecord[] = [
-  ["PO-8841", "Northwind Components", "BRK-220", 240, "confirmed", 30],
-  ["PO-8848", "Cedar Parts Co", "HNG-014", 80, "open", 18],
-  ["PO-8852", "Metro Auto", "FLT-9", 16, "received", 8],
-].map(([poNumber, supplier, sku, quantity, status, hours], index) =>
+const logisticsPurchaseOrders: StoredRecord[] = (
+  [
+    ["PO-8841", "Northwind Components", "BRK-220", 240, "confirmed", 30],
+    ["PO-8848", "Cedar Parts Co", "HNG-014", 80, "open", 18],
+    ["PO-8852", "Metro Auto", "FLT-9", 16, "received", 8],
+  ] as const
+).map(([poNumber, supplier, sku, quantity, status, hours], index) =>
   record({
     id: `rec-log-po-${String(index + 1).padStart(2, "0")}`,
     schemaId: "logistics-purchase-order",
@@ -114,13 +116,15 @@ const logisticsShipments: StoredRecord[] = [
   }),
 ]
 
-const logisticsTracking: StoredRecord[] = [
-  ["SHP-4412", "logistics-origin", "picked_up", 15],
-  ["SHP-4412", "logistics-hub", "in_transit", 11],
-  ["SHP-4418", "logistics-origin", "picked_up", 12],
-  ["SHP-4418", "logistics-hub", "at_hub", 2],
-  ["SHP-4409", "logistics-last-mile", "out_for_delivery", 4],
-].map(([shipmentId, organizationId, milestone, hours], index) =>
+const logisticsTracking: StoredRecord[] = (
+  [
+    ["SHP-4412", "logistics-origin", "picked_up", 15],
+    ["SHP-4412", "logistics-hub", "in_transit", 11],
+    ["SHP-4418", "logistics-origin", "picked_up", 12],
+    ["SHP-4418", "logistics-hub", "at_hub", 2],
+    ["SHP-4409", "logistics-last-mile", "out_for_delivery", 4],
+  ] as const
+).map(([shipmentId, organizationId, milestone, hours], index) =>
   record({
     id: `rec-log-track-${String(index + 1).padStart(2, "0")}`,
     schemaId: "logistics-tracking-event",
@@ -170,18 +174,28 @@ const logisticsDispatches: StoredRecord[] = [
   }),
 ]
 
-const cafeMenu: StoredRecord[] = [
-  ["SKU-LAT", "Latte", "drink", 450, true, "cafe-downtown", 40],
-  ["SKU-ESP", "Espresso", "drink", 300, true, "cafe-downtown", 40],
-  ["SKU-AMR", "Americano", "drink", 350, true, "cafe-university", 36],
-  ["SKU-MOC", "Mocha", "drink", 500, false, "cafe-airport", 30],
-  ["SKU-CRS", "Almond croissant", "pastry", 425, true, "cafe-downtown", 28],
-  ["SKU-MUF", "Blueberry muffin", "pastry", 375, true, "cafe-university", 24],
-  ["SKU-BAG", "Everything bagel", "lunch", 550, true, "cafe-airport", 20],
-  ["SKU-CBZ", "Chicken banh mi", "lunch", 950, true, "cafe-downtown", 18],
-  ["SKU-OAT", "Overnight oats", "lunch", 650, false, "cafe-roastery", 12],
-  ["SKU-CHP", "Chocolate chip cookie", "pastry", 325, true, "cafe-roastery", 8],
-].map(
+const cafeMenu: StoredRecord[] = (
+  [
+    ["SKU-LAT", "Latte", "drink", 450, true, "cafe-downtown", 40],
+    ["SKU-ESP", "Espresso", "drink", 300, true, "cafe-downtown", 40],
+    ["SKU-AMR", "Americano", "drink", 350, true, "cafe-university", 36],
+    ["SKU-MOC", "Mocha", "drink", 500, false, "cafe-airport", 30],
+    ["SKU-CRS", "Almond croissant", "pastry", 425, true, "cafe-downtown", 28],
+    ["SKU-MUF", "Blueberry muffin", "pastry", 375, true, "cafe-university", 24],
+    ["SKU-BAG", "Everything bagel", "lunch", 550, true, "cafe-airport", 20],
+    ["SKU-CBZ", "Chicken banh mi", "lunch", 950, true, "cafe-downtown", 18],
+    ["SKU-OAT", "Overnight oats", "lunch", 650, false, "cafe-roastery", 12],
+    [
+      "SKU-CHP",
+      "Chocolate chip cookie",
+      "pastry",
+      325,
+      true,
+      "cafe-roastery",
+      8,
+    ],
+  ] as const
+).map(
   (
     [sku, name, category, priceCents, available, organizationId, hours],
     index
@@ -197,30 +211,32 @@ const cafeMenu: StoredRecord[] = [
     })
 )
 
-const cafeOrders: StoredRecord[] = [
-  ["T-1041", "cafe-downtown", "in_shop", ["SKU-LAT", "SKU-CRS"], "ready", 6],
-  ["T-1042", "cafe-downtown", "mobile", ["SKU-ESP"], "picked_up", 5],
+const cafeOrders: StoredRecord[] = (
   [
-    "T-1043",
-    "cafe-university",
-    "kiosk",
-    ["SKU-AMR", "SKU-MUF"],
-    "in_progress",
-    3,
-  ],
-  ["T-1044", "cafe-airport", "in_shop", ["SKU-BAG"], "queued", 2],
-  ["T-1045", "cafe-downtown", "mobile", ["SKU-CBZ", "SKU-LAT"], "ready", 2],
-  ["T-1046", "cafe-university", "in_shop", ["SKU-AMR"], "picked_up", 1],
-  ["T-1047", "cafe-airport", "kiosk", ["SKU-MOC"], "queued", 1],
-  [
-    "T-1048",
-    "cafe-downtown",
-    "in_shop",
-    ["SKU-CHP", "SKU-ESP"],
-    "in_progress",
-    0.5,
-  ],
-].map(([ticketId, organizationId, channel, itemSkus, status, hours], index) =>
+    ["T-1041", "cafe-downtown", "in_shop", ["SKU-LAT", "SKU-CRS"], "ready", 6],
+    ["T-1042", "cafe-downtown", "mobile", ["SKU-ESP"], "picked_up", 5],
+    [
+      "T-1043",
+      "cafe-university",
+      "kiosk",
+      ["SKU-AMR", "SKU-MUF"],
+      "in_progress",
+      3,
+    ],
+    ["T-1044", "cafe-airport", "in_shop", ["SKU-BAG"], "queued", 2],
+    ["T-1045", "cafe-downtown", "mobile", ["SKU-CBZ", "SKU-LAT"], "ready", 2],
+    ["T-1046", "cafe-university", "in_shop", ["SKU-AMR"], "picked_up", 1],
+    ["T-1047", "cafe-airport", "kiosk", ["SKU-MOC"], "queued", 1],
+    [
+      "T-1048",
+      "cafe-downtown",
+      "in_shop",
+      ["SKU-CHP", "SKU-ESP"],
+      "in_progress",
+      0.5,
+    ],
+  ] as const
+).map(([ticketId, organizationId, channel, itemSkus, status, hours], index) =>
   record({
     id: `rec-cafe-order-${String(index + 1).padStart(2, "0")}`,
     schemaId: "cafe-order-ticket",
@@ -228,17 +244,25 @@ const cafeOrders: StoredRecord[] = [
     networkId: "cafe",
     hours: hours as number,
     key: `${organizationId}:ticket:${ticketId}`,
-    data: { ticketId, locationId: organizationId, channel, itemSkus, status },
+    data: {
+      ticketId,
+      locationId: organizationId,
+      channel,
+      itemSkus: [...itemSkus],
+      status,
+    },
   })
 )
 
-const cafeLoyalty: StoredRecord[] = [
-  ["earn", 12, "cafe-downtown", 10],
-  ["redeem", -40, "cafe-university", 8],
-  ["earn", 8, "cafe-airport", 5],
-  ["adjust", -4, "cafe-downtown", 3],
-  ["earn", 15, "cafe-roastery", 1],
-].map(([type, points, organizationId, hours], index) =>
+const cafeLoyalty: StoredRecord[] = (
+  [
+    ["earn", 12, "cafe-downtown", 10],
+    ["redeem", -40, "cafe-university", 8],
+    ["earn", 8, "cafe-airport", 5],
+    ["adjust", -4, "cafe-downtown", 3],
+    ["earn", 15, "cafe-roastery", 1],
+  ] as const
+).map(([type, points, organizationId, hours], index) =>
   record({
     id: `rec-cafe-loyalty-${String(index + 1).padStart(2, "0")}`,
     schemaId: "cafe-loyalty-transaction",
@@ -389,13 +413,15 @@ const gymMemberships: StoredRecord[] = [
   }),
 ]
 
-const gymBookings: StoredRecord[] = [
-  ["MEM-2041", "CLS-SPIN-9", false, "gym-flagship", 6],
-  ["MEM-2055", "CLS-LIFT-7", true, "gym-strength", 5],
-  ["MEM-2041", "CLS-YOGA-2", false, "gym-aqua", 4],
-  ["MEM-2071", "CLS-PT-12", false, "gym-pt", 2],
-  ["MEM-2060", "CLS-SWIM-4", false, "gym-aqua", 1],
-].map(([memberId, classId, waitlisted, organizationId, hours], index) =>
+const gymBookings: StoredRecord[] = (
+  [
+    ["MEM-2041", "CLS-SPIN-9", false, "gym-flagship", 6],
+    ["MEM-2055", "CLS-LIFT-7", true, "gym-strength", 5],
+    ["MEM-2041", "CLS-YOGA-2", false, "gym-aqua", 4],
+    ["MEM-2071", "CLS-PT-12", false, "gym-pt", 2],
+    ["MEM-2060", "CLS-SWIM-4", false, "gym-aqua", 1],
+  ] as const
+).map(([memberId, classId, waitlisted, organizationId, hours], index) =>
   record({
     id: `rec-gym-book-${String(index + 1).padStart(2, "0")}`,
     schemaId: "gym-class-booking",
@@ -412,12 +438,14 @@ const gymBookings: StoredRecord[] = [
   })
 )
 
-const gymCheckins: StoredRecord[] = [
-  ["MEM-2041", "gym-flagship", "door", 5],
-  ["MEM-2055", "gym-strength", "kiosk", 4],
-  ["MEM-2071", "gym-flagship", "staff", 2],
-  ["MEM-2041", "gym-aqua", "door", 1],
-].map(([memberId, organizationId, source, hours], index) =>
+const gymCheckins: StoredRecord[] = (
+  [
+    ["MEM-2041", "gym-flagship", "door", 5],
+    ["MEM-2055", "gym-strength", "kiosk", 4],
+    ["MEM-2071", "gym-flagship", "staff", 2],
+    ["MEM-2041", "gym-aqua", "door", 1],
+  ] as const
+).map(([memberId, organizationId, source, hours], index) =>
   record({
     id: `rec-gym-checkin-${String(index + 1).padStart(2, "0")}`,
     schemaId: "gym-check-in",
@@ -501,13 +529,15 @@ const dentistPatients: StoredRecord[] = [
   }),
 ]
 
-const dentistAppointments: StoredRecord[] = [
-  ["PAT-301", "PRV-CHO", "A2", "confirmed", "dentist-family", 8],
-  ["PAT-318", "PRV-PARK", "B1", "sent", "dentist-pediatric", 6],
-  ["PAT-327", "PRV-SHAH", "C3", "pending", "dentist-ortho", 4],
-  ["PAT-330", "PRV-CHO", "A1", "confirmed", "dentist-family", 2],
-  ["PAT-301", "PRV-CHO", "A3", "declined", "dentist-family", 1],
-].map(
+const dentistAppointments: StoredRecord[] = (
+  [
+    ["PAT-301", "PRV-CHO", "A2", "confirmed", "dentist-family", 8],
+    ["PAT-318", "PRV-PARK", "B1", "sent", "dentist-pediatric", 6],
+    ["PAT-327", "PRV-SHAH", "C3", "pending", "dentist-ortho", 4],
+    ["PAT-330", "PRV-CHO", "A1", "confirmed", "dentist-family", 2],
+    ["PAT-301", "PRV-CHO", "A3", "declined", "dentist-family", 1],
+  ] as const
+).map(
   (
     [patientId, providerId, operatory, reminderStatus, organizationId, hours],
     index
@@ -578,12 +608,14 @@ const dentistPlans: StoredRecord[] = [
   }),
 ]
 
-const dentistClaims: StoredRecord[] = [
-  ["CLM-610", "PAT-301", "BCBS", 124000, "submitted", "dentist-family", 10],
-  ["CLM-618", "PAT-327", "CIGNA", 210000, "pending", "dentist-ortho", 7],
-  ["CLM-622", "PAT-318", "AETNA", 18000, "paid", "dentist-pediatric", 4],
-  ["CLM-629", "PAT-330", "BCBS", 64000, "denied", "dentist-family", 2],
-].map(
+const dentistClaims: StoredRecord[] = (
+  [
+    ["CLM-610", "PAT-301", "BCBS", 124000, "submitted", "dentist-family", 10],
+    ["CLM-618", "PAT-327", "CIGNA", 210000, "pending", "dentist-ortho", 7],
+    ["CLM-622", "PAT-318", "AETNA", 18000, "paid", "dentist-pediatric", 4],
+    ["CLM-629", "PAT-330", "BCBS", 64000, "denied", "dentist-family", 2],
+  ] as const
+).map(
   (
     [claimId, patientId, payerId, amountCents, status, organizationId, hours],
     index
@@ -685,13 +717,15 @@ const schoolEnrollments: StoredRecord[] = [
   }),
 ]
 
-const schoolAttendance: StoredRecord[] = [
-  ["STU-4412", "school-high", "present", 6],
-  ["STU-4508", "school-middle", "tardy", 5],
-  ["STU-4601", "school-elementary", "present", 4],
-  ["STU-4412", "school-high", "absent", 2],
-  ["STU-4704", "school-high", "present", 1],
-].map(([studentId, organizationId, status, hours], index) =>
+const schoolAttendance: StoredRecord[] = (
+  [
+    ["STU-4412", "school-high", "present", 6],
+    ["STU-4508", "school-middle", "tardy", 5],
+    ["STU-4601", "school-elementary", "present", 4],
+    ["STU-4412", "school-high", "absent", 2],
+    ["STU-4704", "school-high", "present", 1],
+  ] as const
+).map(([studentId, organizationId, status, hours], index) =>
   record({
     id: `rec-sch-att-${String(index + 1).padStart(2, "0")}`,
     schemaId: "school-attendance",
@@ -708,12 +742,14 @@ const schoolAttendance: StoredRecord[] = [
   })
 )
 
-const schoolCourses: StoredRecord[] = [
-  ["CRS-ALG-2", "Algebra II", "Priya Shah", "school-high", 2, 28, 10],
-  ["CRS-BIO-1", "Biology", "Owen Blake", "school-high", 4, 24, 8],
-  ["CRS-ELA-7", "English 7", "Elena Ruiz", "school-middle", 1, 26, 6],
-  ["CRS-ART-K", "Art Studio", "Grace Owens", "school-elementary", 3, 22, 3],
-].map(
+const schoolCourses: StoredRecord[] = (
+  [
+    ["CRS-ALG-2", "Algebra II", "Priya Shah", "school-high", 2, 28, 10],
+    ["CRS-BIO-1", "Biology", "Owen Blake", "school-high", 4, 24, 8],
+    ["CRS-ELA-7", "English 7", "Elena Ruiz", "school-middle", 1, 26, 6],
+    ["CRS-ART-K", "Art Studio", "Grace Owens", "school-elementary", 3, 22, 3],
+  ] as const
+).map(
   ([courseId, title, teacher, organizationId, period, seats, hours], index) =>
     record({
       id: `rec-sch-crs-${String(index + 1).padStart(2, "0")}`,
@@ -814,13 +850,15 @@ const personalExpenses: StoredRecord[] = [
   }),
 ]
 
-const personalTasks: StoredRecord[] = [
-  ["Renew car tabs", "home", "open", "personal-home", 8],
-  ["Send August invoice", "work", "doing", "personal-work", 5],
-  ["Book dentist for Maya", "family", "open", "personal-family", 3],
-  ["Replace furnace filter", "home", "done", "personal-home", 2],
-  ["Prep client deck", "work", "open", "personal-work", 1],
-].map(([title, area, status, organizationId, hours], index) =>
+const personalTasks: StoredRecord[] = (
+  [
+    ["Renew car tabs", "home", "open", "personal-home", 8],
+    ["Send August invoice", "work", "doing", "personal-work", 5],
+    ["Book dentist for Maya", "family", "open", "personal-family", 3],
+    ["Replace furnace filter", "home", "done", "personal-home", 2],
+    ["Prep client deck", "work", "open", "personal-work", 1],
+  ] as const
+).map(([title, area, status, organizationId, hours], index) =>
   record({
     id: `rec-pers-task-${String(index + 1).padStart(2, "0")}`,
     schemaId: "personal-task",
@@ -837,40 +875,42 @@ const personalTasks: StoredRecord[] = [
   })
 )
 
-const personalContacts: StoredRecord[] = [
+const personalContacts: StoredRecord[] = (
   [
-    "Jordan Hale",
-    "family",
-    "206-555-0142",
-    "jordan@example.com",
-    "personal-family",
-    40,
-  ],
-  [
-    "Maya Hale",
-    "family",
-    "206-555-0188",
-    "maya@example.com",
-    "personal-family",
-    40,
-  ],
-  [
-    "Northwind HVAC",
-    "vendor",
-    "206-555-2201",
-    "service@northwind.example",
-    "personal-home",
-    20,
-  ],
-  [
-    "Priya Shah",
-    "work",
-    "415-555-0190",
-    "priya@studio.example",
-    "personal-work",
-    12,
-  ],
-].map(
+    [
+      "Jordan Hale",
+      "family",
+      "206-555-0142",
+      "jordan@example.com",
+      "personal-family",
+      40,
+    ],
+    [
+      "Maya Hale",
+      "family",
+      "206-555-0188",
+      "maya@example.com",
+      "personal-family",
+      40,
+    ],
+    [
+      "Northwind HVAC",
+      "vendor",
+      "206-555-2201",
+      "service@northwind.example",
+      "personal-home",
+      20,
+    ],
+    [
+      "Priya Shah",
+      "work",
+      "415-555-0190",
+      "priya@studio.example",
+      "personal-work",
+      12,
+    ],
+  ] as const
+).map(
   ([displayName, relationship, phone, email, organizationId, hours], index) =>
     record({
       id: `rec-pers-contact-${String(index + 1).padStart(2, "0")}`,
@@ -888,11 +928,13 @@ const personalContacts: StoredRecord[] = [
     })
 )
 
-const personalSubscriptions: StoredRecord[] = [
-  ["iCloud+", 299, "monthly", "2026-09-04", "personal-home", 14],
-  ["NYT", 1799, "monthly", "2026-09-12", "personal-home", 9],
-  ["Figma", 14400, "yearly", "2026-11-01", "personal-work", 6],
-].map(
+const personalSubscriptions: StoredRecord[] = (
+  [
+    ["iCloud+", 299, "monthly", "2026-09-04", "personal-home", 14],
+    ["NYT", 1799, "monthly", "2026-09-12", "personal-home", 9],
+    ["Figma", 14400, "yearly", "2026-11-01", "personal-work", 6],
+  ] as const
+).map(
   (
     [vendor, amountCents, cadence, nextChargeOn, organizationId, hours],
     index
@@ -1001,13 +1043,15 @@ const portfolioFunds: StoredRecord[] = [
   }),
 ]
 
-const portfolioCommitments: StoredRecord[] = [
-  ["CMT-201", "INV-110", "portfolio-fund-iii", 500000000, "funded", 70],
-  ["CMT-202", "INV-118", "portfolio-fund-iii", 150000000, "funded", 70],
-  ["CMT-203", "INV-124", "portfolio-fund-iii", 2500000000, "funded", 70],
-  ["CMT-210", "INV-110", "portfolio-opportunity", 250000000, "committed", 40],
-  ["CMT-211", "INV-131", "portfolio-opportunity", 800000000, "funded", 36],
-].map(
+const portfolioCommitments: StoredRecord[] = (
+  [
+    ["CMT-201", "INV-110", "portfolio-fund-iii", 500000000, "funded", 70],
+    ["CMT-202", "INV-118", "portfolio-fund-iii", 150000000, "funded", 70],
+    ["CMT-203", "INV-124", "portfolio-fund-iii", 2500000000, "funded", 70],
+    ["CMT-210", "INV-110", "portfolio-opportunity", 250000000, "committed", 40],
+    ["CMT-211", "INV-131", "portfolio-opportunity", 800000000, "funded", 36],
+  ] as const
+).map(
   ([commitmentId, investorId, fundId, commitmentCents, status, hours], index) =>
     record({
       id: `rec-pe-cmt-${String(index + 1).padStart(2, "0")}`,

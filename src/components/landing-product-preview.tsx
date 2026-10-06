@@ -1205,11 +1205,13 @@ function PipelinePane({
 export function LandingProductPreview() {
   const [threadId, setThreadId] = useState<ThreadConfig["id"]>(threads[0].id)
   const [view, setView] = useState<PreviewView>("network")
-  const [selectedSchemaId, setSelectedSchemaId] = useState(threads[0].schemaId)
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState(
+  const [selectedSchemaId, setSelectedSchemaId] = useState<string>(
+    threads[0].schemaId
+  )
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>(
     threads[0].workflowId
   )
-  const [selectedPipelineId, setSelectedPipelineId] = useState(
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string>(
     threads[0].pipelineId
   )
   const example = useMemo(() => {

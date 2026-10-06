@@ -117,7 +117,7 @@ const organizationApi = api.injectEndpoints({
           const { data } = await queryFulfilled
           for (const organization of data.items) {
             dispatch(
-              api.util.upsertQueryData(
+              organizationApi.util.upsertQueryData(
                 "getOrganization",
                 organization.id,
                 organization

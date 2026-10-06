@@ -101,7 +101,7 @@ type NodeDrafts = {
 }
 
 function draftsFromDefinition(
-  type: NodeType,
+  _type: NodeType,
   definition: JsonObject
 ): NodeDrafts {
   const http = httpDraftFromDefinition(definition)

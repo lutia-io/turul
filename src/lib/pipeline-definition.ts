@@ -378,7 +378,6 @@ export function pipelineDraftSentence(levels: PipelineLevelDraft[]) {
 
 export function pipelineSummary(definition: JsonObject) {
   const levels = getPipelineLevels(definition)
-  const nodeCount = levels.reduce((count, level) => count + level.length, 0)
   if (levels.length === 0) {
     return "No levels yet"
   }
