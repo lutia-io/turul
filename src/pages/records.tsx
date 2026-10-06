@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useSearchParams } from "react-router"
-import { PencilIcon, PlusIcon, TableIcon, ViewIcon } from "lucide-react"
+import { PencilIcon, PlusIcon, TableIcon, ViewIcon, WorkflowIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import { AddTableDialog } from "@/components/add-table-dialog"
@@ -202,6 +202,7 @@ export default function RecordsPage() {
   const {
     network,
     organizationId,
+    href,
     isFetching: isWorkspaceFetching,
   } = useNetworkWorkspace()
   const { openCreateRecord, openEditRecord } = useCreateEntity()
@@ -255,26 +256,49 @@ export default function RecordsPage() {
     setParams(nextParams, { replace: true })
   }
 
+  const canCreateRecord = isOrgUser
+    ? canOrg("record", "create")
+    : Boolean(authorization?.network?.member)
+  const canViewWorkflows = canNetwork("workflow_definition", "read")
+  const workflowsHref = activeNetwork
+    ? networkWorkspacePath({
+        networkId: activeNetwork.id,
+        organizationId,
+        rest: "workflow-definitions",
+      })
+    : href("workflow-definitions")
+
   return (
     <DataTablePage
       title="Records"
       description="Each table is one kind of record. Hover a related record, URL, or file for a preview, then click to open it."
       action={
-        (isOrgUser
-          ? canOrg("record", "create")
-          : Boolean(authorization?.network?.member)) ? (
-          <Button
-            onClick={() =>
-              openCreateRecord({
-                networkId: activeNetwork?.id,
-                organizationId,
-                schemaId: activeSchema?.id,
-              })
-            }
-          >
-            <PlusIcon />
-            Create record
-          </Button>
+        canViewWorkflows || canCreateRecord ? (
+          <div className="flex items-center gap-2">
+            {canViewWorkflows ? (
+              <Button
+                variant="outline"
+                render={<Link to={workflowsHref} />}
+              >
+                <WorkflowIcon />
+                Workflows
+              </Button>
+            ) : null}
+            {canCreateRecord ? (
+              <Button
+                onClick={() =>
+                  openCreateRecord({
+                    networkId: activeNetwork?.id,
+                    organizationId,
+                    schemaId: activeSchema?.id,
+                  })
+                }
+              >
+                <PlusIcon />
+                Create record
+              </Button>
+            ) : null}
+          </div>
         ) : null
       }
     >
@@ -299,7 +323,10 @@ export default function RecordsPage() {
           renderMenu={(schema) => {
             const canEdit = canNetwork("schema", "update") && !schema.internal
             const canDelete = canNetwork("schema", "delete") && !schema.internal
-            if (!canEdit && !canDelete) {
+            const canWorkflow =
+              canNetwork("workflow_definition", "read") ||
+              canNetwork("workflow_definition", "create")
+            if (!canEdit && !canDelete && !canWorkflow) {
               return null
             }
             return (

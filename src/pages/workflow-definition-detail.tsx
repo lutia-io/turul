@@ -100,7 +100,7 @@ function workflowDefinitionError(text: string) {
   try {
     const parsed = JSON.parse(text) as unknown
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return "JSON must be a workflow definition object"
+      return "JSON must be a workflow object"
     }
     if (!parseWorkflowDefinition(parsed as JsonObject)) {
       return "JSON must include actions"
@@ -181,9 +181,9 @@ export default function WorkflowDefinitionDetail() {
     return (
       <DefinitionStatusPage
         {...getHumaLoadErrorCopy(workflowQuery.error, {
-          resource: "Workflow definition",
+          resource: "Workflow",
           notFoundMessage:
-            "This workflow definition does not exist or is no longer available.",
+            "This workflow does not exist or is no longer available.",
         })}
       />
     )
@@ -192,11 +192,15 @@ export default function WorkflowDefinitionDetail() {
   if (!visibleWorkflow || !network) {
     return (
       <DefinitionStatusPage
-        title="Workflow definition not found"
-        message="This workflow definition does not exist or is no longer available."
+        title="Workflow not found"
+        message="This workflow does not exist or is no longer available."
       />
     )
   }
+
+  const tableHref = schema
+    ? `${href("records")}?schema=${encodeURIComponent(schema.id)}`
+    : href("records")
 
   const aside = (
     <>
@@ -204,10 +208,10 @@ export default function WorkflowDefinitionDetail() {
         title="Details"
         footer={
           <Link
-            to={href("workflow-definitions")}
+            to={tableHref}
             className="mt-5 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
-            View all workflow definitions
+            View table
           </Link>
         }
       >
@@ -352,10 +356,10 @@ export default function WorkflowDefinitionDetail() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-1.5">
           <Link
-            to={href("workflow-definitions")}
+            to={tableHref}
             className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            Workflow definition
+            {schema?.name ?? "Records"}
           </Link>
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-semibold tracking-tight text-pretty">
@@ -403,7 +407,7 @@ export default function WorkflowDefinitionDetail() {
         {definitionView === "json" ? (
           <JsonDefinitionCard
             definition={visibleWorkflow.definition}
-            label="JSONB definition"
+            label="Workflow JSON"
             description="Trigger, criteria, and actions stored on this workflow."
           />
         ) : (
@@ -486,6 +490,9 @@ function WorkflowDefinitionEdit({
   onCancel: () => void
 }) {
   const formId = useId()
+  const tableHref = schema
+    ? `${href("records")}?schema=${encodeURIComponent(schema.id)}`
+    : href("records")
   const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
   const parsed = parseWorkflowDefinition(workflow.definition)
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
@@ -621,10 +628,10 @@ function WorkflowDefinitionEdit({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1 space-y-1.5">
             <Link
-              to={href("workflow-definitions")}
+              to={tableHref}
               className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              Workflow definition
+              {schema?.name ?? "Records"}
             </Link>
             <div className="flex flex-wrap items-center gap-2.5">
               <Field className="max-w-md min-w-56 gap-1">
@@ -711,8 +718,8 @@ function WorkflowDefinitionEdit({
             <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
               <DefinitionJsonPane
                 id={`${formId}-json`}
-                title="JSON definition"
-                description="Updates as you edit. Paste a definition to fill the builder."
+                title="JSON"
+                description="Updates as you edit. Paste JSON to fill the builder."
                 value={jsonText}
                 onChange={handleJsonChange}
                 onBlur={handleJsonBlur}

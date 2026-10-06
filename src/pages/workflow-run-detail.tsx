@@ -192,7 +192,7 @@ export default function WorkflowRunDetail() {
                   <h2 className="text-sm font-medium">Steps</h2>
                   <p className="text-sm text-muted-foreground">
                     {steps.length === 0
-                      ? "This definition has no actions."
+                      ? "This workflow has no actions."
                       : `${progress}% complete`}
                   </p>
                 </div>
@@ -248,7 +248,7 @@ export default function WorkflowRunDetail() {
               </AsideRow>
               <AsideRow label="Duration">{duration}</AsideRow>
               {definition ? (
-                <AsideRow label="Definition">
+                <AsideRow label="Workflow">
                   <Link
                     to={href(`workflow-definitions/${definition.id}`)}
                     className="inline-flex max-w-full items-center gap-1.5 hover:underline"
@@ -258,7 +258,7 @@ export default function WorkflowRunDetail() {
                   </Link>
                 </AsideRow>
               ) : (
-                <AsideRow label="Definition">
+                <AsideRow label="Workflow">
                   <span className="font-mono text-xs font-normal">
                     {resolved.workflowDefinitionId}
                   </span>

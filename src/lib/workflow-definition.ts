@@ -817,6 +817,42 @@ export function workflowDraftSentence(
   )
 }
 
+export function workflowColumnNames(
+  definition: JsonObject | WorkflowDefinitionBody | undefined
+): string[] {
+  const parsed = parseWorkflowDefinition(definition)
+  if (!parsed) {
+    return []
+  }
+  const names = new Set<string>()
+  for (const field of parsed.trigger.changed ?? []) {
+    const name = field.trim()
+    if (name) {
+      names.add(name)
+    }
+  }
+  collectCriteriaFields(parsed.criteria, names)
+  return [...names]
+}
+
+function collectCriteriaFields(
+  criteria: WorkflowCriteria | undefined,
+  names: Set<string>
+) {
+  if (!criteria) {
+    return
+  }
+  if (typeof criteria.field === "string") {
+    const name = criteria.field.trim()
+    if (name) {
+      names.add(name)
+    }
+  }
+  for (const condition of criteria.conditions ?? []) {
+    collectCriteriaFields(condition, names)
+  }
+}
+
 export function workflowSummary(definition: JsonObject): string {
   const parsed = parseWorkflowDefinition(definition)
   if (parsed) {
@@ -824,7 +860,7 @@ export function workflowSummary(definition: JsonObject): string {
     const conditions = criteriaSummary(parsed.criteria)
     return `${triggerSummary(parsed.trigger)} · ${conditions} · ${actionCount} ${actionCount === 1 ? "action" : "actions"}`
   }
-  return "Workflow definition"
+  return "Workflow"
 }
 
 export function criteriaSummary(

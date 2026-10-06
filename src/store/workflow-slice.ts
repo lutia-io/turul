@@ -77,6 +77,9 @@ export type ListWorkflowDefinitionsParams = {
   slugOp?: StringFilterOp
   schema?: string
   schemaOp?: StringFilterOp
+  schemaId?: string
+  field?: string
+  internal?: boolean
   network?: string
   networkOp?: StringFilterOp
   actions?: number
@@ -128,6 +131,15 @@ function listWorkflowDefinitionQueryParams(
   setStringFilterParam(query, "name", params.name, params.nameOp)
   setStringFilterParam(query, "slug", params.slug, params.slugOp)
   setStringFilterParam(query, "schema", params.schema, params.schemaOp)
+  if (params.schemaId) {
+    query.schemaId = params.schemaId
+  }
+  if (params.field) {
+    query.field = params.field
+  }
+  if (params.internal != null) {
+    query.internal = String(params.internal)
+  }
   setStringFilterParam(query, "network", params.network, params.networkOp)
   setNumberFilterParam(query, "actions", params.actions, params.actionsOp)
 

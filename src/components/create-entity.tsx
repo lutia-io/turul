@@ -25,7 +25,13 @@ type CreateState =
       organizationId?: string
       organizationUserId?: string
     }
-  | { kind: "workflow"; networkId?: string; organizationId?: string }
+  | {
+      kind: "workflow"
+      networkId?: string
+      organizationId?: string
+      schemaId?: string
+      field?: string
+    }
   | { kind: "pipeline"; networkId?: string; organizationId?: string }
   | {
       kind: "record"
@@ -62,6 +68,8 @@ type CreateEntityContextValue = {
   openCreateWorkflow: (scope?: {
     networkId?: string
     organizationId?: string
+    schemaId?: string
+    field?: string
   }) => void
   openEditWorkflow: (workflowDefinitionId: string) => void
   openCreatePipeline: (scope?: {
@@ -223,6 +231,8 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         organizationId={
           state?.kind === "workflow" ? state.organizationId : undefined
         }
+        schemaId={state?.kind === "workflow" ? state.schemaId : undefined}
+        field={state?.kind === "workflow" ? state.field : undefined}
       />
       <PipelineDefinitionDialog
         key={`pipeline-${dialogKeys.pipeline}`}

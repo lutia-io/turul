@@ -118,13 +118,6 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       url: href("workflows"),
       icon: <PlayIcon />,
       isActive: section === "workflows",
-      items: [
-        {
-          title: "Definitions",
-          url: href("workflow-definitions"),
-          isActive: section === "workflow-definitions",
-        },
-      ],
     },
     {
       title: "Pipelines",

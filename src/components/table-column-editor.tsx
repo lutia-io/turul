@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from "react"
 import { PlusIcon } from "lucide-react"
 
 import { columnLabel } from "@/components/schema-records-table"
+import { useCreateEntity } from "@/components/create-entity"
 import { CheckboxField } from "@/components/checkbox-field"
 import {
   DataTableColumnHeader,
@@ -47,8 +48,11 @@ import {
   type FieldKind,
   type ListItemType,
 } from "@/lib/table-columns"
+import { useNetworkWorkspace } from "@/lib/network-workspace"
+import { useSchemaWorkflows } from "@/lib/schema-workflows"
 import { getHumaErrorMessage } from "@/store/api"
 import { useUpdateSchemaMutation } from "@/store/schema-slice"
+import { WorkflowsSubmenu } from "@/components/table-workflows-menu"
 
 type TableRef = {
   id: string
@@ -119,6 +123,10 @@ export function ColumnHeaderMenu({
 }) {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const { network, organizationId } = useNetworkWorkspace()
+  const { openCreateWorkflow } = useCreateEntity()
+  const { canRead, canCreate } = useSchemaWorkflows()
+  const showWorkflows = canRead || canCreate
 
   return (
     <>
@@ -131,6 +139,27 @@ export function ColumnHeaderMenu({
         onHide={onHide}
         onEdit={canEdit ? () => setEditing(true) : undefined}
         onDelete={canEdit ? () => setDeleting(true) : undefined}
+        workflows={
+          showWorkflows ? (
+            <WorkflowsSubmenu
+              key="workflows"
+              schemaId={table.id}
+              field={property.name}
+              showList={canRead}
+              onCreate={
+                canCreate
+                  ? () =>
+                      openCreateWorkflow({
+                        networkId: network?.id,
+                        organizationId,
+                        schemaId: table.id,
+                        field: property.name,
+                      })
+                  : undefined
+              }
+            />
+          ) : undefined
+        }
       />
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="sm:max-w-md">

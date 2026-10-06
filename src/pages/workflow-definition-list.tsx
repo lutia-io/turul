@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Link } from "react-router"
+import { Link, useSearchParams } from "react-router"
 import { PencilIcon, PlusIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
@@ -109,7 +109,10 @@ export default function WorkflowDefinitionList() {
   const { data: networks } = useListNetworksQuery(undefined, {
     skip: !isAuthenticated || Boolean(network),
   })
-  const [query, setQuery] = useState("")
+  const [searchParams, setSearchParams] = useSearchParams()
+  const schemaId = searchParams.get("schema") || undefined
+  const field = searchParams.get("field") || undefined
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "")
   const debouncedQuery = useDebouncedValue(query)
   const [columnFilters, setColumnFilters] = useState<WorkflowColumnFilters>({})
   const [sorting, setSorting] = useState<SortingState>([
@@ -128,7 +131,7 @@ export default function WorkflowDefinitionList() {
 
   useEffect(() => {
     setPagination((current) => ({ ...current, pageIndex: 0 }))
-  }, [debouncedQuery, columnFilters, network?.id, organizationId])
+  }, [debouncedQuery, columnFilters, network?.id, organizationId, schemaId, field])
 
   const listParams = useMemo<ListWorkflowDefinitionsParams>(() => {
     const sort = sorting[0]
@@ -140,6 +143,8 @@ export default function WorkflowDefinitionList() {
       order: sort?.desc ? "desc" : "asc",
       networkId: network?.id,
       organizationId,
+      schemaId,
+      field,
       scope: columnFilters.scope,
       active:
         columnFilters.status === "enabled"
@@ -163,6 +168,8 @@ export default function WorkflowDefinitionList() {
     debouncedQuery,
     network?.id,
     organizationId,
+    schemaId,
+    field,
     pagination.pageIndex,
     pagination.pageSize,
     sorting,
@@ -603,12 +610,38 @@ export default function WorkflowDefinitionList() {
           setColumnFilters((current) => ({ ...current, status: undefined })),
       })
     }
+    if (schemaId) {
+      chips.push({
+        id: "schemaId",
+        label: "Table",
+        value:
+          schemas.find((schema) => schema.id === schemaId)?.name ??
+          "Selected table",
+        onRemove: () => {
+          const next = new URLSearchParams(searchParams)
+          next.delete("schema")
+          setSearchParams(next, { replace: true })
+        },
+      })
+    }
+    if (field) {
+      chips.push({
+        id: "field",
+        label: "Column",
+        value: field,
+        onRemove: () => {
+          const next = new URLSearchParams(searchParams)
+          next.delete("field")
+          setSearchParams(next, { replace: true })
+        },
+      })
+    }
     return chips
-  }, [columnFilters])
+  }, [columnFilters, field, schemaId, schemas, searchParams, setSearchParams])
 
   return (
     <DataTablePage
-      title="Workflow Definitions"
+      title="Workflows"
       description={
         organization
           ? `Network-wide workflows shared with ${organization.name}, plus workflows that belong only to this organization.`
@@ -627,7 +660,7 @@ export default function WorkflowDefinitionList() {
             }
           >
             <PlusIcon />
-            Create workflow definition
+            Create workflow
           </Button>
         ) : null
       }
@@ -664,7 +697,7 @@ export default function WorkflowDefinitionList() {
                 ? "Loading workflows..."
                 : filtersActive
                   ? "No workflows match this view."
-                  : "No workflow definitions yet. Create one to automate what happens when records are created, updated, or on a schedule."
+                  : "No workflows yet. Create one to automate what happens when records are created, updated, or on a schedule."
             }
           />
           <DataTablePagination table={table} />

@@ -158,6 +158,7 @@ export function DataTableColumnHeader({
   onEdit,
   onDelete,
   onHide,
+  workflows,
 }: {
   title: string
   sorted?: false | "asc" | "desc"
@@ -170,9 +171,12 @@ export function DataTableColumnHeader({
   onEdit?: () => void
   onDelete?: () => void
   onHide?: () => void
+  workflows?: ReactNode
 }) {
   const filterActive = isFilterActive(filter)
-  const hasMenu = Boolean(onSort || filter || pin || onEdit || onDelete || onHide)
+  const hasMenu = Boolean(
+    onSort || filter || pin || onEdit || onDelete || onHide || workflows
+  )
   const SortMark =
     sorted === "asc" ? ArrowUpIcon : sorted === "desc" ? ArrowDownIcon : null
 
@@ -187,6 +191,7 @@ export function DataTableColumnHeader({
         Edit column
       </DropdownMenuItem>
     ) : null,
+    workflows ?? null,
     onSort ? (
       <DropdownMenuGroup key="sort">
         <DropdownMenuItem

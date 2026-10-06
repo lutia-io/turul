@@ -63,7 +63,7 @@ export const NETWORK_ACCESS_CATALOG: AccessResource[] = [
   },
   {
     id: "workflow_definition",
-    label: "Workflow definitions",
+    label: "Workflows",
     actions: [
       ACCESS_ACTIONS.create,
       ACCESS_ACTIONS.read,

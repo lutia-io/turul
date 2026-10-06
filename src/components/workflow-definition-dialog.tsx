@@ -75,7 +75,7 @@ function workflowDefinitionError(text: string) {
   try {
     const parsed = JSON.parse(text) as unknown
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return "JSON must be a workflow definition object"
+      return "JSON must be a workflow object"
     }
     if (!parseWorkflowDefinition(parsed as JsonObject)) {
       return "JSON must include actions"
@@ -91,11 +91,15 @@ export function WorkflowDefinitionDialog({
   onOpenChange,
   networkId,
   organizationId,
+  schemaId: lockedSchemaId,
+  field,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   networkId?: string
   organizationId?: string
+  schemaId?: string
+  field?: string
 }) {
   const navigate = useNavigate()
   const formId = useId()
@@ -117,9 +121,9 @@ export function WorkflowDefinitionDialog({
   )
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [schemaId, setSchemaId] = useState("")
+  const [schemaId, setSchemaId] = useState(lockedSchemaId ?? "")
   const [active, setActive] = useState(true)
-  const [trigger, setTrigger] = useState<TriggerDraft>(emptyTrigger())
+  const [trigger, setTrigger] = useState<TriggerDraft>(presetTrigger(field))
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
   const [actions, setActions] = useState<ActionDraft[]>([])
   const [jsonText, setJsonText] = useState("")
@@ -164,7 +168,7 @@ export function WorkflowDefinitionDialog({
         .sort((left, right) => left.name.localeCompare(right.name)),
     [pipelines, selectedNetworkId, selectedOrganizationId]
   )
-  const triggerSchema = networkSchemas.find((schema) => schema.id === schemaId)
+  const triggerSchema = schemas.find((schema) => schema.id === schemaId)
   const triggerFields = schemaFieldOptions(triggerSchema?.definition)
 
   useEffect(() => {
@@ -181,16 +185,16 @@ export function WorkflowDefinitionDialog({
 
     setName("")
     setDescription("")
-    setSchemaId("")
+    setSchemaId(lockedSchemaId ?? "")
     setSelectedOrganizationId(organizationId ?? "")
     setActive(true)
     setDefinitionView("rule")
     jsonSourceRef.current = "builder"
     setJsonError(null)
-    setTrigger(emptyTrigger())
+    setTrigger(presetTrigger(field))
     setCriteria(emptyGroup())
     setActions([])
-  }, [open, organizationId])
+  }, [open, organizationId, lockedSchemaId, field])
 
   useEffect(() => {
     if (!open) {
@@ -205,7 +209,7 @@ export function WorkflowDefinitionDialog({
   }, [firstNetworkId, networkId, open])
 
   useEffect(() => {
-    if (!open) {
+    if (!open || lockedSchemaId) {
       return
     }
     setSchemaId((current) => {
@@ -214,7 +218,7 @@ export function WorkflowDefinitionDialog({
       }
       return networkSchemas[0]?.id ?? ""
     })
-  }, [networkSchemas, open])
+  }, [lockedSchemaId, networkSchemas, open])
 
   const definition = useMemo<WorkflowDefinitionBody | undefined>(() => {
     const nextActions = actionsToApi(actions)
@@ -493,13 +497,22 @@ export function WorkflowDefinitionDialog({
                       </Select>
                     </Field>
                   ) : null}
-                  <SchemaSelect
-                    formId={formId}
-                    schemaId={schemaId}
-                    schemas={networkSchemas}
-                    isLoading={isLoading}
-                    onChange={setSchemaId}
-                  />
+                  {lockedSchemaId ? (
+                    <Field className="gap-1">
+                      <FieldLabel>Table</FieldLabel>
+                      <p className="text-sm">
+                        {triggerSchema?.name ?? "Selected table"}
+                      </p>
+                    </Field>
+                  ) : (
+                    <SchemaSelect
+                      formId={formId}
+                      schemaId={schemaId}
+                      schemas={networkSchemas}
+                      isLoading={isLoading}
+                      onChange={setSchemaId}
+                    />
+                  )}
                   <EnabledField
                     formId={formId}
                     checked={active}
@@ -515,8 +528,8 @@ export function WorkflowDefinitionDialog({
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
                   <DefinitionJsonPane
                     id={`${formId}-json`}
-                    title="JSON definition"
-                    description="Updates as you edit. Paste a definition to fill the builder."
+                    title="JSON"
+                    description="Updates as you edit. Paste JSON to fill the builder."
                     value={jsonText}
                     onChange={handleJsonChange}
                     onBlur={handleJsonBlur}
@@ -576,6 +589,14 @@ export function WorkflowDefinitionDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+function presetTrigger(field?: string): TriggerDraft {
+  const trigger = emptyTrigger()
+  if (!field) {
+    return trigger
+  }
+  return { ...trigger, kind: "updated", changed: [field] }
 }
 
 function SchemaSelect({

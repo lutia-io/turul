@@ -1,6 +1,8 @@
 import { useEffect, useId, useState, type FormEvent } from "react"
 import { ChevronDownIcon, PencilIcon, Trash2Icon } from "lucide-react"
 
+import { useCreateEntity } from "@/components/create-entity"
+import { WorkflowsSubmenu } from "@/components/table-workflows-menu"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -20,6 +22,8 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import type { Schema } from "@/data/networks"
+import { useNetworkWorkspace } from "@/lib/network-workspace"
+import { useSchemaWorkflows } from "@/lib/schema-workflows"
 import { getHumaErrorMessage } from "@/store/api"
 import {
   useDeleteSchemaMutation,
@@ -39,8 +43,12 @@ export function TableSheetMenu({
 }) {
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const { network, organizationId } = useNetworkWorkspace()
+  const { openCreateWorkflow } = useCreateEntity()
+  const { canRead, canCreate } = useSchemaWorkflows()
+  const showWorkflows = canRead || canCreate
 
-  if (!canEdit && !canDelete) {
+  if (!canEdit && !canDelete && !showWorkflows) {
     return null
   }
 
@@ -60,7 +68,26 @@ export function TableSheetMenu({
               Edit table
             </DropdownMenuItem>
           ) : null}
-          {canEdit && canDelete ? <DropdownMenuSeparator /> : null}
+          {canEdit && (showWorkflows || canDelete) ? (
+            <DropdownMenuSeparator />
+          ) : null}
+          {showWorkflows ? (
+            <WorkflowsSubmenu
+              schemaId={schema.id}
+              showList={canRead}
+              onCreate={
+                canCreate
+                  ? () =>
+                      openCreateWorkflow({
+                        networkId: network?.id,
+                        organizationId,
+                        schemaId: schema.id,
+                      })
+                  : undefined
+              }
+            />
+          ) : null}
+          {showWorkflows && canDelete ? <DropdownMenuSeparator /> : null}
           {canDelete ? (
             <DropdownMenuItem
               variant="destructive"
