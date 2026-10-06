@@ -47,6 +47,17 @@ import {
   WorkflowSectionHeading,
 } from "@/components/workflow-rule"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
+import {
+  WorkflowPipelineEditor,
+  type WorkflowPipelineEditorHandle,
+} from "@/components/workflow-pipeline-editor"
+import { useAuthorization } from "@/lib/authorization"
+import {
+  mergeWorkspacePipelines,
+  workspacePipelineFromSaved,
+  type SavedWorkflowPipeline,
+  type WorkflowPipelineSession,
+} from "@/lib/workflow-pipeline"
 import type {
   PipelineDefinition,
   Schema,
@@ -494,6 +505,14 @@ function WorkflowDefinitionEdit({
     ? `${href("records")}?schema=${encodeURIComponent(schema.id)}`
     : href("records")
   const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
+  const pipelineEditorRef = useRef<WorkflowPipelineEditorHandle>(null)
+  const [pipelineSession, setPipelineSession] =
+    useState<WorkflowPipelineSession | null>(null)
+  const [savedPipelines, setSavedPipelines] = useState<PipelineDefinition[]>([])
+  const { canNetwork } = useAuthorization({
+    networkId: workflow.networkId,
+    organizationId: workflow.organizationId ?? null,
+  })
   const parsed = parseWorkflowDefinition(workflow.definition)
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
   const [name, setName] = useState(workflow.name)
@@ -514,6 +533,16 @@ function WorkflowDefinitionEdit({
   const triggerFields = schemaFieldOptions(schema?.definition)
   const isLoading = updateState.isLoading
   const error = updateState.error
+  const availablePipelines = useMemo(
+    () =>
+      mergeWorkspacePipelines(pipelines, savedPipelines).sort((left, right) =>
+        left.name.localeCompare(right.name)
+      ),
+    [pipelines, savedPipelines]
+  )
+  const canCreatePipeline =
+    Boolean(workflow.networkId) && canNetwork("pipeline_definition", "create")
+  const canUpdatePipeline = canNetwork("pipeline_definition", "update")
 
   const definition = useMemo<WorkflowDefinitionBody | undefined>(() => {
     const nextActions = actionsToApi(actions)
@@ -615,6 +644,53 @@ function WorkflowDefinitionEdit({
     } catch {
       // Error is rendered from the mutation state.
     }
+  }
+
+  function rememberPipeline(saved: SavedWorkflowPipeline) {
+    const actionKey = pipelineSession?.actionKey
+    if (!actionKey) {
+      return
+    }
+    const pipeline = workspacePipelineFromSaved(saved)
+    setSavedPipelines((current) => [
+      pipeline,
+      ...current.filter((item) => item.id !== pipeline.id),
+    ])
+    jsonSourceRef.current = "builder"
+    setActions((current) =>
+      current.map((action) =>
+        action.key === actionKey ? { ...action, pipeline: saved.id } : action
+      )
+    )
+    setDefinitionView("rule")
+    setPipelineSession(null)
+  }
+
+  if (pipelineSession && workflow.networkId) {
+    const editingPipeline =
+      pipelineSession.mode === "edit"
+        ? availablePipelines.find(
+            (pipeline) => pipeline.id === pipelineSession.pipelineId
+          )
+        : undefined
+    return (
+      <DefinitionPage fill>
+        <WorkflowPipelineEditor
+          key={`${pipelineSession.mode}-${pipelineSession.pipelineId ?? pipelineSession.actionKey}`}
+          ref={pipelineEditorRef}
+          mode={pipelineSession.mode}
+          pipeline={editingPipeline}
+          networkId={workflow.networkId}
+          organizationId={workflow.organizationId}
+          layeredCancel
+          onDone={rememberPipeline}
+          onCancel={() => {
+            setDefinitionView("rule")
+            setPipelineSession(null)
+          }}
+        />
+      </DefinitionPage>
+    )
   }
 
   return (
@@ -733,9 +809,17 @@ function WorkflowDefinitionEdit({
               actions={actions}
               fields={triggerFields}
               schemas={schemas}
-              pipelines={pipelines}
+              pipelines={availablePipelines}
               triggerSchemaId={workflow.schemaId}
               schemaName={schema?.name}
+              canCreatePipeline={canCreatePipeline}
+              canUpdatePipeline={canUpdatePipeline}
+              onCreatePipeline={(actionKey) =>
+                setPipelineSession({ actionKey, mode: "create" })
+              }
+              onEditPipeline={(actionKey, pipelineId) =>
+                setPipelineSession({ actionKey, mode: "edit", pipelineId })
+              }
               onTriggerChange={(next) => {
                 markBuilderSource()
                 setTrigger(next)

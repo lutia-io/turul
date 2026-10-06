@@ -318,7 +318,6 @@ export default function PipelineDefinitionDetail() {
             className="h-full min-h-0 flex-1"
             levels={viewLevels}
             sentence={summary}
-            details={<div className="flex flex-col gap-3">{aside}</div>}
           />
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto">

@@ -1,10 +1,14 @@
-import { useEffect, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import {
+  CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CopyPlusIcon,
+  PencilIcon,
   PlusIcon,
+  SearchIcon,
   Trash2Icon,
+  XIcon,
   ZapIcon,
 } from "lucide-react"
 
@@ -58,15 +62,105 @@ import {
 
 const CHOOSE_SCHEMA = "__choose_schema__"
 const CHOOSE_FIELD = "__choose_field__"
-const CHOOSE_PIPELINE = "__choose_pipeline__"
-
-function pipelineRef(pipeline: PipelineDefinition) {
-  return pipeline.id
-}
 
 function findPipeline(pipelines: PipelineDefinition[], value: string) {
   return pipelines.find(
     (pipeline) => pipeline.id === value || pipeline.slug === value
+  )
+}
+
+function pipelineMatchesQuery(pipeline: PipelineDefinition, query: string) {
+  const trimmed = query.trim().toLowerCase()
+  if (!trimmed) {
+    return true
+  }
+  return (
+    pipeline.name.toLowerCase().includes(trimmed) ||
+    pipeline.slug.toLowerCase().includes(trimmed)
+  )
+}
+
+function PipelineSearch({
+  id,
+  pipelines,
+  value,
+  onChange,
+}: {
+  id: string
+  pipelines: PipelineDefinition[]
+  value: string
+  onChange: (pipelineId: string) => void
+}) {
+  const [query, setQuery] = useState("")
+  const selected = findPipeline(pipelines, value)
+  const matches = pipelines.filter((pipeline) =>
+    pipelineMatchesQuery(pipeline, query)
+  )
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          id={id}
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search name or slug..."
+          className={cn(
+            "h-8 bg-background pl-8 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
+            query && "pr-8"
+          )}
+        />
+        {query ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            onClick={() => setQuery("")}
+          >
+            <XIcon />
+            <span className="sr-only">Clear search</span>
+          </Button>
+        ) : null}
+      </div>
+      <div className="max-h-40 overflow-y-auto rounded-lg border">
+        {matches.length === 0 ? (
+          <p className="px-3 py-2 text-sm text-muted-foreground">
+            No pipelines match this search.
+          </p>
+        ) : (
+          matches.map((pipeline) => {
+            const isSelected = selected?.id === pipeline.id
+            return (
+              <button
+                key={pipeline.id}
+                type="button"
+                onClick={() => onChange(pipeline.id)}
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/40",
+                  isSelected && "bg-muted/60"
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{pipeline.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {pipeline.slug}
+                </span>
+                {isSelected ? (
+                  <CheckIcon className="size-3.5 shrink-0" />
+                ) : null}
+              </button>
+            )
+          })
+        )}
+      </div>
+      {value && !selected ? (
+        <p className="text-xs text-muted-foreground">
+          Selected pipeline is not in this list: {value}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -476,6 +570,10 @@ function ActionEditor({
   onMove,
   onDuplicate,
   onRemove,
+  canCreatePipeline,
+  canUpdatePipeline,
+  onCreatePipeline,
+  onEditPipeline,
 }: {
   action: ActionDraft
   index: number
@@ -491,6 +589,10 @@ function ActionEditor({
   onMove: (offset: number) => void
   onDuplicate: () => void
   onRemove: () => void
+  canCreatePipeline?: boolean
+  canUpdatePipeline?: boolean
+  onCreatePipeline?: (actionKey: string) => void
+  onEditPipeline?: (actionKey: string, pipelineId: string) => void
 }) {
   const needsSchema = writesRecord(action.type)
   const needsRecord =
@@ -503,9 +605,6 @@ function ActionEditor({
     ? getJsonSchemaProperties(targetSchema.definition)
     : []
   const selectedPipeline = findPipeline(pipelines, action.pipeline)
-  const pipelineValue = selectedPipeline
-    ? pipelineRef(selectedPipeline)
-    : action.pipeline || CHOOSE_PIPELINE
 
   useEffect(() => {
     if (selectedPipeline && action.pipeline !== selectedPipeline.id) {
@@ -699,58 +798,58 @@ function ActionEditor({
             </Field>
           ) : null}
           {action.type === "TRIGGER_PIPELINE" ? (
-            <Field className="mt-3 gap-1">
+            <Field className="mt-3 gap-2">
               <FieldLabel htmlFor={pipelineId}>Pipeline</FieldLabel>
               {pipelines.length > 0 ? (
-                <Select
-                  value={pipelineValue}
-                  modal={false}
-                  items={[
-                    { value: CHOOSE_PIPELINE, label: "Choose a pipeline" },
-                    ...pipelines.map((pipeline) => ({
-                      value: pipelineRef(pipeline),
-                      label: pipeline.name,
-                    })),
-                    ...(action.pipeline && !selectedPipeline
-                      ? [{ value: action.pipeline, label: action.pipeline }]
-                      : []),
-                  ]}
-                  onValueChange={(value) => {
-                    if (!value || value === CHOOSE_PIPELINE) {
-                      onChange({ pipeline: "" })
-                      return
-                    }
-                    onChange({ pipeline: value })
-                  }}
-                >
-                  <SelectTrigger id={pipelineId}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={CHOOSE_PIPELINE}>
-                      Choose a pipeline
-                    </SelectItem>
-                    {pipelines.map((pipeline) => (
-                      <SelectItem
-                        key={pipeline.id}
-                        value={pipelineRef(pipeline)}
-                      >
-                        {pipeline.name}
-                      </SelectItem>
-                    ))}
-                    {action.pipeline && !selectedPipeline ? (
-                      <SelectItem value={action.pipeline}>
-                        {action.pipeline}
-                      </SelectItem>
-                    ) : null}
-                  </SelectContent>
-                </Select>
+                <PipelineSearch
+                  id={pipelineId}
+                  pipelines={pipelines}
+                  value={action.pipeline}
+                  onChange={(pipelineIdValue) =>
+                    onChange({ pipeline: pipelineIdValue })
+                  }
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Create a pipeline in this network before this action can run
-                  one.
+                  {canCreatePipeline
+                    ? "No pipelines in this network yet."
+                    : "Create a pipeline in this network before this action can run one."}
                 </p>
               )}
+              {canCreatePipeline ||
+              (canUpdatePipeline &&
+                selectedPipeline &&
+                !selectedPipeline.internal) ? (
+                <div className="flex flex-wrap gap-2">
+                  {canCreatePipeline && onCreatePipeline ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onCreatePipeline(action.key)}
+                    >
+                      <PlusIcon />
+                      Create pipeline
+                    </Button>
+                  ) : null}
+                  {canUpdatePipeline &&
+                  onEditPipeline &&
+                  selectedPipeline &&
+                  !selectedPipeline.internal ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        onEditPipeline(action.key, selectedPipeline.id)
+                      }
+                    >
+                      <PencilIcon />
+                      Edit pipeline
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
             </Field>
           ) : null}
           {action.type === "TRIGGER_PIPELINE" ? (
@@ -867,6 +966,10 @@ export function WorkflowActionsBuilder({
   triggerSchemaId,
   triggerSchemaName,
   onChange,
+  canCreatePipeline,
+  canUpdatePipeline,
+  onCreatePipeline,
+  onEditPipeline,
 }: {
   value: ActionDraft[]
   schemas: Schema[]
@@ -875,6 +978,10 @@ export function WorkflowActionsBuilder({
   triggerSchemaId?: string
   triggerSchemaName?: string
   onChange: (next: ActionDraft[]) => void
+  canCreatePipeline?: boolean
+  canUpdatePipeline?: boolean
+  onCreatePipeline?: (actionKey: string) => void
+  onEditPipeline?: (actionKey: string, pipelineId: string) => void
 }) {
   function update(key: string, patch: Partial<ActionDraft>) {
     onChange(
@@ -960,6 +1067,10 @@ export function WorkflowActionsBuilder({
                 onRemove={() =>
                   onChange(value.filter((item) => item.key !== action.key))
                 }
+                canCreatePipeline={canCreatePipeline}
+                canUpdatePipeline={canUpdatePipeline}
+                onCreatePipeline={onCreatePipeline}
+                onEditPipeline={onEditPipeline}
               />
             ))}
           </ol>

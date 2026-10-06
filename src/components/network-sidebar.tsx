@@ -124,13 +124,6 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       url: href("pipelines"),
       icon: <ActivityIcon />,
       isActive: section === "pipelines",
-      items: [
-        {
-          title: "Definitions",
-          url: href("pipeline-definitions"),
-          isActive: section === "pipeline-definitions",
-        },
-      ],
     },
   ]
 

@@ -37,6 +37,18 @@ import {
 } from "@/components/ui/select"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
 import {
+  WorkflowPipelineEditor,
+  type WorkflowPipelineEditorHandle,
+} from "@/components/workflow-pipeline-editor"
+import { useAuthorization } from "@/lib/authorization"
+import {
+  mergeWorkspacePipelines,
+  workspacePipelineFromSaved,
+  type SavedWorkflowPipeline,
+  type WorkflowPipelineSession,
+} from "@/lib/workflow-pipeline"
+import type { PipelineDefinition } from "@/data/networks"
+import {
   parseJsonObject,
   stringifyDefinition,
   type JsonObject,
@@ -127,6 +139,14 @@ export function WorkflowDefinitionDialog({
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
   const [actions, setActions] = useState<ActionDraft[]>([])
   const [jsonText, setJsonText] = useState("")
+  const [pipelineSession, setPipelineSession] =
+    useState<WorkflowPipelineSession | null>(null)
+  const [savedPipelines, setSavedPipelines] = useState<PipelineDefinition[]>([])
+  const pipelineEditorRef = useRef<WorkflowPipelineEditorHandle>(null)
+  const { canNetwork } = useAuthorization({
+    networkId: selectedNetworkId || undefined,
+    organizationId: selectedOrganizationId || null,
+  })
   const [jsonError, setJsonError] = useState<string | null>(null)
   const jsonSourceRef = useRef<"builder" | "json">("builder")
 
@@ -152,7 +172,7 @@ export function WorkflowDefinitionDialog({
   )
   const networkPipelines = useMemo(
     () =>
-      pipelines
+      mergeWorkspacePipelines(pipelines, savedPipelines)
         .filter((pipeline) => {
           if (pipeline.networkId !== selectedNetworkId) {
             return false
@@ -166,8 +186,17 @@ export function WorkflowDefinitionDialog({
           )
         })
         .sort((left, right) => left.name.localeCompare(right.name)),
-    [pipelines, selectedNetworkId, selectedOrganizationId]
+    [pipelines, savedPipelines, selectedNetworkId, selectedOrganizationId]
   )
+  const canCreatePipeline =
+    Boolean(selectedNetworkId) && canNetwork("pipeline_definition", "create")
+  const canUpdatePipeline = canNetwork("pipeline_definition", "update")
+  const editingPipeline =
+    pipelineSession?.mode === "edit"
+      ? networkPipelines.find(
+          (pipeline) => pipeline.id === pipelineSession.pipelineId
+        )
+      : undefined
   const triggerSchema = schemas.find((schema) => schema.id === schemaId)
   const triggerFields = schemaFieldOptions(triggerSchema?.definition)
 
@@ -194,6 +223,8 @@ export function WorkflowDefinitionDialog({
     setTrigger(presetTrigger(field))
     setCriteria(emptyGroup())
     setActions([])
+    setPipelineSession(null)
+    setSavedPipelines([])
   }, [open, organizationId, lockedSchemaId, field])
 
   useEffect(() => {
@@ -323,6 +354,38 @@ export function WorkflowDefinitionDialog({
     void submitDefinition(body)
   }
 
+  function rememberPipeline(saved: SavedWorkflowPipeline) {
+    const actionKey = pipelineSession?.actionKey
+    if (!actionKey) {
+      return
+    }
+    const pipeline = workspacePipelineFromSaved(saved)
+    setSavedPipelines((current) => [
+      pipeline,
+      ...current.filter((item) => item.id !== pipeline.id),
+    ])
+    jsonSourceRef.current = "builder"
+    setActions((current) =>
+      current.map((action) =>
+        action.key === actionKey ? { ...action, pipeline: saved.id } : action
+      )
+    )
+    setDefinitionView("rule")
+    setPipelineSession(null)
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && pipelineEditorRef.current?.cancelNode()) {
+      return
+    }
+    if (!nextOpen && pipelineSession) {
+      setDefinitionView("rule")
+      setPipelineSession(null)
+      return
+    }
+    onOpenChange(nextOpen)
+  }
+
   async function submitDefinition(body: WorkflowDefinitionBody) {
     try {
       const workflow = await createWorkflow({
@@ -348,244 +411,277 @@ export function WorkflowDefinitionDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         size="full"
         className="sm:inset-x-[8vw] lg:inset-x-16 xl:inset-x-[12vw]"
       >
-        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1.5">
-              <DialogTitle>Create a workflow</DialogTitle>
-              <DialogDescription>{sentence}</DialogDescription>
-            </div>
-            <Button
-              type="button"
-              variant={definitionView === "json" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() =>
-                setDefinitionView((view) => (view === "rule" ? "json" : "rule"))
-              }
-            >
-              <FileJsonIcon />
-              {definitionView === "json" ? "Rule" : "JSON"}
-            </Button>
-          </div>
-        </DialogHeader>
-        <form
-          id={formId}
-          onSubmit={handleSubmit}
-          autoComplete="off"
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
-              <FieldGroup className="shrink-0 gap-3 rounded-2xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
-                <div
-                  className={cn(
-                    "grid gap-3",
-                    showNetwork
-                      ? "sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
-                      : "sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
-                  )}
+        {pipelineSession ? (
+          <WorkflowPipelineEditor
+            key={`${pipelineSession.mode}-${pipelineSession.pipelineId ?? pipelineSession.actionKey}`}
+            ref={pipelineEditorRef}
+            mode={pipelineSession.mode}
+            pipeline={editingPipeline}
+            networkId={selectedNetworkId}
+            organizationId={selectedOrganizationId || undefined}
+            onDone={rememberPipeline}
+            onCancel={() => {
+              setDefinitionView("rule")
+              setPipelineSession(null)
+            }}
+          />
+        ) : null}
+        {pipelineSession ? null : (
+          <>
+            <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1.5">
+                  <DialogTitle>Create a workflow</DialogTitle>
+                  <DialogDescription>{sentence}</DialogDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant={definitionView === "json" ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() =>
+                    setDefinitionView((view) =>
+                      view === "rule" ? "json" : "rule"
+                    )
+                  }
                 >
-                  <Field className="gap-1">
-                    <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
-                    <Input
-                      id={`${formId}-name`}
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      placeholder="Shipment overweight"
-                      autoFocus
-                      required
-                      disabled={isLoading}
-                      aria-invalid={error ? true : undefined}
-                    />
-                  </Field>
-                  <Field className="gap-1">
-                    <FieldLabel htmlFor={`${formId}-description`}>
-                      Description
-                    </FieldLabel>
-                    <Input
-                      id={`${formId}-description`}
-                      value={description}
-                      onChange={(event) => setDescription(event.target.value)}
-                      placeholder="What this workflow does"
-                      disabled={isLoading}
-                    />
-                  </Field>
-                  {showNetwork ? (
+                  <FileJsonIcon />
+                  {definitionView === "json" ? "Rule" : "JSON"}
+                </Button>
+              </div>
+            </DialogHeader>
+            <form
+              id={formId}
+              onSubmit={handleSubmit}
+              autoComplete="off"
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
+                <FieldGroup className="shrink-0 gap-3 rounded-2xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
+                  <div
+                    className={cn(
+                      "grid gap-3",
+                      showNetwork
+                        ? "sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
+                        : "sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
+                    )}
+                  >
                     <Field className="gap-1">
-                      <FieldLabel htmlFor={`${formId}-network`}>
-                        Network
-                      </FieldLabel>
-                      <Select
-                        value={selectedNetworkId}
-                        disabled={isLoading}
+                      <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
+                      <Input
+                        id={`${formId}-name`}
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Shipment overweight"
+                        autoFocus
                         required
-                        modal={false}
-                        items={networks.map((network) => ({
-                          value: network.id,
-                          label: network.name,
-                        }))}
-                        onValueChange={(value) => {
-                          if (!value) {
-                            return
-                          }
-                          setSelectedNetworkId(value)
-                          if (!lockOrganization) {
-                            setSelectedOrganizationId("")
-                          }
-                          setSchemaId("")
-                        }}
-                      >
-                        <SelectTrigger id={`${formId}-network`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {networks.map((network) => (
-                            <SelectItem key={network.id} value={network.id}>
-                              {network.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        disabled={isLoading}
+                        aria-invalid={error ? true : undefined}
+                      />
                     </Field>
-                  ) : null}
-                  {showOrganization ? (
                     <Field className="gap-1">
-                      <FieldLabel htmlFor={`${formId}-organization`}>
-                        Organization
+                      <FieldLabel htmlFor={`${formId}-description`}>
+                        Description
                       </FieldLabel>
-                      <Select
-                        value={selectedOrganizationId || entireNetworkValue}
-                        disabled={lockOrganization || isLoading}
-                        modal={false}
-                        items={[
-                          {
-                            value: entireNetworkValue,
-                            label: "Entire network",
-                          },
-                          ...networkOrganizations.map((organization) => ({
-                            value: organization.id,
-                            label: organization.name,
-                          })),
-                        ]}
-                        onValueChange={(value) => {
-                          if (!value || value === entireNetworkValue) {
-                            setSelectedOrganizationId("")
-                            return
-                          }
-                          setSelectedOrganizationId(value)
-                        }}
-                      >
-                        <SelectTrigger id={`${formId}-organization`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={entireNetworkValue}>
-                            Entire network
-                          </SelectItem>
-                          {networkOrganizations.map((organization) => (
-                            <SelectItem
-                              key={organization.id}
-                              value={organization.id}
-                            >
-                              {organization.name}
+                      <Input
+                        id={`${formId}-description`}
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        placeholder="What this workflow does"
+                        disabled={isLoading}
+                      />
+                    </Field>
+                    {showNetwork ? (
+                      <Field className="gap-1">
+                        <FieldLabel htmlFor={`${formId}-network`}>
+                          Network
+                        </FieldLabel>
+                        <Select
+                          value={selectedNetworkId}
+                          disabled={isLoading}
+                          required
+                          modal={false}
+                          items={networks.map((network) => ({
+                            value: network.id,
+                            label: network.name,
+                          }))}
+                          onValueChange={(value) => {
+                            if (!value) {
+                              return
+                            }
+                            setSelectedNetworkId(value)
+                            if (!lockOrganization) {
+                              setSelectedOrganizationId("")
+                            }
+                            setSchemaId("")
+                          }}
+                        >
+                          <SelectTrigger id={`${formId}-network`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {networks.map((network) => (
+                              <SelectItem key={network.id} value={network.id}>
+                                {network.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    ) : null}
+                    {showOrganization ? (
+                      <Field className="gap-1">
+                        <FieldLabel htmlFor={`${formId}-organization`}>
+                          Organization
+                        </FieldLabel>
+                        <Select
+                          value={selectedOrganizationId || entireNetworkValue}
+                          disabled={lockOrganization || isLoading}
+                          modal={false}
+                          items={[
+                            {
+                              value: entireNetworkValue,
+                              label: "Entire network",
+                            },
+                            ...networkOrganizations.map((organization) => ({
+                              value: organization.id,
+                              label: organization.name,
+                            })),
+                          ]}
+                          onValueChange={(value) => {
+                            if (!value || value === entireNetworkValue) {
+                              setSelectedOrganizationId("")
+                              return
+                            }
+                            setSelectedOrganizationId(value)
+                          }}
+                        >
+                          <SelectTrigger id={`${formId}-organization`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={entireNetworkValue}>
+                              Entire network
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  ) : null}
-                  {lockedSchemaId ? (
-                    <Field className="gap-1">
-                      <FieldLabel>Table</FieldLabel>
-                      <p className="text-sm">
-                        {triggerSchema?.name ?? "Selected table"}
-                      </p>
-                    </Field>
-                  ) : (
-                    <SchemaSelect
+                            {networkOrganizations.map((organization) => (
+                              <SelectItem
+                                key={organization.id}
+                                value={organization.id}
+                              >
+                                {organization.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    ) : null}
+                    {lockedSchemaId ? (
+                      <Field className="gap-1">
+                        <FieldLabel>Table</FieldLabel>
+                        <p className="text-sm">
+                          {triggerSchema?.name ?? "Selected table"}
+                        </p>
+                      </Field>
+                    ) : (
+                      <SchemaSelect
+                        formId={formId}
+                        schemaId={schemaId}
+                        schemas={networkSchemas}
+                        isLoading={isLoading}
+                        onChange={setSchemaId}
+                      />
+                    )}
+                    <EnabledField
                       formId={formId}
-                      schemaId={schemaId}
-                      schemas={networkSchemas}
-                      isLoading={isLoading}
-                      onChange={setSchemaId}
+                      checked={active}
+                      onChange={setActive}
                     />
-                  )}
-                  <EnabledField
-                    formId={formId}
-                    checked={active}
-                    onChange={setActive}
-                  />
-                </div>
-                {error ? (
-                  <FieldError>{getHumaErrorMessage(error)}</FieldError>
-                ) : null}
-              </FieldGroup>
+                  </div>
+                  {error ? (
+                    <FieldError>{getHumaErrorMessage(error)}</FieldError>
+                  ) : null}
+                </FieldGroup>
 
-              {definitionView === "json" ? (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
-                  <DefinitionJsonPane
-                    id={`${formId}-json`}
-                    title="JSON"
-                    description="Updates as you edit. Paste JSON to fill the builder."
-                    value={jsonText}
-                    onChange={handleJsonChange}
-                    onBlur={handleJsonBlur}
-                    error={jsonError}
-                  />
-                </div>
-              ) : (
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
-                  <WorkflowRuleEditor
-                    trigger={trigger}
-                    criteria={criteria}
-                    actions={actions}
-                    fields={triggerFields}
-                    schemas={networkSchemas}
-                    pipelines={networkPipelines}
-                    triggerSchemaId={schemaId}
-                    schemaName={triggerSchema?.name}
-                    onTriggerChange={(next) => {
-                      markBuilderSource()
-                      setTrigger(next)
-                    }}
-                    onCriteriaChange={(next) => {
-                      markBuilderSource()
-                      setCriteria(next)
-                    }}
-                    onActionsChange={(next) => {
-                      markBuilderSource()
-                      setActions(next)
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          <DialogFooter>
-            <DialogClose
-              render={<Button variant="outline" disabled={isLoading} />}
-            >
-              Cancel
-            </DialogClose>
-            <Button
-              type="submit"
-              disabled={isLoading || !canSubmit || Boolean(jsonError)}
-              aria-busy={isLoading}
-              className={isLoading ? "disabled:opacity-100" : undefined}
-            >
-              {isLoading ? (
-                <>
-                  <Loader className="animate-spin" />
-                  <span className="sr-only">Creating</span>
-                </>
-              ) : (
-                "Create workflow"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+                {definitionView === "json" ? (
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
+                    <DefinitionJsonPane
+                      id={`${formId}-json`}
+                      title="JSON"
+                      description="Updates as you edit. Paste JSON to fill the builder."
+                      value={jsonText}
+                      onChange={handleJsonChange}
+                      onBlur={handleJsonBlur}
+                      error={jsonError}
+                    />
+                  </div>
+                ) : (
+                  <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+                    <WorkflowRuleEditor
+                      trigger={trigger}
+                      criteria={criteria}
+                      actions={actions}
+                      fields={triggerFields}
+                      schemas={networkSchemas}
+                      pipelines={networkPipelines}
+                      triggerSchemaId={schemaId}
+                      schemaName={triggerSchema?.name}
+                      onTriggerChange={(next) => {
+                        markBuilderSource()
+                        setTrigger(next)
+                      }}
+                      onCriteriaChange={(next) => {
+                        markBuilderSource()
+                        setCriteria(next)
+                      }}
+                      onActionsChange={(next) => {
+                        markBuilderSource()
+                        setActions(next)
+                      }}
+                      canCreatePipeline={canCreatePipeline}
+                      canUpdatePipeline={canUpdatePipeline}
+                      onCreatePipeline={(actionKey) =>
+                        setPipelineSession({ actionKey, mode: "create" })
+                      }
+                      onEditPipeline={(actionKey, pipelineId) =>
+                        setPipelineSession({
+                          actionKey,
+                          mode: "edit",
+                          pipelineId,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <DialogClose
+                  render={<Button variant="outline" disabled={isLoading} />}
+                >
+                  Cancel
+                </DialogClose>
+                <Button
+                  type="submit"
+                  disabled={isLoading || !canSubmit || Boolean(jsonError)}
+                  aria-busy={isLoading}
+                  className={isLoading ? "disabled:opacity-100" : undefined}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader className="animate-spin" />
+                      <span className="sr-only">Creating</span>
+                    </>
+                  ) : (
+                    "Create workflow"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

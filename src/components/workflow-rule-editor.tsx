@@ -22,6 +22,10 @@ export function WorkflowRuleEditor({
   onTriggerChange,
   onCriteriaChange,
   onActionsChange,
+  canCreatePipeline,
+  canUpdatePipeline,
+  onCreatePipeline,
+  onEditPipeline,
 }: {
   trigger: TriggerDraft
   criteria: CriteriaGroupDraft
@@ -34,6 +38,10 @@ export function WorkflowRuleEditor({
   onTriggerChange: (next: TriggerDraft) => void
   onCriteriaChange: (next: CriteriaGroupDraft) => void
   onActionsChange: (next: ActionDraft[]) => void
+  canCreatePipeline?: boolean
+  canUpdatePipeline?: boolean
+  onCreatePipeline?: (actionKey: string) => void
+  onEditPipeline?: (actionKey: string, pipelineId: string) => void
 }) {
   return (
     <>
@@ -61,6 +69,10 @@ export function WorkflowRuleEditor({
           triggerSchemaId={triggerSchemaId}
           triggerSchemaName={schemaName}
           onChange={onActionsChange}
+          canCreatePipeline={canCreatePipeline}
+          canUpdatePipeline={canUpdatePipeline}
+          onCreatePipeline={onCreatePipeline}
+          onEditPipeline={onEditPipeline}
         />
       </DefinitionCard>
     </>
