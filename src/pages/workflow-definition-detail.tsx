@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useId,
   useMemo,
   useRef,
@@ -10,7 +9,6 @@ import {
 import { Link, useParams, useSearchParams } from "react-router"
 import {
   ClockIcon,
-  FileJsonIcon,
   TableIcon,
   FilterIcon,
   GalleryVerticalEndIcon,
@@ -35,8 +33,6 @@ import {
   DefinitionStatusPage,
   PublicationPills,
 } from "@/components/definition-detail"
-import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
-import { JsonDefinitionCard } from "@/components/json-definition-card"
 import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -63,11 +59,6 @@ import type {
   Schema,
   WorkflowDefinition,
 } from "@/data/networks"
-import {
-  parseJsonObject,
-  stringifyDefinition,
-  type JsonObject,
-} from "@/lib/json-definition"
 import {
   useNetworkWorkspace,
   useWorkspaceOrganizations,
@@ -105,23 +96,6 @@ import {
   useUpdateWorkflowDefinitionMutation,
 } from "@/store/workflow-slice"
 
-type DefinitionView = "rule" | "json"
-
-function workflowDefinitionError(text: string) {
-  try {
-    const parsed = JSON.parse(text) as unknown
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return "JSON must be a workflow object"
-    }
-    if (!parseWorkflowDefinition(parsed as JsonObject)) {
-      return "JSON must include actions"
-    }
-    return null
-  } catch {
-    return "Invalid JSON"
-  }
-}
-
 export default function WorkflowDefinitionDetail() {
   const { workflowDefinitionId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -136,7 +110,6 @@ export default function WorkflowDefinitionDetail() {
   const { organizations } = useWorkspaceOrganizations()
   const { runs } = useWorkspaceWorkflowRuns()
   const { openEditWorkflow } = useCreateEntity()
-  const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
   const workflowQuery = useGetWorkflowDefinitionQuery(
     workflowDefinitionId ?? "",
     { skip: !isAuthenticated || !workflowDefinitionId }
@@ -392,17 +365,6 @@ export default function WorkflowDefinitionDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
-            type="button"
-            variant={definitionView === "json" ? "secondary" : "outline"}
-            size="sm"
-            onClick={() =>
-              setDefinitionView((view) => (view === "rule" ? "json" : "rule"))
-            }
-          >
-            <FileJsonIcon />
-            {definitionView === "json" ? "Rule" : "JSON"}
-          </Button>
-          <Button
             variant="outline"
             size="sm"
             disabled={visibleWorkflow.internal}
@@ -415,69 +377,59 @@ export default function WorkflowDefinitionDetail() {
       </div>
 
       <DefinitionColumns aside={aside}>
-        {definitionView === "json" ? (
-          <JsonDefinitionCard
-            definition={visibleWorkflow.definition}
-            label="Workflow JSON"
-            description="Trigger, criteria, and actions stored on this workflow."
+        <DefinitionCard>
+          <WorkflowSectionHeading
+            icon={
+              parsed?.trigger.on?.includes("schedule")
+                ? ClockIcon
+                : WorkflowIcon
+            }
+            title="When"
+            description={triggerSummary(parsed?.trigger)}
           />
-        ) : (
-          <>
-            <DefinitionCard>
-              <WorkflowSectionHeading
-                icon={
-                  parsed?.trigger.on?.includes("schedule")
-                    ? ClockIcon
-                    : WorkflowIcon
-                }
-                title="When"
-                description={triggerSummary(parsed?.trigger)}
-              />
-            </DefinitionCard>
+        </DefinitionCard>
 
-            <DefinitionCard>
-              <WorkflowSectionHeading
-                icon={FilterIcon}
-                title="If"
-                description={
-                  schema
-                    ? `These conditions are evaluated against the ${schema.name} record after the trigger fires.`
-                    : "These conditions are evaluated against the triggering record after the trigger fires."
-                }
-              />
-              <div className="mt-6">
-                <WorkflowCriteriaView criteria={parsed?.criteria} />
-              </div>
-            </DefinitionCard>
+        <DefinitionCard>
+          <WorkflowSectionHeading
+            icon={FilterIcon}
+            title="If"
+            description={
+              schema
+                ? `These conditions are evaluated against the ${schema.name} record after the trigger fires.`
+                : "These conditions are evaluated against the triggering record after the trigger fires."
+            }
+          />
+          <div className="mt-6">
+            <WorkflowCriteriaView criteria={parsed?.criteria} />
+          </div>
+        </DefinitionCard>
 
-            <DefinitionCard>
-              <WorkflowSectionHeading
-                icon={ZapIcon}
-                title="Then"
-                description="These steps run in order after the trigger and conditions match."
-              />
-              {actions.length > 0 ? (
-                <ol className="mt-6">
-                  {actions.map((action, index) => (
-                    <WorkflowActionView
-                      key={`${action.type}-${index}`}
-                      action={action}
-                      index={index}
-                      last={index === actions.length - 1}
-                      schemas={schemas}
-                      pipelines={pipelines}
-                      href={href}
-                    />
-                  ))}
-                </ol>
-              ) : (
-                <p className="mt-6 text-sm text-muted-foreground">
-                  This workflow does not declare any actions.
-                </p>
-              )}
-            </DefinitionCard>
-          </>
-        )}
+        <DefinitionCard>
+          <WorkflowSectionHeading
+            icon={ZapIcon}
+            title="Then"
+            description="These steps run in order after the trigger and conditions match."
+          />
+          {actions.length > 0 ? (
+            <ol className="mt-6">
+              {actions.map((action, index) => (
+                <WorkflowActionView
+                  key={`${action.type}-${index}`}
+                  action={action}
+                  index={index}
+                  last={index === actions.length - 1}
+                  schemas={schemas}
+                  pipelines={pipelines}
+                  href={href}
+                />
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-6 text-sm text-muted-foreground">
+              This workflow does not declare any actions.
+            </p>
+          )}
+        </DefinitionCard>
       </DefinitionColumns>
     </DefinitionPage>
   )
@@ -514,7 +466,6 @@ function WorkflowDefinitionEdit({
     organizationId: workflow.organizationId ?? null,
   })
   const parsed = parseWorkflowDefinition(workflow.definition)
-  const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
   const [name, setName] = useState(workflow.name)
   const [description, setDescription] = useState(workflow.description ?? "")
   const [active, setActive] = useState(workflow.active)
@@ -527,9 +478,6 @@ function WorkflowDefinitionEdit({
   const [actions, setActions] = useState<ActionDraft[]>(() =>
     actionsFromApi(parsed?.actions)
   )
-  const [jsonText, setJsonText] = useState("")
-  const [jsonError, setJsonError] = useState<string | null>(null)
-  const jsonSourceRef = useRef<"builder" | "json">("builder")
   const triggerFields = schemaFieldOptions(schema?.definition)
   const isLoading = updateState.isLoading
   const error = updateState.error
@@ -556,79 +504,14 @@ function WorkflowDefinitionEdit({
     }
   }, [actions, criteria, trigger, triggerFields])
 
-  const generatedJson = stringifyDefinition(
-    definition ?? { trigger: triggerToApi(trigger), criteria: {}, actions: [] }
-  )
-
-  useEffect(() => {
-    if (jsonSourceRef.current === "json") {
-      return
-    }
-    setJsonText(generatedJson)
-    setJsonError(null)
-  }, [generatedJson])
-
-  function markBuilderSource() {
-    jsonSourceRef.current = "builder"
-  }
-
-  function applyWorkflowDefinition(body: WorkflowDefinitionBody) {
-    jsonSourceRef.current = "json"
-    setTrigger(triggerFromApi(body.trigger))
-    setCriteria(criteriaFromApi(body.criteria))
-    setActions(actionsFromApi(body.actions))
-  }
-
-  function handleJsonChange(text: string) {
-    jsonSourceRef.current = "json"
-    setJsonText(text)
-    const parsedJson = parseJsonObject(text)
-    if (!parsedJson) {
-      setJsonError(workflowDefinitionError(text))
-      return
-    }
-    const body = parseWorkflowDefinition(parsedJson)
-    if (!body) {
-      setJsonError("JSON must include actions")
-      return
-    }
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-  }
-
-  function handleJsonBlur() {
-    if (!jsonText.trim()) {
-      jsonSourceRef.current = "builder"
-      setJsonText(generatedJson)
-      setJsonError(null)
-      return
-    }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parseWorkflowDefinition(parsedJson) : undefined
-    if (!parsedJson || !body) {
-      setJsonError(workflowDefinitionError(jsonText))
-      return
-    }
-    jsonSourceRef.current = "json"
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-    setJsonText(stringifyDefinition(parsedJson))
-  }
-
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(definition) &&
-    (definition?.actions.length ?? 0) > 0 &&
-    !jsonError
+    (definition?.actions.length ?? 0) > 0
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!canSubmit || !definition) {
-      return
-    }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parseWorkflowDefinition(parsedJson) : definition
-    if (!body || body.actions.length === 0) {
+    if (!canSubmit || !definition || definition.actions.length === 0) {
       return
     }
     try {
@@ -637,7 +520,7 @@ function WorkflowDefinitionEdit({
         name: name.trim(),
         description: description.trim(),
         active,
-        definition: body,
+        definition,
         schemaId: workflow.schemaId,
       }).unwrap()
       onCancel()
@@ -656,13 +539,11 @@ function WorkflowDefinitionEdit({
       pipeline,
       ...current.filter((item) => item.id !== pipeline.id),
     ])
-    jsonSourceRef.current = "builder"
     setActions((current) =>
       current.map((action) =>
         action.key === actionKey ? { ...action, pipeline: saved.id } : action
       )
     )
-    setDefinitionView("rule")
     setPipelineSession(null)
   }
 
@@ -685,7 +566,6 @@ function WorkflowDefinitionEdit({
           layeredCancel
           onDone={rememberPipeline}
           onCancel={() => {
-            setDefinitionView("rule")
             setPipelineSession(null)
           }}
         />
@@ -752,17 +632,6 @@ function WorkflowDefinitionEdit({
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant={definitionView === "json" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() =>
-                setDefinitionView((view) => (view === "rule" ? "json" : "rule"))
-              }
-            >
-              <FileJsonIcon />
-              {definitionView === "json" ? "Rule" : "JSON"}
-            </Button>
-            <Button
-              type="button"
               variant="outline"
               size="sm"
               disabled={isLoading}
@@ -773,7 +642,7 @@ function WorkflowDefinitionEdit({
             <Button
               type="submit"
               size="sm"
-              disabled={isLoading || !canSubmit || Boolean(jsonError)}
+              disabled={isLoading || !canSubmit}
               aria-busy={isLoading}
               className={isLoading ? "disabled:opacity-100" : undefined}
             >
@@ -790,50 +659,27 @@ function WorkflowDefinitionEdit({
         </div>
 
         <DefinitionColumns aside={aside}>
-          {definitionView === "json" ? (
-            <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
-              <DefinitionJsonPane
-                id={`${formId}-json`}
-                title="JSON"
-                description="Updates as you edit. Paste JSON to fill the builder."
-                value={jsonText}
-                onChange={handleJsonChange}
-                onBlur={handleJsonBlur}
-                error={jsonError}
-              />
-            </div>
-          ) : (
-            <WorkflowRuleEditor
-              trigger={trigger}
-              criteria={criteria}
-              actions={actions}
-              fields={triggerFields}
-              schemas={schemas}
-              pipelines={availablePipelines}
-              triggerSchemaId={workflow.schemaId}
-              schemaName={schema?.name}
-              canCreatePipeline={canCreatePipeline}
-              canUpdatePipeline={canUpdatePipeline}
-              onCreatePipeline={(actionKey) =>
-                setPipelineSession({ actionKey, mode: "create" })
-              }
-              onEditPipeline={(actionKey, pipelineId) =>
-                setPipelineSession({ actionKey, mode: "edit", pipelineId })
-              }
-              onTriggerChange={(next) => {
-                markBuilderSource()
-                setTrigger(next)
-              }}
-              onCriteriaChange={(next) => {
-                markBuilderSource()
-                setCriteria(next)
-              }}
-              onActionsChange={(next) => {
-                markBuilderSource()
-                setActions(next)
-              }}
-            />
-          )}
+          <WorkflowRuleEditor
+            trigger={trigger}
+            criteria={criteria}
+            actions={actions}
+            fields={triggerFields}
+            schemas={schemas}
+            pipelines={availablePipelines}
+            triggerSchemaId={workflow.schemaId}
+            schemaName={schema?.name}
+            canCreatePipeline={canCreatePipeline}
+            canUpdatePipeline={canUpdatePipeline}
+            onCreatePipeline={(actionKey) =>
+              setPipelineSession({ actionKey, mode: "create" })
+            }
+            onEditPipeline={(actionKey, pipelineId) =>
+              setPipelineSession({ actionKey, mode: "edit", pipelineId })
+            }
+            onTriggerChange={setTrigger}
+            onCriteriaChange={setCriteria}
+            onActionsChange={setActions}
+          />
         </DefinitionColumns>
       </form>
     </DefinitionPage>

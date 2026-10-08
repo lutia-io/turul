@@ -1,6 +1,5 @@
 export { default as AppLayout } from "./app-layout.tsx"
 export { default as NetworkLayout } from "./network-layout.tsx"
-export { default as Home } from "./home.tsx"
 export { default as Account } from "./account.tsx"
 export { default as Billing } from "./billing.tsx"
 export { default as Notifications } from "./notifications.tsx"

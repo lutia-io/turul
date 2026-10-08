@@ -10,7 +10,7 @@ export default function Signup() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
 
   if (isAuthenticated) {
-    return <Navigate to="/app/home" replace />
+    return <Navigate to="/app/networks" replace />
   }
 
   return (

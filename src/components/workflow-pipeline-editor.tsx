@@ -85,7 +85,6 @@ export function WorkflowPipelineEditor({
         : undefined
     )
   )
-  const [jsonError, setJsonError] = useState<string | null>(null)
   const isLoading = createState.isLoading || updateState.isLoading
   const error = createState.error ?? updateState.error
   const sentence = pipelineDraftSentence(levels)
@@ -93,7 +92,6 @@ export function WorkflowPipelineEditor({
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(networkId) &&
-    !jsonError &&
     (Boolean(definition) || nodeOpen)
   const missingPipeline = mode === "edit" && !pipeline
 
@@ -126,7 +124,7 @@ export function WorkflowPipelineEditor({
       return
     }
     const body = levelsToApi(committed.levels)
-    if (!name.trim() || !networkId || !body || jsonError) {
+    if (!name.trim() || !networkId || !body) {
       return
     }
     const saved = {
@@ -289,9 +287,7 @@ export function WorkflowPipelineEditor({
           onChange={setLevels}
           view={definitionView}
           sentence={sentence}
-          jsonInputId={`${formId}-json`}
           onNodeSessionChange={setNodeOpen}
-          onJsonErrorChange={setJsonError}
         />
       </div>
     </div>

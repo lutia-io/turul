@@ -59,7 +59,7 @@ export function AppHeader() {
         <div className="flex min-w-0 items-center gap-2">
           <SidebarTrigger className="-ml-1" />
           <Link
-            to="/app/home"
+            to="/app/networks"
             className="flex items-center gap-1.5 text-xl font-semibold"
           >
             <FishIcon className="size-6" />

@@ -1,7 +1,6 @@
 import {
   CheckIcon,
   ChevronDownIcon,
-  FileJsonIcon,
   LayersIcon,
   WorkflowIcon,
   type LucideIcon,
@@ -15,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-export type PipelineView = "canvas" | "levels" | "json"
+export type PipelineView = "canvas" | "levels"
 
 const pipelineViews: {
   id: PipelineView
@@ -24,7 +23,6 @@ const pipelineViews: {
 }[] = [
   { id: "levels", label: "Levels", icon: LayersIcon },
   { id: "canvas", label: "Canvas", icon: WorkflowIcon },
-  { id: "json", label: "JSON", icon: FileJsonIcon },
 ]
 
 export function PipelineViewMenu({
@@ -53,10 +51,7 @@ export function PipelineViewMenu({
           const selected = view.id === value
 
           return (
-            <DropdownMenuItem
-              key={view.id}
-              onClick={() => onChange(view.id)}
-            >
+            <DropdownMenuItem key={view.id} onClick={() => onChange(view.id)}>
               <ViewIcon />
               {view.label}
               {selected ? <CheckIcon className="ml-auto opacity-70" /> : null}

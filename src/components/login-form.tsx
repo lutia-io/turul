@@ -27,7 +27,7 @@ export function LoginForm() {
     try {
       await loginUser({ email, password }).unwrap()
       const from = location.state?.from?.pathname
-      navigate(from && from.startsWith("/app") ? from : "/app/home", { replace: true })
+      navigate(from && from.startsWith("/app") ? from : "/app/networks", { replace: true })
     } catch {
       // Error is rendered from the mutation state.
     }

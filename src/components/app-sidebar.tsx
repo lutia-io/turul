@@ -2,7 +2,6 @@ import * as React from "react"
 import {
   BellIcon,
   CreditCardIcon,
-  HomeIcon,
   ListIcon,
   ShieldIcon,
   UserIcon,
@@ -37,11 +36,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: me } = useMeQuery(undefined, { skip: !isAuthenticated })
   const isOrgUser = me?.principalType === "organization_user"
   const navMain = [
-    {
-      title: "Home",
-      url: "/app/home",
-      icon: <HomeIcon />,
-    },
     {
       title: "Networks",
       url: "/app/networks",

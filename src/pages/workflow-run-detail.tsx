@@ -4,13 +4,11 @@ import {
   Building2Icon,
   CheckIcon,
   CopyIcon,
-  FileJsonIcon,
   GalleryVerticalEndIcon,
   RotateCcwIcon,
   WorkflowIcon,
 } from "lucide-react"
 
-import { JsonDefinitionCard } from "@/components/json-definition-card"
 import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -40,8 +38,6 @@ import {
   useGetWorkflowQuery,
   useRetryWorkflowMutation,
 } from "@/store/workflow-slice"
-
-type DataView = "steps" | "json"
 
 export default function WorkflowRunDetail() {
   const { workflowRunId } = useParams()
@@ -84,7 +80,6 @@ export default function WorkflowRunDetail() {
   const status = resolved ? apiWorkflowStatus(resolved.status) : "Queued"
   const currentStep = resolved ? apiWorkflowCurrentStep(resolved) : 0
   const progress = resolved ? runProgress(currentStep, steps.length, status) : 0
-  const [dataView, setDataView] = useState<DataView>("steps")
 
   if (workflowQuery.isLoading) {
     return <WorkflowRunSkeleton />
@@ -144,94 +139,70 @@ export default function WorkflowRunDetail() {
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {resolved.status === "failed" ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                void retryWorkflow(resolved.id)
-              }}
-              disabled={retryState.isLoading}
-              aria-busy={retryState.isLoading}
-            >
-              <RotateCcwIcon
-                className={retryState.isLoading ? "animate-spin" : undefined}
-              />
-              {retryState.isLoading ? "Retrying..." : "Retry"}
-            </Button>
-          ) : null}
-          {resolved.data ? (
-            <Button
-              type="button"
-              variant={dataView === "json" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() =>
-                setDataView((view) => (view === "steps" ? "json" : "steps"))
-              }
-            >
-              <FileJsonIcon />
-              {dataView === "json" ? "Steps" : "JSON"}
-            </Button>
-          ) : null}
-        </div>
+        {resolved.status === "failed" ? (
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              void retryWorkflow(resolved.id)
+            }}
+            disabled={retryState.isLoading}
+            aria-busy={retryState.isLoading}
+          >
+            <RotateCcwIcon
+              className={retryState.isLoading ? "animate-spin" : undefined}
+            />
+            {retryState.isLoading ? "Retrying..." : "Retry"}
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          {dataView === "json" && resolved.data ? (
-            <JsonDefinitionCard
-              definition={resolved.data}
-              label="Trigger record"
-              description="Record data captured when this workflow started."
-            />
-          ) : (
-            <section className="min-w-0 rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-medium">Steps</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {steps.length === 0
-                      ? "This workflow has no actions."
-                      : `${progress}% complete`}
-                  </p>
-                </div>
-                <p className="text-sm text-muted-foreground tabular-nums">
-                  {Math.min(currentStep, steps.length)}/{steps.length}
+          <section className="min-w-0 rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-medium">Steps</h2>
+                <p className="text-sm text-muted-foreground">
+                  {steps.length === 0
+                    ? "This workflow has no actions."
+                    : `${progress}% complete`}
                 </p>
               </div>
-              <div className="mt-4 h-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-[width]",
-                    status === "Failed" ? "bg-red-500" : "bg-emerald-500"
-                  )}
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              {steps.length > 0 ? (
-                <ol className="mt-8">
-                  {steps.map((step, index) => (
-                    <StepRow
-                      key={step.id}
-                      step={step}
-                      status={status}
-                      currentStep={currentStep}
-                      last={index === steps.length - 1}
-                    />
-                  ))}
-                </ol>
-              ) : null}
-            </section>
-          )}
+              <p className="text-sm text-muted-foreground tabular-nums">
+                {Math.min(currentStep, steps.length)}/{steps.length}
+              </p>
+            </div>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-[width]",
+                  status === "Failed" ? "bg-red-500" : "bg-emerald-500"
+                )}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            {steps.length > 0 ? (
+              <ol className="mt-8">
+                {steps.map((step, index) => (
+                  <StepRow
+                    key={step.id}
+                    step={step}
+                    status={status}
+                    currentStep={currentStep}
+                    last={index === steps.length - 1}
+                  />
+                ))}
+              </ol>
+            ) : null}
+          </section>
 
-          {dataView === "steps" ? (
-            <WorkflowActionsJournal
-              workflowId={resolved.id}
-              steps={steps}
-              pollingInterval={live ? 2000 : 0}
-            />
-          ) : null}
+          <WorkflowActionsJournal
+            workflowId={resolved.id}
+            steps={steps}
+            pollingInterval={live ? 2000 : 0}
+          />
         </div>
 
         <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-6">

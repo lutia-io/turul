@@ -29,7 +29,6 @@ import {
   FileDetail,
   Signup,
   Login,
-  Home,
   Account,
   Billing,
   Notifications,
@@ -90,7 +89,10 @@ export function App() {
         <Route path="/app/login" element={<Login />} />
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
-            <Route path="/app/home" element={<Home />} />
+            <Route
+              path="/app/home"
+              element={<Navigate to="/app/networks" replace />}
+            />
             <Route path="/app/access" element={<PlatformAccess />} />
             <Route path="/app/networks" element={<NetworkList />} />
             <Route path="/app/account" element={<Account />} />

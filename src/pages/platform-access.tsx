@@ -27,7 +27,7 @@ export default function PlatformAccess() {
     networks.find((item) => item.id === requestedId) ?? networks[0]
 
   if (me?.principalType === "organization_user") {
-    return <Navigate to="/app/home" replace />
+    return <Navigate to="/app/networks" replace />
   }
 
   if (isLoading && networks.length === 0 && !isError) {

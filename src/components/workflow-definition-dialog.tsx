@@ -7,11 +7,10 @@ import {
   type FormEvent,
 } from "react"
 import { useNavigate } from "react-router"
-import { FileJsonIcon, Loader } from "lucide-react"
+import { Loader } from "lucide-react"
 
 import { EnabledField } from "@/components/checkbox-field"
 import { Button } from "@/components/ui/button"
-import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import {
   Dialog,
   DialogClose,
@@ -49,11 +48,6 @@ import {
 } from "@/lib/workflow-pipeline"
 import type { PipelineDefinition } from "@/data/networks"
 import {
-  parseJsonObject,
-  stringifyDefinition,
-  type JsonObject,
-} from "@/lib/json-definition"
-import {
   networkWorkspacePath,
   useWorkspaceNetworkList,
   useWorkspaceOrganizations,
@@ -61,15 +55,11 @@ import {
   useWorkspaceSchemas,
 } from "@/lib/network-workspace"
 import {
-  actionsFromApi,
   actionsToApi,
-  criteriaFromApi,
   criteriaToApi,
   emptyGroup,
   emptyTrigger,
-  parseWorkflowDefinition,
   schemaFieldOptions,
-  triggerFromApi,
   triggerToApi,
   workflowDraftSentence,
   type ActionDraft,
@@ -82,21 +72,6 @@ import { getHumaErrorMessage } from "@/store/api"
 import { useCreateWorkflowDefinitionMutation } from "@/store/workflow-slice"
 
 const entireNetworkValue = "__network__"
-
-function workflowDefinitionError(text: string) {
-  try {
-    const parsed = JSON.parse(text) as unknown
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return "JSON must be a workflow object"
-    }
-    if (!parseWorkflowDefinition(parsed as JsonObject)) {
-      return "JSON must include actions"
-    }
-    return null
-  } catch {
-    return "Invalid JSON"
-  }
-}
 
 export function WorkflowDefinitionDialog({
   open,
@@ -124,7 +99,6 @@ export function WorkflowDefinitionDialog({
   const error = createState.error
   const lockNetwork = Boolean(networkId)
   const lockOrganization = Boolean(organizationId)
-  const [definitionView, setDefinitionView] = useState<"rule" | "json">("rule")
   const [selectedNetworkId, setSelectedNetworkId] = useState(
     networkId ?? networks[0]?.id ?? ""
   )
@@ -138,7 +112,6 @@ export function WorkflowDefinitionDialog({
   const [trigger, setTrigger] = useState<TriggerDraft>(presetTrigger(field))
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
   const [actions, setActions] = useState<ActionDraft[]>([])
-  const [jsonText, setJsonText] = useState("")
   const [pipelineSession, setPipelineSession] =
     useState<WorkflowPipelineSession | null>(null)
   const [savedPipelines, setSavedPipelines] = useState<PipelineDefinition[]>([])
@@ -147,8 +120,6 @@ export function WorkflowDefinitionDialog({
     networkId: selectedNetworkId || undefined,
     organizationId: selectedOrganizationId || null,
   })
-  const [jsonError, setJsonError] = useState<string | null>(null)
-  const jsonSourceRef = useRef<"builder" | "json">("builder")
 
   const firstNetworkId = networks[0]?.id ?? ""
   const networkOrganizations = organizations.filter(
@@ -217,9 +188,6 @@ export function WorkflowDefinitionDialog({
     setSchemaId(lockedSchemaId ?? "")
     setSelectedOrganizationId(organizationId ?? "")
     setActive(true)
-    setDefinitionView("rule")
-    jsonSourceRef.current = "builder"
-    setJsonError(null)
     setTrigger(presetTrigger(field))
     setCriteria(emptyGroup())
     setActions([])
@@ -263,65 +231,6 @@ export function WorkflowDefinitionDialog({
     }
   }, [actions, criteria, trigger, triggerFields])
 
-  const generatedJson = stringifyDefinition(
-    definition ?? { trigger: triggerToApi(trigger), criteria: {}, actions: [] }
-  )
-
-  useEffect(() => {
-    if (jsonSourceRef.current === "json") {
-      return
-    }
-    setJsonText(generatedJson)
-    setJsonError(null)
-  }, [generatedJson])
-
-  function markBuilderSource() {
-    jsonSourceRef.current = "builder"
-  }
-
-  function applyWorkflowDefinition(body: WorkflowDefinitionBody) {
-    jsonSourceRef.current = "json"
-    setTrigger(triggerFromApi(body.trigger))
-    setCriteria(criteriaFromApi(body.criteria))
-    setActions(actionsFromApi(body.actions))
-  }
-
-  function handleJsonChange(text: string) {
-    jsonSourceRef.current = "json"
-    setJsonText(text)
-    const parsed = parseJsonObject(text)
-    if (!parsed) {
-      setJsonError(workflowDefinitionError(text))
-      return
-    }
-    const body = parseWorkflowDefinition(parsed)
-    if (!body) {
-      setJsonError("JSON must include actions")
-      return
-    }
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-  }
-
-  function handleJsonBlur() {
-    if (!jsonText.trim()) {
-      jsonSourceRef.current = "builder"
-      setJsonText(generatedJson)
-      setJsonError(null)
-      return
-    }
-    const parsed = parseJsonObject(jsonText)
-    const body = parsed ? parseWorkflowDefinition(parsed) : undefined
-    if (!parsed || !body) {
-      setJsonError(workflowDefinitionError(jsonText))
-      return
-    }
-    jsonSourceRef.current = "json"
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-    setJsonText(stringifyDefinition(parsed))
-  }
-
   const showNetwork = networks.length > 0 && !lockNetwork
   const showOrganization = true
   const sentence = workflowDraftSentence(
@@ -336,22 +245,15 @@ export function WorkflowDefinitionDialog({
     Boolean(selectedNetworkId) &&
     Boolean(schemaId) &&
     Boolean(definition) &&
-    (definition?.actions.length ?? 0) > 0 &&
-    !jsonError
+    (definition?.actions.length ?? 0) > 0
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!canSubmit || !definition) {
+    if (!canSubmit || !definition || definition.actions.length === 0) {
       return
     }
 
-    const parsed = parseJsonObject(jsonText)
-    const body = parsed ? parseWorkflowDefinition(parsed) : definition
-    if (!body || body.actions.length === 0) {
-      return
-    }
-
-    void submitDefinition(body)
+    void submitDefinition(definition)
   }
 
   function rememberPipeline(saved: SavedWorkflowPipeline) {
@@ -364,13 +266,11 @@ export function WorkflowDefinitionDialog({
       pipeline,
       ...current.filter((item) => item.id !== pipeline.id),
     ])
-    jsonSourceRef.current = "builder"
     setActions((current) =>
       current.map((action) =>
         action.key === actionKey ? { ...action, pipeline: saved.id } : action
       )
     )
-    setDefinitionView("rule")
     setPipelineSession(null)
   }
 
@@ -379,7 +279,6 @@ export function WorkflowDefinitionDialog({
       return
     }
     if (!nextOpen && pipelineSession) {
-      setDefinitionView("rule")
       setPipelineSession(null)
       return
     }
@@ -426,7 +325,6 @@ export function WorkflowDefinitionDialog({
             organizationId={selectedOrganizationId || undefined}
             onDone={rememberPipeline}
             onCancel={() => {
-              setDefinitionView("rule")
               setPipelineSession(null)
             }}
           />
@@ -434,24 +332,9 @@ export function WorkflowDefinitionDialog({
         {pipelineSession ? null : (
           <>
             <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1.5">
-                  <DialogTitle>Create a workflow</DialogTitle>
-                  <DialogDescription>{sentence}</DialogDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant={definitionView === "json" ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    setDefinitionView((view) =>
-                      view === "rule" ? "json" : "rule"
-                    )
-                  }
-                >
-                  <FileJsonIcon />
-                  {definitionView === "json" ? "Rule" : "JSON"}
-                </Button>
+              <div className="min-w-0 space-y-1.5">
+                <DialogTitle>Create a workflow</DialogTitle>
+                <DialogDescription>{sentence}</DialogDescription>
               </div>
             </DialogHeader>
             <form
@@ -606,56 +489,33 @@ export function WorkflowDefinitionDialog({
                   ) : null}
                 </FieldGroup>
 
-                {definitionView === "json" ? (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
-                    <DefinitionJsonPane
-                      id={`${formId}-json`}
-                      title="JSON"
-                      description="Updates as you edit. Paste JSON to fill the builder."
-                      value={jsonText}
-                      onChange={handleJsonChange}
-                      onBlur={handleJsonBlur}
-                      error={jsonError}
-                    />
-                  </div>
-                ) : (
-                  <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
-                    <WorkflowRuleEditor
-                      trigger={trigger}
-                      criteria={criteria}
-                      actions={actions}
-                      fields={triggerFields}
-                      schemas={networkSchemas}
-                      pipelines={networkPipelines}
-                      triggerSchemaId={schemaId}
-                      schemaName={triggerSchema?.name}
-                      onTriggerChange={(next) => {
-                        markBuilderSource()
-                        setTrigger(next)
-                      }}
-                      onCriteriaChange={(next) => {
-                        markBuilderSource()
-                        setCriteria(next)
-                      }}
-                      onActionsChange={(next) => {
-                        markBuilderSource()
-                        setActions(next)
-                      }}
-                      canCreatePipeline={canCreatePipeline}
-                      canUpdatePipeline={canUpdatePipeline}
-                      onCreatePipeline={(actionKey) =>
-                        setPipelineSession({ actionKey, mode: "create" })
-                      }
-                      onEditPipeline={(actionKey, pipelineId) =>
-                        setPipelineSession({
-                          actionKey,
-                          mode: "edit",
-                          pipelineId,
-                        })
-                      }
-                    />
-                  </div>
-                )}
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+                  <WorkflowRuleEditor
+                    trigger={trigger}
+                    criteria={criteria}
+                    actions={actions}
+                    fields={triggerFields}
+                    schemas={networkSchemas}
+                    pipelines={networkPipelines}
+                    triggerSchemaId={schemaId}
+                    schemaName={triggerSchema?.name}
+                    onTriggerChange={setTrigger}
+                    onCriteriaChange={setCriteria}
+                    onActionsChange={setActions}
+                    canCreatePipeline={canCreatePipeline}
+                    canUpdatePipeline={canUpdatePipeline}
+                    onCreatePipeline={(actionKey) =>
+                      setPipelineSession({ actionKey, mode: "create" })
+                    }
+                    onEditPipeline={(actionKey, pipelineId) =>
+                      setPipelineSession({
+                        actionKey,
+                        mode: "edit",
+                        pipelineId,
+                      })
+                    }
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <DialogClose
@@ -665,7 +525,7 @@ export function WorkflowDefinitionDialog({
                 </DialogClose>
                 <Button
                   type="submit"
-                  disabled={isLoading || !canSubmit || Boolean(jsonError)}
+                  disabled={isLoading || !canSubmit}
                   aria-busy={isLoading}
                   className={isLoading ? "disabled:opacity-100" : undefined}
                 >
