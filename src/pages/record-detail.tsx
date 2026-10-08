@@ -20,6 +20,8 @@ import {
   PhoneRecordLink,
   RelatedRecordLink,
   UriRecordLink,
+  UserRecordLink,
+  type RecordUser,
 } from "@/components/schema-records-table"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -41,6 +43,7 @@ import {
   isForeignProperty,
   isPhoneProperty,
   isUriProperty,
+  isUserProperty,
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
@@ -96,6 +99,7 @@ export default function RecordDetail() {
   const user = record
     ? organizationUsers.find((item) => item.id === record.organizationUserId)
     : undefined
+  const usersById = new Map(organizationUsers.map((item) => [item.id, item]))
   const properties = schema ? getJsonSchemaProperties(schema.definition) : []
   const fileIds = record ? getRecordFileIds(record.data, properties) : []
   const valueProperties = properties.filter(
@@ -203,8 +207,10 @@ export default function RecordDetail() {
                   property={property}
                   value={record.data[property.name]}
                   related={recordQuery.data?.related}
+                  usersById={usersById}
                   schemas={schemas}
                   recordHref={(recordId) => href(`records/${recordId}`)}
+                  userHref={(userId) => href(`organization-users/${userId}`)}
                 />
               ))}
             </dl>
@@ -368,14 +374,18 @@ function FieldItem({
   property,
   value,
   related,
+  usersById,
   schemas,
   recordHref,
+  userHref,
 }: {
   property: JsonSchemaProperty
   value: JsonValue | undefined
   related?: Record<string, { id: string; schemaId: string; title: string }>
+  usersById?: Map<string, RecordUser>
   schemas: Schema[]
   recordHref: (recordId: string) => string
+  userHref: (userId: string) => string
 }) {
   return (
     <div
@@ -389,8 +399,10 @@ function FieldItem({
           property={property}
           value={value}
           related={related}
+          usersById={usersById}
           schemas={schemas}
           recordHref={recordHref}
+          userHref={userHref}
         />
       </dd>
     </div>
@@ -401,17 +413,31 @@ function FieldValue({
   property,
   value,
   related,
+  usersById,
   schemas,
   recordHref,
+  userHref,
 }: {
   property: JsonSchemaProperty
   value: JsonValue | undefined
   related?: Record<string, { id: string; schemaId: string; title: string }>
+  usersById?: Map<string, RecordUser>
   schemas: Schema[]
   recordHref: (recordId: string) => string
+  userHref: (userId: string) => string
 }) {
   if (value == null || value === "") {
     return <span className="text-muted-foreground">—</span>
+  }
+
+  if (isUserProperty(property) && typeof value === "string" && value) {
+    return (
+      <UserRecordLink
+        userId={value}
+        user={usersById?.get(value)}
+        href={userHref(value)}
+      />
+    )
   }
 
   if (isForeignProperty(property) && typeof value === "string" && value) {

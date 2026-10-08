@@ -304,6 +304,15 @@ export function isFileProperty(property: JsonSchemaProperty) {
   return property.format === "file"
 }
 
+export function isUserProperty(property: JsonSchemaProperty) {
+  return property.format === "user"
+}
+
+export function userIdFromFormValue(raw: string) {
+  const id = raw.trim()
+  return id || undefined
+}
+
 export function isFileArrayProperty(property: JsonSchemaProperty) {
   return isFileProperty(property) && property.type === "array"
 }

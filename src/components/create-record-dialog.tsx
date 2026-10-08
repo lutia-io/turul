@@ -43,7 +43,9 @@ import {
   isFileArrayProperty,
   isFileProperty,
   isForeignProperty,
+  isUserProperty,
   isTemplateExpression,
+  userIdFromFormValue,
   parseJsonObject,
   type JsonObject,
   type JsonSchemaProperty,
@@ -51,6 +53,7 @@ import {
 } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
+  organizationUserName,
   useWorkspaceNetworkList,
   useWorkspaceOrganizations,
   useWorkspaceSchemas,
@@ -159,7 +162,7 @@ export function CreateRecordDialog({
       sort: "name",
       order: "asc",
     },
-    { skip: !open || editing || !selectedNetworkId || !selectedOrganizationId }
+    { skip: !open || !selectedNetworkId || !selectedOrganizationId }
   )
   const organizationUsers = useMemo(
     () =>
@@ -323,6 +326,19 @@ export function CreateRecordDialog({
     try {
       const data: JsonObject = {}
       for (const property of properties) {
+        if (isUserProperty(property)) {
+          const id = userIdFromFormValue(values[property.name] ?? "")
+          if (!id) {
+            if (inputRequired(property, editing)) {
+              setFormError(`${columnLabel(property)} is required.`)
+              return
+            }
+            continue
+          }
+          data[property.name] = id
+          continue
+        }
+
         if (isFileProperty(property)) {
           const ids = parseFileIds(values[property.name] ?? "")
           for (const uploaded of uploads[property.name] ?? []) {
@@ -465,6 +481,7 @@ export function CreateRecordDialog({
                 schemas={schemas}
                 networkId={selectedNetworkId}
                 organizationId={selectedOrganizationId}
+                organizationUsers={organizationUsers}
                 value={values[property.name] ?? ""}
                 uploads={uploads[property.name] ?? []}
                 editing={editing}
@@ -690,6 +707,7 @@ function RecordPropertyField({
   schemas,
   networkId,
   organizationId,
+  organizationUsers,
   value,
   uploads,
   editing,
@@ -702,6 +720,12 @@ function RecordPropertyField({
   schemas: Schema[]
   networkId: string
   organizationId: string
+  organizationUsers: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }[]
   value: string
   uploads: File[]
   editing?: boolean
@@ -713,6 +737,22 @@ function RecordPropertyField({
   const label = columnLabel(property)
   const required = inputRequired(property, editing)
   const hint = editing ? undefined : defaultHint(property)
+
+  if (isUserProperty(property)) {
+    return (
+      <RecordUserField
+        id={id}
+        label={label}
+        required={required}
+        description={property.description}
+        hint={hint}
+        organizationUsers={organizationUsers}
+        value={value}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    )
+  }
 
   if (isFileProperty(property)) {
     return (
@@ -999,6 +1039,64 @@ function AddressLineInput({
         placeholder={field.placeholder}
         onChange={(event) => onChange(field.name, event.target.value)}
       />
+    </Field>
+  )
+}
+
+function RecordUserField({
+  id,
+  label,
+  required,
+  description,
+  hint,
+  organizationUsers,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string
+  label: string
+  required?: boolean
+  description?: string
+  hint?: string
+  organizationUsers: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }[]
+  value: string
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  const known = organizationUsers.some((user) => user.id === value)
+
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>
+        {label}
+        {required ? "" : " (optional)"}
+      </FieldLabel>
+      <NativeSelect
+        id={id}
+        value={value}
+        required={required}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <NativeSelectOption value="">
+          {required ? "Select a user" : "None"}
+        </NativeSelectOption>
+        {!known && value ? (
+          <NativeSelectOption value={value}>{value}</NativeSelectOption>
+        ) : null}
+        {organizationUsers.map((user) => (
+          <NativeSelectOption key={user.id} value={user.id}>
+            {organizationUserName(user) || user.email}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      <FieldHint description={description} hint={hint} />
     </Field>
   )
 }

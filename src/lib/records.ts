@@ -8,6 +8,7 @@ import {
   isFileProperty,
   isForeignProperty,
   isPhoneProperty,
+  isUserProperty,
   type JsonObject,
   type JsonSchemaProperty,
   type JsonValue,
@@ -92,7 +93,8 @@ export function recordDisplayTitle(
       property.type !== "string" ||
       isFileProperty(property) ||
       isForeignProperty(property) ||
-      isPhoneProperty(property)
+      isPhoneProperty(property) ||
+      isUserProperty(property)
     ) {
       continue
     }

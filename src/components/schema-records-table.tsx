@@ -28,15 +28,17 @@ import {
   isForeignProperty,
   isPhoneProperty,
   isUriProperty,
+  isUserProperty,
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
-import { workspaceRecordFromApi } from "@/lib/network-workspace"
+import { organizationUserName, workspaceRecordFromApi } from "@/lib/network-workspace"
 import {
   formatCellValue,
   formatFileSize,
   recordDisplayTitle,
 } from "@/lib/records"
+import { userInitials } from "@/lib/user"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { useAppSelector } from "@/store/hooks"
@@ -51,18 +53,22 @@ export function RecordCell({
   property,
   filesById,
   relatedById,
+  usersById,
   schemas,
   href,
   relatedHref,
+  userHref,
   onPreviewFile,
 }: {
   record: StoredRecord
   property: JsonSchemaProperty
   filesById: Map<string, StoredFile>
   relatedById?: Map<string, RelatedRecord>
+  usersById?: Map<string, RecordUser>
   schemas?: Schema[]
   href: string
   relatedHref?: (recordId: string) => string
+  userHref?: (userId: string) => string
   onPreviewFile: (fileId: string) => void
 }) {
   const value = record.data[property.name]
@@ -83,6 +89,16 @@ export function RecordCell({
         </div>
       )
     }
+  }
+
+  if (isUserProperty(property) && typeof value === "string" && value) {
+    return (
+      <UserRecordLink
+        userId={value}
+        user={usersById?.get(value)}
+        href={userHref?.(value)}
+      />
+    )
   }
 
   if (isForeignProperty(property) && typeof value === "string" && value) {
@@ -144,6 +160,140 @@ export function RecordCell({
         <span className="text-muted-foreground">—</span>
       )}
     </Link>
+  )
+}
+
+export type RecordUser = {
+  firstName: string
+  lastName: string
+  email?: string
+}
+
+const avatarPalette = [
+  "blue",
+  "cyan",
+  "teal",
+  "green",
+  "purple",
+  "pink",
+  "orange",
+] as const
+
+function avatarTone(seed: string) {
+  let hash = 0
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 33 + seed.charCodeAt(i)) >>> 0
+  }
+  return getBadgeColor(avatarPalette[hash % avatarPalette.length])
+}
+
+function recordUserLabel(user: RecordUser | undefined, fallback: string) {
+  if (!user) {
+    return fallback
+  }
+  return organizationUserName(user) || user.email || fallback
+}
+
+function recordUserInitials(user: RecordUser | undefined) {
+  if (!user) {
+    return ""
+  }
+  return userInitials({
+    id: "",
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email ?? "",
+  })
+}
+
+function UserAvatar({
+  user,
+  seed,
+  size = "sm",
+}: {
+  user?: RecordUser
+  seed: string
+  size?: "sm" | "md"
+}) {
+  const tone = avatarTone(seed)
+  const initials = recordUserInitials(user)
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold",
+        size === "md" ? "size-9 text-xs" : "size-5 text-[9px]",
+        tone.bg,
+        tone.text
+      )}
+      aria-hidden
+    >
+      {initials || "?"}
+    </span>
+  )
+}
+
+export function UserRecordLink({
+  userId,
+  user,
+  href,
+}: {
+  userId: string
+  user?: RecordUser
+  href?: string
+}) {
+  const name = recordUserLabel(user, userId)
+  const chip = (
+    <>
+      <UserAvatar user={user} seed={userId} />
+      <span className="min-w-0 truncate">{name}</span>
+    </>
+  )
+
+  if (!href) {
+    return (
+      <span className={cn(linkChipClass, "cursor-default pl-1")}>{chip}</span>
+    )
+  }
+
+  return (
+    <HoverCard>
+      <HoverCardTrigger
+        delay={350}
+        closeDelay={150}
+        render={<Link to={href} />}
+        className={cn(linkChipClass, "pl-1")}
+      >
+        {chip}
+        <ArrowUpRightIcon className="size-3 shrink-0 text-muted-foreground transition-colors group-hover/link:text-foreground" />
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" className="w-72 p-0">
+        <div className="flex items-center gap-3 p-3">
+          <UserAvatar user={user} seed={userId} size="md" />
+          <div className="min-w-0">
+            <p className="truncate font-medium">{name}</p>
+            {user?.email ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {user.email}
+              </p>
+            ) : (
+              <p className="truncate text-xs text-muted-foreground">
+                Organization user
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="border-t px-3 py-2">
+          <Link
+            to={href}
+            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            View user
+            <ArrowUpRightIcon className="size-3" />
+          </Link>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   )
 }
 

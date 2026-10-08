@@ -18,6 +18,7 @@ export const fieldKinds = [
   { value: "phone", label: "Phone" },
   { value: "url", label: "URL" },
   { value: "file", label: "File" },
+  { value: "user", label: "User" },
   { value: "address", label: "Address" },
   { value: "foreign", label: "Related record" },
   { value: "list", label: "List" },
@@ -85,6 +86,9 @@ export function kindFromProperty(property: {
   }
   if (property.format === "file") {
     return "file"
+  }
+  if (property.format === "user") {
+    return "user"
   }
   if (property.format === "email") {
     return "email"
@@ -357,6 +361,8 @@ function shapeForKind(kind: FieldKind): { type: string; format: string } {
       return { type: "string", format: "uri" }
     case "file":
       return { type: "string", format: "file" }
+    case "user":
+      return { type: "string", format: "user" }
     case "address":
       return { type: "object", format: ADDRESS_FORMAT }
     case "foreign":

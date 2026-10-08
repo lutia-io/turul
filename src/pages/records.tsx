@@ -40,6 +40,7 @@ import {
   columnLabel,
   RecordCell,
   SchemaSheetTabs,
+  type RecordUser,
 } from "@/components/schema-records-table"
 import {
   AddColumnButton,
@@ -59,6 +60,7 @@ import {
   isForeignProperty,
   isPhoneProperty,
   isUriProperty,
+  isUserProperty,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
 import {
@@ -66,6 +68,7 @@ import {
   useNetworkWorkspace,
   useWorkspaceFiles,
   useWorkspaceNetworksWithDefinitions,
+  useWorkspaceOrganizationUsers,
   workspaceRecordFromApi,
 } from "@/lib/network-workspace"
 import { useAuthorization } from "@/lib/authorization"
@@ -451,6 +454,17 @@ function SchemaRecordsDataTable({
     () => getJsonSchemaProperties(schema.definition),
     [schema.definition]
   )
+  const { organizationUsers } = useWorkspaceOrganizationUsers()
+  const usersById = useMemo(() => {
+    const users = new Map<string, RecordUser>()
+    for (const user of organizationUsers) {
+      if (organizationId && user.organizationId !== organizationId) {
+        continue
+      }
+      users.set(user.id, user)
+    }
+    return users
+  }, [organizationId, organizationUsers])
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
   const [columnFilters, setColumnFilters] = useState<RecordColumnFilters>({
@@ -529,6 +543,17 @@ function SchemaRecordsDataTable({
       })
     },
     [organizationId]
+  )
+
+  const hrefForUser = useCallback(
+    (userId: string) => {
+      return networkWorkspacePath({
+        networkId: network.id,
+        organizationId,
+        rest: `organization-users/${userId}`,
+      })
+    },
+    [network.id, organizationId]
   )
 
   const hrefForRelated = useCallback(
@@ -617,15 +642,18 @@ function SchemaRecordsDataTable({
                 property={property}
                 filesById={filesById}
                 relatedById={relatedById}
+                usersById={usersById}
                 schemas={network.schemas}
                 href={hrefFor(row.original)}
                 relatedHref={hrefForRelated}
+                userHref={hrefForUser}
                 onPreviewFile={setPreviewFileId}
               />
             ),
             size:
               isForeignProperty(property) ||
               isFileProperty(property) ||
+              isUserProperty(property) ||
               isUriProperty(property) ||
               isEmailProperty(property) ||
               isPhoneProperty(property) ||
@@ -672,6 +700,8 @@ function SchemaRecordsDataTable({
       filesById,
       hrefFor,
       hrefForRelated,
+      hrefForUser,
+      usersById,
       network.schemas,
       onEdit,
       properties,
