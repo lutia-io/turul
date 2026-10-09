@@ -7,7 +7,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -17,9 +16,10 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { Input } from "@/components/ui/input"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
-import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { ChevronsUpDownIcon, PlusIcon, SearchIcon } from "lucide-react"
 
 export type SwitcherKind = "network" | "organization"
 
@@ -54,6 +54,8 @@ export function TeamSwitcher({
   addLabel?: string | null
 }) {
   const { isMobile } = useSidebar()
+  const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState("")
   const [uncontrolledId, setUncontrolledId] = React.useState(
     activeId ?? teams[0]?.id
   )
@@ -67,9 +69,22 @@ export function TeamSwitcher({
   const menuLabel = label ?? copy.plural
   const actionLabel =
     addLabel === undefined ? `Add ${copy.singular.toLowerCase()}` : addLabel
+  const normalizedQuery = query.trim().toLowerCase()
+  const visibleTeams = normalizedQuery
+    ? teams.filter((team) =>
+        `${team.name} ${team.plan}`.toLowerCase().includes(normalizedQuery)
+      )
+    : teams
 
   if (!activeTeam && !actionLabel && teams.length === 0) {
     return null
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (nextOpen) {
+      setQuery("")
+    }
   }
 
   function handleSelect(team: SwitcherItem) {
@@ -77,12 +92,26 @@ export function TeamSwitcher({
       setUncontrolledId(team.id)
     }
     onSelect?.(team)
+    setOpen(false)
+  }
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      return
+    }
+
+    if (event.key === "Enter" && normalizedQuery && visibleTeams[0]) {
+      event.preventDefault()
+      handleSelect(visibleTeams[0])
+    }
+
+    event.stopPropagation()
   }
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={handleOpenChange}>
           <DropdownMenuTrigger
             render={
               <SidebarMenuButton
@@ -118,47 +147,70 @@ export function TeamSwitcher({
             <ChevronsUpDownIcon className="ml-auto" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-fit"
+            className="flex w-64 flex-col overflow-hidden p-0"
             align="start"
             side={isMobile ? "bottom" : "right"}
             sideOffset={4}
           >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
+            <div className="shrink-0 p-1.5 pb-1">
+              <p className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
                 {menuLabel}
-              </DropdownMenuLabel>
-              {teams.map((team) => {
-                const tone = getBadgeColor(team.color)
+              </p>
+              {teams.length > 0 ? (
+                <div className="relative">
+                  <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    placeholder="Search"
+                    aria-label={`Search ${copy.plural.toLowerCase()}`}
+                    className="h-7 border-transparent bg-muted/70 pl-7 text-xs shadow-none focus-visible:ring-1"
+                    autoFocus
+                  />
+                </div>
+              ) : null}
+            </div>
+            <DropdownMenuGroup className="max-h-72 min-h-0 overflow-y-auto p-1">
+              {normalizedQuery && visibleTeams.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                  No matches
+                </p>
+              ) : (
+                visibleTeams.map((team) => {
+                  const tone = getBadgeColor(team.color)
 
-                return (
-                  <DropdownMenuItem
-                    key={team.id}
-                    onClick={() => handleSelect(team)}
-                    className="gap-2 p-2"
-                  >
-                    <div
-                      className={cn(
-                        "flex size-6 items-center justify-center rounded-md text-white [&_svg]:stroke-white",
-                        tone.bg
-                      )}
+                  return (
+                    <DropdownMenuItem
+                      key={team.id}
+                      onClick={() => handleSelect(team)}
+                      className="gap-2 p-2"
                     >
-                      {team.logo}
-                    </div>
-                    <div className="grid flex-1 text-left leading-tight">
-                      <span>{team.name}</span>
-                      {team.plan ? (
-                        <span className="text-xs text-muted-foreground">
-                          {team.plan}
-                        </span>
-                      ) : null}
-                    </div>
-                  </DropdownMenuItem>
-                )
-              })}
+                      <div
+                        className={cn(
+                          "flex size-6 items-center justify-center rounded-md text-white [&_svg]:stroke-white",
+                          tone.bg
+                        )}
+                      >
+                        {team.logo}
+                      </div>
+                      <div className="grid min-w-0 flex-1 text-left leading-tight">
+                        <span className="truncate">{team.name}</span>
+                        {team.plan ? (
+                          <span className="truncate text-xs text-muted-foreground">
+                            {team.plan}
+                          </span>
+                        ) : null}
+                      </div>
+                    </DropdownMenuItem>
+                  )
+                })
+              )}
             </DropdownMenuGroup>
             {actionLabel ? (
-              <>
-                <DropdownMenuSeparator />
+              <div className="shrink-0 p-1 pt-0">
+                <DropdownMenuSeparator className="mx-0 my-1" />
                 <DropdownMenuGroup>
                   <DropdownMenuItem className="gap-2 p-2" onClick={onAdd}>
                     <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
@@ -169,7 +221,7 @@ export function TeamSwitcher({
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
-              </>
+              </div>
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
