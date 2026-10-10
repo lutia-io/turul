@@ -19,7 +19,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
-import { ChevronsUpDownIcon, PlusIcon, SearchIcon } from "lucide-react"
+import {
+  ChevronsUpDownIcon,
+  LoaderCircleIcon,
+  PlusIcon,
+  SearchIcon,
+} from "lucide-react"
 
 export type SwitcherKind = "network" | "organization"
 
@@ -42,6 +47,10 @@ export function TeamSwitcher({
   activeId,
   onSelect,
   onAdd,
+  onQueryChange,
+  appliedQuery = "",
+  isSearching = false,
+  searchError,
   label,
   addLabel,
 }: {
@@ -50,6 +59,10 @@ export function TeamSwitcher({
   activeId?: string | null
   onSelect?: (team: SwitcherItem) => void
   onAdd?: () => void
+  onQueryChange?: (query: string) => void
+  appliedQuery?: string
+  isSearching?: boolean
+  searchError?: string | null
   label?: string
   addLabel?: string | null
 }) {
@@ -59,32 +72,62 @@ export function TeamSwitcher({
   const [uncontrolledId, setUncontrolledId] = React.useState(
     activeId ?? teams[0]?.id
   )
+  const onQueryChangeRef = React.useRef(onQueryChange)
+  onQueryChangeRef.current = onQueryChange
   const selectedId = activeId === undefined ? uncontrolledId : activeId
-  const activeTeam = selectedId
-    ? (teams.find((team) => team.id === selectedId) ??
-      (activeId === undefined ? teams[0] : undefined))
+  const matchedTeam = selectedId
+    ? teams.find((team) => team.id === selectedId)
     : undefined
+  const activeTeamRef = React.useRef<SwitcherItem | undefined>(undefined)
+  if (matchedTeam) {
+    activeTeamRef.current = matchedTeam
+  }
+  const activeTeam =
+    matchedTeam ??
+    (activeTeamRef.current?.id === selectedId
+      ? activeTeamRef.current
+      : undefined) ??
+    (activeId === undefined ? teams[0] : undefined)
   const activeTone = getBadgeColor(activeTeam?.color)
   const copy = kindCopy[kind]
   const menuLabel = label ?? copy.plural
   const actionLabel =
     addLabel === undefined ? `Add ${copy.singular.toLowerCase()}` : addLabel
-  const normalizedQuery = query.trim().toLowerCase()
-  const visibleTeams = normalizedQuery
-    ? teams.filter((team) =>
-        `${team.name} ${team.plan}`.toLowerCase().includes(normalizedQuery)
-      )
-    : teams
+  const trimmedQuery = query.trim()
+  const pending =
+    trimmedQuery.length > 0 &&
+    (trimmedQuery !== appliedQuery.trim() || isSearching)
+  const showSearch =
+    teams.length > 0 ||
+    trimmedQuery.length > 0 ||
+    Boolean(activeTeam) ||
+    pending ||
+    Boolean(searchError)
 
-  if (!activeTeam && !actionLabel && teams.length === 0) {
+  React.useEffect(() => {
+    if (!trimmedQuery) {
+      onQueryChangeRef.current?.("")
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      onQueryChangeRef.current?.(trimmedQuery)
+    }, 300)
+    return () => window.clearTimeout(timeout)
+  }, [trimmedQuery])
+
+  if (!activeTeam && !actionLabel && teams.length === 0 && !trimmedQuery) {
     return null
+  }
+
+  function resetQuery() {
+    setQuery("")
+    onQueryChangeRef.current?.("")
   }
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen)
-    if (nextOpen) {
-      setQuery("")
-    }
+    resetQuery()
   }
 
   function handleSelect(team: SwitcherItem) {
@@ -93,6 +136,7 @@ export function TeamSwitcher({
     }
     onSelect?.(team)
     setOpen(false)
+    resetQuery()
   }
 
   function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -100,9 +144,18 @@ export function TeamSwitcher({
       return
     }
 
-    if (event.key === "Enter" && normalizedQuery && visibleTeams[0]) {
+    if (event.key === "Enter") {
       event.preventDefault()
-      handleSelect(visibleTeams[0])
+      onQueryChangeRef.current?.(trimmedQuery)
+      if (
+        trimmedQuery &&
+        trimmedQuery === appliedQuery.trim() &&
+        !isSearching &&
+        !searchError &&
+        teams[0]
+      ) {
+        handleSelect(teams[0])
+      }
     }
 
     event.stopPropagation()
@@ -156,7 +209,7 @@ export function TeamSwitcher({
               <p className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
                 {menuLabel}
               </p>
-              {teams.length > 0 ? (
+              {showSearch ? (
                 <div className="relative">
                   <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -166,6 +219,7 @@ export function TeamSwitcher({
                     onPointerDown={(event) => event.stopPropagation()}
                     placeholder="Search"
                     aria-label={`Search ${copy.plural.toLowerCase()}`}
+                    aria-busy={pending}
                     className="h-7 border-transparent bg-muted/70 pl-7 text-xs shadow-none focus-visible:ring-1"
                     autoFocus
                   />
@@ -173,12 +227,21 @@ export function TeamSwitcher({
               ) : null}
             </div>
             <DropdownMenuGroup className="max-h-72 min-h-0 overflow-y-auto p-1">
-              {normalizedQuery && visibleTeams.length === 0 ? (
+              {pending ? (
+                <p className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+                  <LoaderCircleIcon className="size-3 animate-spin" />
+                  Searching...
+                </p>
+              ) : searchError ? (
+                <p className="px-2 py-1.5 text-xs text-destructive">
+                  {searchError}
+                </p>
+              ) : trimmedQuery && teams.length === 0 ? (
                 <p className="px-2 py-1.5 text-xs text-muted-foreground">
                   No matches
                 </p>
               ) : (
-                visibleTeams.map((team) => {
+                teams.map((team) => {
                   const tone = getBadgeColor(team.color)
 
                   return (

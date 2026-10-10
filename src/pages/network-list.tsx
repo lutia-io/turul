@@ -302,7 +302,7 @@ export default function NetworkList() {
   const { openCreateNetwork } = useCreateEntity()
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
-  const [sort, setSort] = useState<NetworkListSort>("createdAt")
+  const [sort, setSort] = useState<NetworkListSort>("updatedAt")
   const [order, setOrder] = useState<"asc" | "desc">("desc")
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(12)
@@ -369,7 +369,7 @@ export default function NetworkList() {
         <DataTableToolbar
           query={query}
           onQueryChange={setQuery}
-          searchPlaceholder="Search name or slug..."
+          searchPlaceholder="Search name..."
           searchClassName="sm:max-w-3xl"
           filters={
             <NativeSelect

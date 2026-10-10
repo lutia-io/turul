@@ -1,6 +1,6 @@
 "use client"
 
-import type { ComponentProps } from "react"
+import { useState, type ComponentProps } from "react"
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router"
 import {
   ActivityIcon,
@@ -35,8 +35,17 @@ import {
   parseNetworkPath,
   useNetworkWorkspace,
   useWorkspaceNetworkList,
+  workspaceNetworkFromApi,
+  workspaceOrganizationFromApi,
 } from "@/lib/network-workspace"
 import { useAuthorization } from "@/lib/authorization"
+import { getHumaErrorMessage } from "@/store/api"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useAppSelector } from "@/store/hooks"
+import { useListNetworksQuery } from "@/store/network-slice"
+import { useListOrganizationsQuery } from "@/store/organization-slice"
+
+const switcherSearchPageSize = 100
 
 export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate()
@@ -45,6 +54,42 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { isMobile, setOpenMobile } = useSidebar()
   const { network, organizationId, href } = useNetworkWorkspace()
   const { networks } = useWorkspaceNetworkList()
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const [networkQuery, setNetworkQuery] = useState("")
+  const [organizationQuery, setOrganizationQuery] = useState("")
+  const [organizationScopeId, setOrganizationScopeId] = useState(network?.id)
+  if (organizationScopeId !== network?.id) {
+    setOrganizationScopeId(network?.id)
+    setOrganizationQuery("")
+  }
+  const scopedOrganizationQuery =
+    organizationScopeId === network?.id ? organizationQuery : ""
+  const networkSearch = useListNetworksQuery(
+    {
+      page: 1,
+      pageSize: switcherSearchPageSize,
+      q: networkQuery,
+      sort: "name",
+      order: "asc",
+    },
+    { skip: !isAuthenticated || networkQuery.length === 0 }
+  )
+  const organizationSearch = useListOrganizationsQuery(
+    {
+      page: 1,
+      pageSize: switcherSearchPageSize,
+      networkId: network?.id,
+      q: scopedOrganizationQuery,
+      sort: "name",
+      order: "asc",
+    },
+    {
+      skip:
+        !isAuthenticated ||
+        !network?.id ||
+        scopedOrganizationQuery.length === 0,
+    }
+  )
   const { openCreateNetwork, openCreateOrganization } = useCreateEntity()
   const { isOrgUser } = useAuthorization()
   const parsed = parseNetworkPath(pathname)
@@ -53,8 +98,14 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const recordsUrl = href("records")
   const recordsSchemaId = searchParams.get("schema") ?? network?.schemas[0]?.id
 
-  const switcherNetworks =
-    network && !networks.some((item) => item.id === network.id)
+  const networkSearchActive = isAuthenticated && networkQuery.length > 0
+  const organizationSearchActive =
+    isAuthenticated &&
+    Boolean(network?.id) &&
+    scopedOrganizationQuery.length > 0
+  const switcherNetworks = networkSearchActive
+    ? (networkSearch.data?.items ?? []).map(workspaceNetworkFromApi)
+    : network && !networks.some((item) => item.id === network.id)
       ? [network, ...networks]
       : networks
   const networkItems = switcherNetworks.map((item) => ({
@@ -64,25 +115,36 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
     plan: item.summary,
     color: item.color,
   }))
+  const searchedOrganizations = (organizationSearch.data?.items ?? []).map(
+    workspaceOrganizationFromApi
+  )
 
-  const organizationItems = [
-    {
-      id: "all",
-      name: "All organizations",
-      logo: <Building2Icon />,
-      plan: network
-        ? `${network.organizations.length} in ${network.name}`
-        : "Entire network",
-      color: "gray" as const,
-    },
-    ...(network?.organizations.map((organization) => ({
-      id: organization.id,
-      name: organization.name,
-      logo: <Building2Icon />,
-      plan: organization.type,
-      color: organization.color,
-    })) ?? []),
-  ]
+  const organizationItems = organizationSearchActive
+    ? searchedOrganizations.map((organization) => ({
+        id: organization.id,
+        name: organization.name,
+        logo: <Building2Icon />,
+        plan: organization.type,
+        color: organization.color,
+      }))
+    : [
+        {
+          id: "all",
+          name: "All organizations",
+          logo: <Building2Icon />,
+          plan: network
+            ? `${network.organizations.length} in ${network.name}`
+            : "Entire network",
+          color: "gray" as const,
+        },
+        ...(network?.organizations.map((organization) => ({
+          id: organization.id,
+          name: organization.name,
+          logo: <Building2Icon />,
+          plan: organization.type,
+          color: organization.color,
+        })) ?? []),
+      ]
 
   const overviewItems = [
     {
@@ -167,6 +229,17 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
           kind="network"
           teams={networkItems}
           activeId={network?.id}
+          onQueryChange={setNetworkQuery}
+          appliedQuery={networkQuery}
+          isSearching={networkSearchActive && networkSearch.isLoading}
+          searchError={
+            networkSearchActive && networkSearch.isError
+              ? getHumaErrorMessage(
+                  networkSearch.error,
+                  "Failed to search networks"
+                )
+              : undefined
+          }
           onSelect={(item) => {
             closeMobileSidebar()
             navigate(
@@ -182,9 +255,21 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
           }}
         />
         <TeamSwitcher
+          key={network?.id ?? "organizations"}
           kind="organization"
           teams={organizationItems}
           activeId={organizationId ?? "all"}
+          onQueryChange={setOrganizationQuery}
+          appliedQuery={scopedOrganizationQuery}
+          isSearching={organizationSearchActive && organizationSearch.isLoading}
+          searchError={
+            organizationSearchActive && organizationSearch.isError
+              ? getHumaErrorMessage(
+                  organizationSearch.error,
+                  "Failed to search organizations"
+                )
+              : undefined
+          }
           onSelect={(item) => {
             if (!network) {
               return
