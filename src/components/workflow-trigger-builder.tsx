@@ -73,7 +73,7 @@ export function WorkflowTriggerBuilder({
       <WorkflowSectionHeading
         icon={value.kind === "schedule" ? ClockIcon : WorkflowIcon}
         title="When"
-        description={triggerSummary(triggerToApi(value))}
+        description={triggerSummary(triggerToApi(value), fields)}
       />
       <div className="mt-6 flex flex-col gap-4">
         <div className="flex flex-wrap gap-1.5">

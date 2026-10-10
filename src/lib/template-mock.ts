@@ -8,19 +8,21 @@ export const mockTextTemplate = "{{ mockText }}"
 export const mockNumberTemplate = "{{ mockNumber }}"
 export const mockBooleanTemplate = "{{ mockBoolean }}"
 export const mockDateTemplate = "{{ mockDate }}"
+export const mockTimeTemplate = "{{ mockTime }}"
 export const mockDateTimeTemplate = "{{ mockDateTime }}"
 export const mockEmailTemplate = "{{ mockEmail }}"
 export const mockURLTemplate = "{{ mockURL }}"
 export const mockPhoneTemplate = "{{ mockPhone }}"
 
 const MOCK_TOKEN_RE =
-  /^\{\{\s*mock(Text|Number|Integer|Boolean|DateTime|Date|Email|URL|Phone|Choice)\b[^}]*\}\}$/
+  /^\{\{\s*mock(Text|Number|Integer|Boolean|DateTime|Date|Time|Email|URL|Phone|Choice)\b[^}]*\}\}$/
 
 export const mockTemplateVariables: TemplateVariable[] = [
   { label: "Mock text", token: mockTextTemplate, hint: "mock" },
   { label: "Mock number", token: mockNumberTemplate, hint: "mock" },
   { label: "Mock yes / no", token: mockBooleanTemplate, hint: "mock" },
   { label: "Mock date", token: mockDateTemplate, hint: "mock" },
+  { label: "Mock time", token: mockTimeTemplate, hint: "mock" },
   { label: "Mock date & time", token: mockDateTimeTemplate, hint: "mock" },
   { label: "Mock email", token: mockEmailTemplate, hint: "mock" },
   { label: "Mock URL", token: mockURLTemplate, hint: "mock" },
@@ -78,6 +80,9 @@ export function mockVariableForProperty(
   }
   if (property.format === "date") {
     return { label: "Mock date", token: mockDateTemplate, hint: "mock" }
+  }
+  if (property.format === "time") {
+    return { label: "Mock time", token: mockTimeTemplate, hint: "mock" }
   }
   if (property.format === "date-time") {
     return {

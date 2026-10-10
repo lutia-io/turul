@@ -62,6 +62,7 @@ import {
   workspaceRecordFromApi,
 } from "@/lib/network-workspace"
 import { recordDisplayTitle } from "@/lib/records"
+import { fromTimeInputValue, toTimeInputValue } from "@/lib/time"
 import { getHumaErrorMessage } from "@/store/api"
 import { useCreateFileMutation, useListFilesQuery } from "@/store/file-slice"
 import { useListOrganizationUsersQuery } from "@/store/organization-user-slice"
@@ -558,9 +559,14 @@ function defaultHint(property: JsonSchemaProperty) {
 function emptyValues(properties: JsonSchemaProperty[]) {
   const values: Record<string, string> = {}
   for (const property of properties) {
-    values[property.name] =
-      staticDefaultValue(property) ??
-      (property.type === "boolean" && inputRequired(property) ? "false" : "")
+    const fallback =
+      property.type === "boolean" && inputRequired(property) ? "false" : ""
+    const staticValue = staticDefaultValue(property)
+    if (property.format === "time" && staticValue) {
+      values[property.name] = toTimeInputValue(staticValue) || fallback
+      continue
+    }
+    values[property.name] = staticValue ?? fallback
   }
   return values
 }
@@ -606,6 +612,9 @@ function formValueFromData(
   }
   if (property.format === "date-time" && typeof value === "string") {
     return toDatetimeLocal(value)
+  }
+  if (property.format === "time" && typeof value === "string") {
+    return toTimeInputValue(value)
   }
   if (typeof value === "string" || typeof value === "number") {
     return String(value)
@@ -672,6 +681,9 @@ function coercePropertyValue(
       return undefined
     }
     return date.toISOString()
+  }
+  if (property.format === "time" && trimmed) {
+    return fromTimeInputValue(trimmed)
   }
   return trimmed || undefined
 }
@@ -888,11 +900,13 @@ function RecordPropertyField({
           ? "url"
           : property.format === "date"
             ? "date"
-            : property.format === "date-time"
-              ? "datetime-local"
-              : property.type === "number"
-                ? "number"
-                : "text"
+            : property.format === "time"
+              ? "time"
+              : property.format === "date-time"
+                ? "datetime-local"
+                : property.type === "number"
+                  ? "number"
+                  : "text"
 
   return (
     <Field>
@@ -900,6 +914,7 @@ function RecordPropertyField({
       <Input
         id={id}
         type={inputType}
+        step={inputType === "time" ? 1 : undefined}
         value={value}
         required={required}
         disabled={disabled}

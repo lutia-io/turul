@@ -1,6 +1,7 @@
 import type { StoredRecord } from "@/data/files"
 import type { Schema } from "@/data/networks"
 import { formatAddressLine, isEmptyAddress, parseAddress } from "@/lib/address"
+import { formatTimeValue } from "@/lib/time"
 import {
   getJsonSchemaProperties,
   getRecordFileIds,
@@ -57,6 +58,10 @@ export function formatCellValue(
 
   if (typeof value === "string" && property.format === "date") {
     return value
+  }
+
+  if (typeof value === "string" && property.format === "time") {
+    return formatTimeValue(value)
   }
 
   if (typeof value === "string" && property.format === "date-time") {

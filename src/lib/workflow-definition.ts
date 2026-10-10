@@ -1,3 +1,4 @@
+import { columnLabel, propertyLabel } from "@/components/schema-records-table"
 import {
   getJsonSchemaProperties,
   type JsonObject,
@@ -359,7 +360,10 @@ function formatClock(hour: string, minute: string) {
   return `${hour12}:${padTimePart(safeMinute)} ${period}`
 }
 
-export function triggerSummary(trigger: WorkflowTrigger | undefined): string {
+export function triggerSummary(
+  trigger: WorkflowTrigger | undefined,
+  fields?: JsonSchemaProperty[]
+): string {
   const draft = triggerFromApi(trigger)
   if (draft.kind === "schedule") {
     const zone =
@@ -380,7 +384,7 @@ export function triggerSummary(trigger: WorkflowTrigger | undefined): string {
   }
   if (draft.kind === "created_updated") {
     if (draft.changed.length === 1) {
-      return `When a record is created or ${draft.changed[0]} changes`
+      return `When a record is created or ${fieldSummaryLabel(draft.changed[0], fields)} changes`
     }
     if (draft.changed.length > 1) {
       return "When a record is created or selected fields change"
@@ -388,12 +392,20 @@ export function triggerSummary(trigger: WorkflowTrigger | undefined): string {
     return "When a record is created or updated"
   }
   if (draft.changed.length === 1) {
-    return `When ${draft.changed[0]} changes`
+    return `When ${fieldSummaryLabel(draft.changed[0], fields)} changes`
   }
   if (draft.changed.length > 1) {
     return "When selected fields change"
   }
   return "When a record is updated"
+}
+
+function fieldSummaryLabel(name: string, fields?: JsonSchemaProperty[]) {
+  const match = fields?.find((field) => field.name === name)
+  if (match) {
+    return columnLabel(match)
+  }
+  return propertyLabel(name)
 }
 
 export const operatorLabels: Record<CompareOperator, string> = {
@@ -820,11 +832,12 @@ export function parseWorkflowDefinition(
 export function workflowRuleSentence(
   trigger: WorkflowTrigger | undefined,
   criteria: WorkflowCriteria | undefined,
-  actionCount: number
+  actionCount: number,
+  fields?: JsonSchemaProperty[]
 ) {
   const conditionCount = countCriteriaLeaves(criteria)
-  return `${triggerSummary(trigger)}${
-    conditionCount > 0 ? ` · ${criteriaSummary(criteria)}.` : "."
+  return `${triggerSummary(trigger, fields)}${
+    conditionCount > 0 ? ` · ${criteriaSummary(criteria, fields)}.` : "."
   }${
     actionCount > 0
       ? ` Then ${actionCount} ${actionCount === 1 ? "action" : "actions"} run in order.`
@@ -841,7 +854,8 @@ export function workflowDraftSentence(
   return workflowRuleSentence(
     triggerToApi(trigger),
     criteriaToApi(criteria, fields),
-    actions.length
+    actions.length,
+    fields
   )
 }
 
@@ -881,18 +895,22 @@ function collectCriteriaFields(
   }
 }
 
-export function workflowSummary(definition: JsonObject): string {
+export function workflowSummary(
+  definition: JsonObject,
+  fields?: JsonSchemaProperty[]
+): string {
   const parsed = parseWorkflowDefinition(definition)
   if (parsed) {
     const actionCount = parsed.actions.length
-    const conditions = criteriaSummary(parsed.criteria)
-    return `${triggerSummary(parsed.trigger)} · ${conditions} · ${actionCount} ${actionCount === 1 ? "action" : "actions"}`
+    const conditions = criteriaSummary(parsed.criteria, fields)
+    return `${triggerSummary(parsed.trigger, fields)} · ${conditions} · ${actionCount} ${actionCount === 1 ? "action" : "actions"}`
   }
   return "Workflow"
 }
 
 export function criteriaSummary(
-  criteria: WorkflowCriteria | undefined
+  criteria: WorkflowCriteria | undefined,
+  fields?: JsonSchemaProperty[]
 ): string {
   if (!criteria) {
     return "No conditions"
@@ -912,7 +930,7 @@ export function criteriaSummary(
     return "None of the conditions match"
   }
   if (criteria.field && criteria.operator) {
-    return `${criteria.field} ${operatorLabels[asCompareOperator(criteria.operator)]} ${stringifyValue(criteria.value)}`
+    return `${fieldSummaryLabel(criteria.field, fields)} ${operatorLabels[asCompareOperator(criteria.operator)]} ${stringifyValue(criteria.value)}`
   }
   return "No conditions"
 }

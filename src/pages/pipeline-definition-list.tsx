@@ -177,7 +177,7 @@ export default function PipelineDefinitionList() {
   const filtersActive =
     query.trim().length > 0 || Object.values(columnFilters).some(Boolean)
   const networksById = useMemo(
-    () => new Map((networks ?? []).map((item) => [item.id, item])),
+    () => new Map((networks?.items ?? []).map((item) => [item.id, item])),
     [networks]
   )
 

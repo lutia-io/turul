@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
 import {
   GalleryVerticalEndIcon,
@@ -10,8 +10,13 @@ import {
 } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
-import { RefreshButton } from "@/components/refresh-button"
+import {
+  DataTableToolbar,
+  dataTablePageSummary,
+} from "@/components/data-table"
+import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
 import { Button } from "@/components/ui/button"
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
   Card,
   CardDescription,
@@ -34,18 +39,40 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  networkWorkspacePath,
-  useWorkspaceNetworkList,
-} from "@/lib/network-workspace"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { networkWorkspacePath } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { userDisplayName } from "@/lib/user"
-import { getHumaErrorMessage } from "@/store/api"
-import { useDeleteNetworkMutation } from "@/store/network-slice"
-import type { Network } from "@/data/networks"
-import type { ApiUserRef } from "@/store/api"
+import { getHumaErrorMessage, type ApiUserRef } from "@/store/api"
+import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useAppSelector } from "@/store/hooks"
+import {
+  useDeleteNetworkMutation,
+  useListNetworksQuery,
+  type ApiNetwork,
+  type ListNetworksParams,
+  type NetworkListSort,
+} from "@/store/network-slice"
 
-type NetworkDetails = Network
+type NetworkDetails = ApiNetwork
+
+const PAGE_SIZES = [12, 24, 48]
+const sortFields: NetworkListSort[] = ["name", "slug", "createdAt", "updatedAt"]
+
+const sortOptions: { value: string; label: string }[] = [
+  { value: "name:asc", label: "Name (A–Z)" },
+  { value: "name:desc", label: "Name (Z–A)" },
+  { value: "slug:asc", label: "Slug (A–Z)" },
+  { value: "slug:desc", label: "Slug (Z–A)" },
+  { value: "createdAt:asc", label: "Created (oldest)" },
+  { value: "createdAt:desc", label: "Created (newest)" },
+  { value: "updatedAt:asc", label: "Updated (oldest)" },
+  { value: "updatedAt:desc", label: "Updated (newest)" },
+]
+
+function isNetworkSort(value: string): value is NetworkListSort {
+  return sortFields.includes(value as NetworkListSort)
+}
 
 function activityLabel(
   createdAt?: string,
@@ -69,7 +96,7 @@ function DeleteNetworkDialog({
   open,
   onOpenChange,
 }: {
-  network: Network
+  network: NetworkDetails
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -211,12 +238,104 @@ function NetworkListSkeleton() {
   )
 }
 
+function NetworkListPagination({
+  pageIndex,
+  pageSize,
+  total,
+  onPageIndexChange,
+  onPageSizeChange,
+}: {
+  pageIndex: number
+  pageSize: number
+  total: number
+  onPageIndexChange: (pageIndex: number) => void
+  onPageSizeChange: (pageSize: number) => void
+}) {
+  const pageCount = Math.max(Math.ceil(total / pageSize), 1)
+
+  return (
+    <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>Cards per page</span>
+        <NativeSelect
+          aria-label="Cards per page"
+          value={String(pageSize)}
+          className="w-[4.5rem]"
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+        >
+          {PAGE_SIZES.map((size) => (
+            <NativeSelectOption key={size} value={String(size)}>
+              {size}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </div>
+      <div className="flex items-center gap-3">
+        <p className="text-sm text-muted-foreground tabular-nums">
+          Page {pageIndex + 1} of {pageCount}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onPageIndexChange(pageIndex - 1)}
+          disabled={pageIndex <= 0}
+        >
+          Previous
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onPageIndexChange(pageIndex + 1)}
+          disabled={pageIndex + 1 >= pageCount}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function NetworkList() {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { openCreateNetwork } = useCreateEntity()
-  const { networks, isLoading, isFetching, isError, error, refetch } =
-    useWorkspaceNetworkList()
-  const showHeaderCreate =
-    isLoading || isFetching || isError || networks.length > 0
+  const [query, setQuery] = useState("")
+  const debouncedQuery = useDebouncedValue(query)
+  const [sort, setSort] = useState<NetworkListSort>("createdAt")
+  const [order, setOrder] = useState<"asc" | "desc">("desc")
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageSize, setPageSize] = useState(12)
+
+  useEffect(() => {
+    setPageIndex(0)
+  }, [debouncedQuery, sort, order])
+
+  const listParams = useMemo<ListNetworksParams>(
+    () => ({
+      page: pageIndex + 1,
+      pageSize,
+      q: debouncedQuery.trim() || undefined,
+      sort,
+      order,
+    }),
+    [debouncedQuery, order, pageIndex, pageSize, sort]
+  )
+
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useListNetworksQuery(listParams, { skip: !isAuthenticated })
+  const dataRef = useRef(data)
+  if (data) {
+    dataRef.current = data
+  }
+  const list = data ?? dataRef.current
+  const networks = list?.items ?? []
+  const total = list?.total ?? 0
+  const filtersActive = query.trim().length > 0
+  const showInitialSkeleton = !list && (isLoading || isFetching) && !isError
+  const showEmpty =
+    data != null && data.total === 0 && !filtersActive && !isError
+  const showHeaderCreate = !showEmpty
 
   return (
     <div className="@container flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
@@ -231,7 +350,7 @@ export default function NetworkList() {
         </div>
         {showHeaderCreate ? (
           <div className="flex items-center gap-2">
-            {networks.length > 0 ? (
+            {networks.length > 0 || filtersActive ? (
               <RefreshButton
                 onRefresh={refetch}
                 isRefreshing={isFetching}
@@ -246,13 +365,52 @@ export default function NetworkList() {
         ) : null}
       </div>
 
-      {isLoading || isFetching ? (
+      {showEmpty ? null : (
+        <DataTableToolbar
+          query={query}
+          onQueryChange={setQuery}
+          searchPlaceholder="Search name or slug..."
+          searchClassName="sm:max-w-3xl"
+          filters={
+            <NativeSelect
+              aria-label="Sort networks"
+              value={`${sort}:${order}`}
+              className="w-48"
+              onChange={(event) => {
+                const [nextSort, nextOrder] = event.target.value.split(":")
+                if (nextSort && isNetworkSort(nextSort)) {
+                  setSort(nextSort)
+                }
+                if (nextOrder === "asc" || nextOrder === "desc") {
+                  setOrder(nextOrder)
+                }
+              }}
+            >
+              {sortOptions.map((option) => (
+                <NativeSelectOption key={option.value} value={option.value}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          }
+          count={dataTablePageSummary({
+            isLoading: isLoading || isFetching,
+            loadingLabel: "Loading networks...",
+            pageIndex,
+            pageSize,
+            total,
+            singular: "network",
+          })}
+        />
+      )}
+
+      {showInitialSkeleton ? (
         <NetworkListSkeleton />
       ) : isError ? (
         <p className="text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load networks")}
         </p>
-      ) : networks.length === 0 ? (
+      ) : showEmpty ? (
         <Card className="items-center px-6 py-12 text-center">
           <div className="flex size-12 items-center justify-center rounded-lg bg-violet-500 text-white">
             <NetworkIcon className="size-5" />
@@ -270,11 +428,31 @@ export default function NetworkList() {
           </Button>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
-          {networks.map((network) => (
-            <NetworkCard key={network.id} network={network} />
-          ))}
-        </div>
+        <>
+          <LoadingFrame isLoading={isFetching} label="Loading networks">
+            {networks.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No networks match this view.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
+                {networks.map((network) => (
+                  <NetworkCard key={network.id} network={network} />
+                ))}
+              </div>
+            )}
+          </LoadingFrame>
+          <NetworkListPagination
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            total={total}
+            onPageIndexChange={setPageIndex}
+            onPageSizeChange={(nextPageSize) => {
+              setPageSize(nextPageSize)
+              setPageIndex(0)
+            }}
+          />
+        </>
       )}
     </div>
   )

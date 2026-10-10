@@ -46,6 +46,7 @@ import {
 import { useAuthorization } from "@/lib/authorization"
 import {
   parseWorkflowDefinition,
+  schemaFieldOptions,
   workflowSummary,
 } from "@/lib/workflow-definition"
 import { getHumaErrorMessage } from "@/store/api"
@@ -196,7 +197,7 @@ export default function WorkflowDefinitionList() {
     [schemas]
   )
   const networksById = useMemo(
-    () => new Map((networks ?? []).map((item) => [item.id, item])),
+    () => new Map((networks?.items ?? []).map((item) => [item.id, item])),
     [networks]
   )
 
@@ -413,7 +414,12 @@ export default function WorkflowDefinitionList() {
               to={hrefFor(row.original)}
               className="text-muted-foreground"
             >
-              {workflowSummary(row.original.definition)}
+              {workflowSummary(
+                row.original.definition,
+                schemaFieldOptions(
+                  schemasById.get(row.original.schemaId)?.definition
+                )
+              )}
             </DataTableCellLink>
           ),
           size: 280,

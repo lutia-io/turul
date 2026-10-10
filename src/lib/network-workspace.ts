@@ -490,7 +490,7 @@ export function useWorkspaceNetworkList(options?: WorkspaceQueryOptions) {
 
   return {
     ...query,
-    networks: (query.data ?? []).map(workspaceNetworkFromApi),
+    networks: (query.data?.items ?? []).map(workspaceNetworkFromApi),
   }
 }
 
@@ -508,7 +508,7 @@ export function useWorkspaceNetworks(options?: WorkspaceQueryOptions) {
       void query.refetch()
       void organizationsQuery.refetch()
     },
-    networks: (query.data ?? []).map((network) =>
+    networks: (query.data?.items ?? []).map((network) =>
       withNetworkOrganizations(
         workspaceNetworkFromApi(network),
         organizationsQuery.organizations

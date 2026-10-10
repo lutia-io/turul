@@ -1,5 +1,32 @@
-import { useEffect, useId, useState, type FormEvent } from "react"
-import { PlusIcon } from "lucide-react"
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react"
+import {
+  BracesIcon,
+  CalendarClockIcon,
+  CalendarIcon,
+  ClockIcon,
+  FileIcon,
+  HashIcon,
+  Link2Icon,
+  LinkIcon,
+  ListChecksIcon,
+  ListIcon,
+  MailIcon,
+  MapPinIcon,
+  PhoneIcon,
+  PlusIcon,
+  ToggleLeftIcon,
+  TypeIcon,
+  UserIcon,
+  XIcon,
+  type LucideIcon,
+} from "lucide-react"
 
 import { columnLabel } from "@/components/schema-records-table"
 import { useCreateEntity } from "@/components/create-entity"
@@ -18,18 +45,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
 import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select"
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { JsonObject, JsonSchemaProperty } from "@/lib/json-definition"
 import {
   addColumn,
@@ -50,6 +84,7 @@ import {
 } from "@/lib/table-columns"
 import { useNetworkWorkspace } from "@/lib/network-workspace"
 import { useSchemaWorkflows } from "@/lib/schema-workflows"
+import { toFieldName } from "@/lib/slug"
 import { getHumaErrorMessage } from "@/store/api"
 import { useUpdateSchemaMutation } from "@/store/schema-slice"
 import { WorkflowsSubmenu } from "@/components/table-workflows-menu"
@@ -220,9 +255,7 @@ function DeleteColumnDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete {label}</DialogTitle>
-          <DialogDescription>
-            {deleteColumnWarning(label)}
-          </DialogDescription>
+          <DialogDescription>{deleteColumnWarning(label)}</DialogDescription>
         </DialogHeader>
         {error ? (
           <FieldError>
@@ -303,9 +336,18 @@ function ColumnFormBody({
   const [formError, setFormError] = useState<string>()
   const [updateSchema, { isLoading, error, reset }] = useUpdateSchemaMutation()
   const label = draft.title.trim() || "This column"
+  const fieldKey =
+    mode === "edit" && property
+      ? property.name
+      : draft.title.trim()
+        ? toFieldName(draft.title)
+        : ""
   const warnings =
     mode === "edit" && property
-      ? columnChangeWarnings(columnLabel(property), columnImpact(property, draft))
+      ? columnChangeWarnings(
+          columnLabel(property),
+          columnImpact(property, draft)
+        )
       : []
 
   useEffect(() => {
@@ -323,7 +365,7 @@ function ColumnFormBody({
   async function save() {
     const title = draft.title.trim()
     if (!title) {
-      setNameError("Name is required.")
+      setNameError("Display name is required.")
       setFormError(undefined)
       return
     }
@@ -338,7 +380,10 @@ function ColumnFormBody({
       return
     }
     setNameError(undefined)
-    if (draft.kind === "choices" && draft.enumValues.every((value) => !value.trim())) {
+    if (
+      draft.kind === "choices" &&
+      draft.enumValues.every((value) => !value.trim())
+    ) {
       setFormError("Add at least one choice.")
       return
     }
@@ -377,6 +422,8 @@ function ColumnFormBody({
           formId={formId}
           draft={draft}
           tables={tables}
+          fieldKey={fieldKey}
+          keyLocked={mode === "edit"}
           nameError={nameError}
           onChange={update}
         />
@@ -428,8 +475,8 @@ function ColumnFormBody({
               </DialogDescription>
             ) : (
               <DialogDescription>
-                The name you see can change. Values stay attached to this
-                column.
+                The display name can change. The key and stored values stay on
+                this column.
               </DialogDescription>
             )}
           </DialogHeader>
@@ -446,7 +493,7 @@ function ColumnFormBody({
         <div>
           <p className="text-sm font-medium">{heading}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Choose a name and the kind of value this column holds.
+            Choose a display name and the kind of value this column holds.
           </p>
         </div>
         {fields}
@@ -456,23 +503,264 @@ function ColumnFormBody({
   )
 }
 
+function ChoicesInput({
+  id,
+  values,
+  onChange,
+}: {
+  id: string
+  values: string[]
+  onChange: (values: string[]) => void
+}) {
+  const [pending, setPending] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function commit(raw: string) {
+    const incoming = raw
+      .split(/\r?\n/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+    if (incoming.length === 0) {
+      setPending("")
+      return
+    }
+    const seen = new Set(values)
+    const next = [...values]
+    for (const value of incoming) {
+      if (seen.has(value)) {
+        continue
+      }
+      seen.add(value)
+      next.push(value)
+    }
+    if (next.length !== values.length) {
+      onChange(next)
+    }
+    setPending("")
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+      event.preventDefault()
+      commit(pending)
+      return
+    }
+    if (
+      event.key === "Backspace" &&
+      pending === "" &&
+      values.length > 0 &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault()
+      onChange(values.slice(0, -1))
+    }
+  }
+
+  return (
+    <div
+      className="flex min-h-8 w-full cursor-text flex-wrap items-center gap-1 rounded-lg border border-input bg-transparent px-1.5 py-1 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          event.preventDefault()
+          inputRef.current?.focus()
+        }
+      }}
+    >
+      {values.map((value, index) => (
+        <span
+          key={`${value}-${index}`}
+          className="inline-flex max-w-full items-center gap-0.5 rounded-full bg-muted py-0.5 pr-0.5 pl-2 text-[11px] font-medium"
+        >
+          <span className="truncate">{value}</span>
+          <button
+            type="button"
+            aria-label={`Remove ${value}`}
+            className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onChange(values.filter((_, item) => item !== index))}
+          >
+            <XIcon className="size-2.5" />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        id={id}
+        value={pending}
+        onChange={(event) => {
+          const value = event.target.value
+          if (value.includes("\n")) {
+            commit(value)
+            return
+          }
+          setPending(value)
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={() => commit(pending)}
+        placeholder="Hit Enter to submit"
+        className="h-6 min-w-16 flex-1 bg-transparent px-1 text-sm outline-none placeholder:text-muted-foreground"
+      />
+    </div>
+  )
+}
+
+const fieldKindIcons = {
+  text: TypeIcon,
+  choices: ListChecksIcon,
+  number: HashIcon,
+  boolean: ToggleLeftIcon,
+  date: CalendarIcon,
+  time: ClockIcon,
+  datetime: CalendarClockIcon,
+  email: MailIcon,
+  phone: PhoneIcon,
+  url: LinkIcon,
+  file: FileIcon,
+  user: UserIcon,
+  address: MapPinIcon,
+  foreign: Link2Icon,
+  list: ListIcon,
+  object: BracesIcon,
+} satisfies Record<FieldKind, LucideIcon>
+
+const listItemIcons = {
+  string: TypeIcon,
+  number: HashIcon,
+  boolean: ToggleLeftIcon,
+} satisfies Record<ListItemType, LucideIcon>
+
+function TypeOption({
+  icon: Icon,
+  label,
+}: {
+  icon: LucideIcon
+  label: string
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <Icon className="size-4 text-muted-foreground" aria-hidden />
+      <span className="truncate">{label}</span>
+    </span>
+  )
+}
+
+function FieldKindSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: FieldKind
+  onChange: (kind: FieldKind) => void
+}) {
+  return (
+    <Select
+      value={value}
+      modal={false}
+      items={fieldKinds.map((kind) => ({
+        value: kind.value,
+        label: kind.label,
+      }))}
+      onValueChange={(next) => {
+        if (next) {
+          onChange(next)
+        }
+      }}
+    >
+      <SelectTrigger id={id}>
+        <SelectValue>
+          {(selected: FieldKind | null) => {
+            const kind = fieldKinds.find((item) => item.value === selected)
+            return kind ? (
+              <TypeOption
+                icon={fieldKindIcons[kind.value]}
+                label={kind.label}
+              />
+            ) : null
+          }}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent align="start">
+        {fieldKinds.map((kind) => (
+          <SelectItem key={kind.value} value={kind.value} label={kind.label}>
+            <TypeOption icon={fieldKindIcons[kind.value]} label={kind.label} />
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function ListItemTypeSelect({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: ListItemType
+  onChange: (itemsType: ListItemType) => void
+}) {
+  return (
+    <Select
+      value={value}
+      modal={false}
+      items={listItemTypes.map((item) => ({
+        value: item,
+        label: listItemTypeLabels[item],
+      }))}
+      onValueChange={(next) => {
+        if (next) {
+          onChange(next)
+        }
+      }}
+    >
+      <SelectTrigger id={id}>
+        <SelectValue>
+          {(selected: ListItemType | null) =>
+            selected ? (
+              <TypeOption
+                icon={listItemIcons[selected]}
+                label={listItemTypeLabels[selected]}
+              />
+            ) : null
+          }
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent align="start">
+        {listItemTypes.map((item) => (
+          <SelectItem key={item} value={item} label={listItemTypeLabels[item]}>
+            <TypeOption
+              icon={listItemIcons[item]}
+              label={listItemTypeLabels[item]}
+            />
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 function ColumnFields({
   formId,
   draft,
   tables,
+  fieldKey,
+  keyLocked,
   nameError,
   onChange,
 }: {
   formId: string
   draft: ColumnDraft
   tables: { id: string; name: string }[]
+  fieldKey: string
+  keyLocked: boolean
   nameError?: string
   onChange: (next: Partial<ColumnDraft>) => void
 }) {
   return (
     <div className="grid gap-3">
       <Field data-invalid={nameError ? true : undefined}>
-        <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
+        <FieldLabel htmlFor={`${formId}-name`}>Display name</FieldLabel>
         <Input
           id={`${formId}-name`}
           value={draft.title}
@@ -484,69 +772,77 @@ function ColumnFields({
         {nameError ? <FieldError>{nameError}</FieldError> : null}
       </Field>
       <Field>
+        <FieldLabel htmlFor={`${formId}-key`}>Key</FieldLabel>
+        <Input
+          id={`${formId}-key`}
+          value={fieldKey}
+          readOnly
+          tabIndex={-1}
+          placeholder="status"
+          className="font-mono text-muted-foreground"
+        />
+        <FieldDescription>
+          {keyLocked
+            ? "Workflows and stored values use this key. It does not change."
+            : "Saved once from the display name. Renaming later does not change it."}
+        </FieldDescription>
+      </Field>
+      <Field>
         <FieldLabel htmlFor={`${formId}-kind`}>Type</FieldLabel>
-        <NativeSelect
+        <FieldKindSelect
           id={`${formId}-kind`}
           value={draft.kind}
-          onChange={(event) =>
-            onChange({ kind: event.target.value as FieldKind })
-          }
-        >
-          {fieldKinds.map((kind) => (
-            <NativeSelectOption key={kind.value} value={kind.value}>
-              {kind.label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+          onChange={(kind) => onChange({ kind })}
+        />
       </Field>
       {draft.kind === "choices" ? (
         <Field>
           <FieldLabel htmlFor={`${formId}-choices`}>Choices</FieldLabel>
-          <Textarea
+          <ChoicesInput
             id={`${formId}-choices`}
-            value={draft.enumValues.join("\n")}
-            onChange={(event) =>
-              onChange({ enumValues: event.target.value.split("\n") })
-            }
-            placeholder={"Open\nClosed"}
-            rows={4}
+            values={draft.enumValues}
+            onChange={(enumValues) => onChange({ enumValues })}
           />
         </Field>
       ) : null}
       {draft.kind === "list" ? (
         <Field>
           <FieldLabel htmlFor={`${formId}-items`}>List of</FieldLabel>
-          <NativeSelect
+          <ListItemTypeSelect
             id={`${formId}-items`}
             value={draft.itemsType}
-            onChange={(event) =>
-              onChange({ itemsType: event.target.value as ListItemType })
-            }
-          >
-            {listItemTypes.map((item) => (
-              <NativeSelectOption key={item} value={item}>
-                {listItemTypeLabels[item]}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+            onChange={(itemsType) => onChange({ itemsType })}
+          />
         </Field>
       ) : null}
       {draft.kind === "foreign" ? (
         <Field>
           <FieldLabel htmlFor={`${formId}-related`}>Related table</FieldLabel>
           {tables.length > 0 ? (
-            <NativeSelect
-              id={`${formId}-related`}
-              value={draft.schemaId}
-              onChange={(event) => onChange({ schemaId: event.target.value })}
+            <Select
+              value={draft.schemaId || null}
+              modal={false}
+              items={tables.map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))}
+              onValueChange={(schemaId) => {
+                if (schemaId) {
+                  onChange({ schemaId })
+                }
+              }}
             >
-              <NativeSelectOption value="">Choose a table</NativeSelectOption>
-              {tables.map((item) => (
-                <NativeSelectOption key={item.id} value={item.id}>
-                  {item.name}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+              <SelectTrigger id={`${formId}-related`}>
+                <SelectValue placeholder="Choose a table" />
+              </SelectTrigger>
+              <SelectContent align="start">
+                {tables.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
             <p className="text-xs text-muted-foreground">
               Add a table before relating records.
@@ -558,13 +854,17 @@ function ColumnFields({
         id={`${formId}-required`}
         checked={draft.required}
         onChange={(required) => onChange({ required })}
-        label="Required on new rows"
+        label="Required"
       />
     </div>
   )
 }
 
-function saveLabel(mode: "add" | "edit", confirming: boolean, isLoading: boolean) {
+function saveLabel(
+  mode: "add" | "edit",
+  confirming: boolean,
+  isLoading: boolean
+) {
   if (isLoading) {
     return "Saving..."
   }

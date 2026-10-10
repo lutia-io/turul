@@ -13,6 +13,7 @@ export const fieldKinds = [
   { value: "number", label: "Number" },
   { value: "boolean", label: "Yes / No" },
   { value: "date", label: "Date" },
+  { value: "time", label: "Time" },
   { value: "datetime", label: "Date & time" },
   { value: "email", label: "Email" },
   { value: "phone", label: "Phone" },
@@ -101,6 +102,9 @@ export function kindFromProperty(property: {
   }
   if (property.format === "date") {
     return "date"
+  }
+  if (property.format === "time") {
+    return "time"
   }
   if (property.format === "date-time") {
     return "datetime"
@@ -351,6 +355,8 @@ function shapeForKind(kind: FieldKind): { type: string; format: string } {
       return { type: "boolean", format: "" }
     case "date":
       return { type: "string", format: "date" }
+    case "time":
+      return { type: "string", format: "time" }
     case "datetime":
       return { type: "string", format: "date-time" }
     case "email":

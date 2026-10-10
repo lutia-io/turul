@@ -156,6 +156,9 @@ function propertyKind(property: JsonSchemaProperty) {
   if (property.format === "date") {
     return "Date"
   }
+  if (property.format === "time") {
+    return "Time"
+  }
   if (property.format === "date-time") {
     return "Date & time"
   }
@@ -192,6 +195,7 @@ function previewColumns(properties: JsonSchemaProperty[]) {
     (property) =>
       property.format !== "date-time" &&
       property.format !== "date" &&
+      property.format !== "time" &&
       !(property.enumValues && property.enumValues.length > 0)
   )
   const seen = new Set<string>()

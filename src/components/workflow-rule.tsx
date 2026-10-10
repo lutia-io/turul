@@ -5,8 +5,9 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import { propertyLabel } from "@/components/schema-records-table"
+import { columnLabel, propertyLabel } from "@/components/schema-records-table"
 import type { PipelineDefinition, Schema } from "@/data/networks"
+import type { JsonSchemaProperty } from "@/lib/json-definition"
 import { cn } from "@/lib/utils"
 import {
   actionDataEntries,
@@ -112,8 +113,10 @@ export function WorkflowCriterionPart({
 
 export function WorkflowCriteriaView({
   criteria,
+  fields,
 }: {
   criteria?: WorkflowCriteria
+  fields?: JsonSchemaProperty[]
 }) {
   if (!hasCriteria(criteria)) {
     return (
@@ -124,17 +127,19 @@ export function WorkflowCriteriaView({
   }
 
   if (criteria?.logic) {
-    return <CriteriaGroupView criteria={criteria} depth={0} />
+    return <CriteriaGroupView criteria={criteria} fields={fields} depth={0} />
   }
 
-  return <CriteriaLeafView criteria={criteria!} />
+  return <CriteriaLeafView criteria={criteria!} fields={fields} />
 }
 
 function CriteriaGroupView({
   criteria,
+  fields,
   depth,
 }: {
   criteria: WorkflowCriteria
+  fields?: JsonSchemaProperty[]
   depth: number
 }) {
   const logic = (criteria.logic ?? "AND") as CriteriaLogic
@@ -179,9 +184,13 @@ function CriteriaGroupView({
             <div key={index}>
               {index > 0 ? <WorkflowLogicJoiner logic={logic} /> : null}
               {condition.logic ? (
-                <CriteriaGroupView criteria={condition} depth={depth + 1} />
+                <CriteriaGroupView
+                  criteria={condition}
+                  fields={fields}
+                  depth={depth + 1}
+                />
               ) : (
-                <CriteriaLeafView criteria={condition} />
+                <CriteriaLeafView criteria={condition} fields={fields} />
               )}
             </div>
           ))
@@ -195,7 +204,13 @@ function CriteriaGroupView({
   )
 }
 
-function CriteriaLeafView({ criteria }: { criteria: WorkflowCriteria }) {
+function CriteriaLeafView({
+  criteria,
+  fields,
+}: {
+  criteria: WorkflowCriteria
+  fields?: JsonSchemaProperty[]
+}) {
   if (!criteria.field || !criteria.operator) {
     return (
       <div className="rounded-xl border bg-background px-4 py-3 text-sm text-muted-foreground">
@@ -206,12 +221,14 @@ function CriteriaLeafView({ criteria }: { criteria: WorkflowCriteria }) {
 
   const operator =
     operatorLabels[criteria.operator as CompareOperator] ?? criteria.operator
+  const property = fields?.find((field) => field.name === criteria.field)
+  const label = property ? columnLabel(property) : propertyLabel(criteria.field)
 
   return (
     <div className="rounded-xl border bg-background p-4 shadow-xs">
       <div className="grid gap-4 sm:grid-cols-3">
         <WorkflowCriterionPart label="Field">
-          <p className="text-sm font-medium">{propertyLabel(criteria.field)}</p>
+          <p className="text-sm font-medium">{label}</p>
           <p className="mt-0.5 font-mono text-xs text-muted-foreground">
             {criteria.field}
           </p>

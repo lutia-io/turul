@@ -131,6 +131,7 @@ export default function WorkflowDefinitionDetail() {
   const schema = visibleWorkflow
     ? schemas.find((item) => item.id === visibleWorkflow.schemaId)
     : undefined
+  const fields = schemaFieldOptions(schema?.definition)
   const parsed = visibleWorkflow
     ? parseWorkflowDefinition(visibleWorkflow.definition)
     : undefined
@@ -220,7 +221,9 @@ export default function WorkflowDefinitionDetail() {
               </span>
             )}
           </AsideRow>
-          <AsideRow label="Trigger">{triggerSummary(parsed?.trigger)}</AsideRow>
+          <AsideRow label="Trigger">
+            {triggerSummary(parsed?.trigger, fields)}
+          </AsideRow>
           <AsideRow label="Match">
             {rootLogic ? (
               <span className="inline-flex items-center gap-1.5">
@@ -359,7 +362,8 @@ export default function WorkflowDefinitionDetail() {
               workflowRuleSentence(
                 parsed?.trigger,
                 parsed?.criteria,
-                actions.length
+                actions.length,
+                fields
               )}
           </p>
         </div>
@@ -385,7 +389,7 @@ export default function WorkflowDefinitionDetail() {
                 : WorkflowIcon
             }
             title="When"
-            description={triggerSummary(parsed?.trigger)}
+            description={triggerSummary(parsed?.trigger, fields)}
           />
         </DefinitionCard>
 
@@ -400,7 +404,7 @@ export default function WorkflowDefinitionDetail() {
             }
           />
           <div className="mt-6">
-            <WorkflowCriteriaView criteria={parsed?.criteria} />
+            <WorkflowCriteriaView criteria={parsed?.criteria} fields={fields} />
           </div>
         </DefinitionCard>
 
