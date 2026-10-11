@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { RotateCcwIcon, ViewIcon } from "lucide-react"
+import { LayersIcon, RotateCcwIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import {
@@ -26,7 +26,9 @@ import {
   type StringFilterOp,
 } from "@/components/data-table-view"
 import { RunStatusPill } from "@/components/run-card"
+import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { useAuthorization } from "@/lib/authorization"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { getBadgeColor } from "@/lib/badge"
 import {
@@ -112,7 +114,8 @@ function headerPin(column: {
 
 export default function PipelineList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const { network, organizationId } = useNetworkWorkspace()
+  const { network, organizationId, href } = useNetworkWorkspace()
+  const { canNetwork } = useAuthorization()
   const { pipelines } = useWorkspacePipelines()
   const { organizations } = useWorkspaceOrganizations()
   const [query, setQuery] = useState("")
@@ -546,6 +549,17 @@ export default function PipelineList() {
         network
           ? `Live pipeline executions in ${network.name}${organizationId ? " for this organization" : ""}.`
           : "Active pipeline executions across your networks. Open a run to inspect the current level."
+      }
+      action={
+        canNetwork("pipeline_definition", "read") ? (
+          <Button
+            variant="outline"
+            render={<Link to={href("pipeline-definitions")} />}
+          >
+            <LayersIcon />
+            Pipeline Definitions
+          </Button>
+        ) : null
       }
     >
       <DataTableToolbar

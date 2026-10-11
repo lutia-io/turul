@@ -5,7 +5,6 @@ import {
   PlusIcon,
   TableIcon,
   ViewIcon,
-  WorkflowIcon,
 } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
@@ -211,7 +210,6 @@ export default function RecordsPage() {
   const {
     network,
     organizationId,
-    href,
     isFetching: isWorkspaceFetching,
   } = useNetworkWorkspace()
   const { openCreateRecord, openEditRecord } = useCreateEntity()
@@ -273,43 +271,25 @@ export default function RecordsPage() {
   const canCreateRecord = isOrgUser
     ? canOrg("record", "create")
     : Boolean(authorization?.network?.member)
-  const canViewWorkflows = canNetwork("workflow_definition", "read")
-  const workflowsHref = activeNetwork
-    ? networkWorkspacePath({
-        networkId: activeNetwork.id,
-        organizationId,
-        rest: "workflow-definitions",
-      })
-    : href("workflow-definitions")
 
   return (
     <DataTablePage
       title="Records"
       description="Each table is one kind of record. Hover a related record, URL, or file for a preview, then click to open it."
       action={
-        canViewWorkflows || canCreateRecord ? (
-          <div className="flex items-center gap-2">
-            {canViewWorkflows ? (
-              <Button variant="outline" render={<Link to={workflowsHref} />}>
-                <WorkflowIcon />
-                All Workflows
-              </Button>
-            ) : null}
-            {canCreateRecord ? (
-              <Button
-                onClick={() =>
-                  openCreateRecord({
-                    networkId: activeNetwork?.id,
-                    organizationId,
-                    schemaId: activeSchema?.id,
-                  })
-                }
-              >
-                <PlusIcon />
-                Create record
-              </Button>
-            ) : null}
-          </div>
+        canCreateRecord ? (
+          <Button
+            onClick={() =>
+              openCreateRecord({
+                networkId: activeNetwork?.id,
+                organizationId,
+                schemaId: activeSchema?.id,
+              })
+            }
+          >
+            <PlusIcon />
+            Create record
+          </Button>
         ) : null
       }
     >
