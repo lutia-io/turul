@@ -4,13 +4,18 @@ import {
   addressPropertySchema,
 } from "@/lib/address"
 import { columnLabel, propertyLabel } from "@/components/schema-records-table"
-import type { JsonObject, JsonSchemaProperty, JsonValue } from "@/lib/json-definition"
+import type {
+  JsonObject,
+  JsonSchemaProperty,
+  JsonValue,
+} from "@/lib/json-definition"
 import { toFieldName } from "@/lib/slug"
 
 export const fieldKinds = [
   { value: "text", label: "Text" },
   { value: "choices", label: "Choices" },
   { value: "number", label: "Number" },
+  { value: "currency", label: "Currency" },
   { value: "boolean", label: "Yes / No" },
   { value: "date", label: "Date" },
   { value: "time", label: "Time" },
@@ -28,7 +33,7 @@ export const fieldKinds = [
 
 export type FieldKind = (typeof fieldKinds)[number]["value"]
 
-export const listItemTypes = ["string", "number", "boolean"] as const
+export const listItemTypes = ["string", "number", "boolean", "user"] as const
 
 export type ListItemType = (typeof listItemTypes)[number]
 
@@ -36,6 +41,7 @@ export const listItemTypeLabels: Record<ListItemType, string> = {
   string: "Text",
   number: "Number",
   boolean: "Yes / No",
+  user: "User",
 }
 
 export type ColumnDraft = {
@@ -79,6 +85,9 @@ export function kindFromProperty(property: {
   format?: string
   enumValues?: string[]
 }): FieldKind {
+  if (property.type === "array") {
+    return "list"
+  }
   if (property.format === "address") {
     return "address"
   }
@@ -96,6 +105,9 @@ export function kindFromProperty(property: {
   }
   if (property.format === "phone") {
     return "phone"
+  }
+  if (property.format === "currency") {
+    return "currency"
   }
   if (property.format === "uri") {
     return "url"
@@ -115,9 +127,6 @@ export function kindFromProperty(property: {
   if (property.type === "number" || property.type === "integer") {
     return "number"
   }
-  if (property.type === "array") {
-    return "list"
-  }
   if (property.type === "object") {
     return "object"
   }
@@ -128,7 +137,8 @@ export function kindFromProperty(property: {
 }
 
 export function draftFromProperty(property: JsonSchemaProperty): ColumnDraft {
-  const itemType = property.itemsType === "integer" ? "number" : property.itemsType
+  const itemType =
+    property.itemsType === "integer" ? "number" : property.itemsType
   const itemsType = listItemTypes.find((item) => item === itemType)
   return {
     title: property.title?.trim() || propertyLabel(property.name),
@@ -201,7 +211,10 @@ export function columnNameError(
       return duplicateFieldMessage(title)
     }
   }
-  if (editingKey === undefined && Object.hasOwn(properties, toFieldName(title))) {
+  if (
+    editingKey === undefined &&
+    Object.hasOwn(properties, toFieldName(title))
+  ) {
     return duplicateFieldMessage(title)
   }
   return undefined
@@ -324,6 +337,8 @@ function propertySpec(
   }
   if (shape.type !== "array") {
     delete spec.items
+  } else if (draft.itemsType === "user") {
+    spec.items = { type: "string", format: "user" }
   } else {
     spec.items = { type: draft.itemsType }
   }
@@ -331,7 +346,8 @@ function propertySpec(
   const typeChanged =
     !previous ||
     previous.type !== shape.type ||
-    (typeof previous.format === "string" ? previous.format : "") !== shape.format
+    (typeof previous.format === "string" ? previous.format : "") !==
+      shape.format
   if (typeChanged || !Object.hasOwn(spec, "default")) {
     delete spec.default
   }
@@ -351,6 +367,8 @@ function shapeForKind(kind: FieldKind): { type: string; format: string } {
   switch (kind) {
     case "number":
       return { type: "number", format: "" }
+    case "currency":
+      return { type: "number", format: "currency" }
     case "boolean":
       return { type: "boolean", format: "" }
     case "date":

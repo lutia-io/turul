@@ -60,6 +60,7 @@ import {
   isForeignProperty,
   isPhoneProperty,
   isUriProperty,
+  isUserArrayProperty,
   isUserProperty,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
@@ -291,7 +292,7 @@ export default function RecordsPage() {
             {canViewWorkflows ? (
               <Button variant="outline" render={<Link to={workflowsHref} />}>
                 <WorkflowIcon />
-                Workflows
+                All Workflows
               </Button>
             ) : null}
             {canCreateRecord ? (
@@ -654,6 +655,7 @@ function SchemaRecordsDataTable({
               isForeignProperty(property) ||
               isFileProperty(property) ||
               isUserProperty(property) ||
+              isUserArrayProperty(property) ||
               isUriProperty(property) ||
               isEmailProperty(property) ||
               isPhoneProperty(property) ||

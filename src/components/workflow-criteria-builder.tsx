@@ -172,6 +172,7 @@ function ConditionValueInput({
     )
   }
 
+  const currency = field?.format === "currency"
   const numeric =
     field?.type === "number" ||
     leaf.operator === "gt" ||
@@ -179,20 +180,40 @@ function ConditionValueInput({
     leaf.operator === "lt" ||
     leaf.operator === "lte"
 
-  return (
+  const input = (
     <Input
       id={id}
       value={leaf.value}
       onChange={(event) => onChange(event.target.value)}
       type={numeric && leaf.operator !== "in" ? "number" : "text"}
+      inputMode={currency && leaf.operator !== "in" ? "decimal" : undefined}
+      step={currency && leaf.operator !== "in" ? "any" : undefined}
+      className={
+        currency && leaf.operator !== "in" ? "pl-6 tabular-nums" : undefined
+      }
       placeholder={
         leaf.operator === "in"
           ? "draft, published"
-          : field?.type === "number"
-            ? "0"
-            : "Value"
+          : currency
+            ? "0.00"
+            : field?.type === "number"
+              ? "0"
+              : "Value"
       }
     />
+  )
+
+  if (!currency || leaf.operator === "in") {
+    return input
+  }
+
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-muted-foreground">
+        $
+      </span>
+      {input}
+    </div>
   )
 }
 
@@ -266,32 +287,32 @@ function LeafEditor({
 
   return (
     <div className="group/row relative rounded-xl border bg-background p-4 shadow-xs">
-      <div className="absolute top-2 right-2 flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100">
-          <IconTooltipButton
-            label="Move up"
-            disabled={!canMoveUp}
-            onClick={() => onMove(-1)}
-          >
-            <ChevronUpIcon />
-          </IconTooltipButton>
-          <IconTooltipButton
-            label="Move down"
-            disabled={!canMoveDown}
-            onClick={() => onMove(1)}
-          >
-            <ChevronDownIcon />
-          </IconTooltipButton>
-          <IconTooltipButton label="Duplicate condition" onClick={onDuplicate}>
-            <CopyPlusIcon />
-          </IconTooltipButton>
-          <IconTooltipButton
-            label="Remove condition"
-            destructive
-            onClick={onRemove}
-          >
-            <Trash2Icon />
-          </IconTooltipButton>
-        </div>
+      <div className="absolute top-2 right-2 flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within/row:opacity-100 sm:group-hover/row:opacity-100">
+        <IconTooltipButton
+          label="Move up"
+          disabled={!canMoveUp}
+          onClick={() => onMove(-1)}
+        >
+          <ChevronUpIcon />
+        </IconTooltipButton>
+        <IconTooltipButton
+          label="Move down"
+          disabled={!canMoveDown}
+          onClick={() => onMove(1)}
+        >
+          <ChevronDownIcon />
+        </IconTooltipButton>
+        <IconTooltipButton label="Duplicate condition" onClick={onDuplicate}>
+          <CopyPlusIcon />
+        </IconTooltipButton>
+        <IconTooltipButton
+          label="Remove condition"
+          destructive
+          onClick={onRemove}
+        >
+          <Trash2Icon />
+        </IconTooltipButton>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3 sm:items-start sm:pr-20">
         <Field className="gap-1">
           <FieldLabel htmlFor={fieldId}>Field</FieldLabel>
@@ -558,9 +579,7 @@ function GroupEditor({
                     }
                     onMove={(offset) => moveChild(index, offset)}
                     onDuplicate={() => duplicateChild(index)}
-                    onRemove={() =>
-                      onChange(removeFromGroup(group, child.key))
-                    }
+                    onRemove={() => onChange(removeFromGroup(group, child.key))}
                   />
                 ) : (
                   <GroupEditor
@@ -569,15 +588,18 @@ function GroupEditor({
                     depth={depth + 1}
                     canRemove
                     onChange={(next) => patchNode(child.key, () => next)}
-                    onRemove={() =>
-                      onChange(removeFromGroup(group, child.key))
-                    }
+                    onRemove={() => onChange(removeFromGroup(group, child.key))}
                   />
                 )}
               </div>
             ))}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={addCondition}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addCondition}
+              >
                 <PlusIcon />
                 Add condition
               </Button>
@@ -631,9 +653,7 @@ export function WorkflowCriteriaBuilder({
           <WorkflowEmptyAdd
             title="No extra conditions"
             description="The workflow runs whenever the trigger fires. Add a condition to narrow it down."
-            onClick={() =>
-              onChange(addToGroup(value, value.key, emptyLeaf()))
-            }
+            onClick={() => onChange(addToGroup(value, value.key, emptyLeaf()))}
           />
         ) : (
           <GroupEditor

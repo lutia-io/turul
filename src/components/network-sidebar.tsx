@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type ComponentProps } from "react"
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router"
+import { Link, useLocation, useNavigate } from "react-router"
 import {
   ActivityIcon,
   ArrowLeftIcon,
@@ -50,7 +50,6 @@ const switcherSearchPageSize = 100
 export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const [searchParams] = useSearchParams()
   const { isMobile, setOpenMobile } = useSidebar()
   const { network, organizationId, href } = useNetworkWorkspace()
   const { networks } = useWorkspaceNetworkList()
@@ -96,7 +95,6 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const rest = parsed?.rest ?? ""
   const section = networkSectionRest(rest)
   const recordsUrl = href("records")
-  const recordsSchemaId = searchParams.get("schema") ?? network?.schemas[0]?.id
 
   const networkSearchActive = isAuthenticated && networkQuery.length > 0
   const organizationSearchActive =
@@ -160,12 +158,6 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       title: "Records",
       url: recordsUrl,
       icon: <TableIcon />,
-      items:
-        network?.schemas.map((schema) => ({
-          title: schema.name,
-          url: `${recordsUrl}?schema=${schema.id}`,
-          isActive: rest === "records" && schema.id === recordsSchemaId,
-        })) ?? [],
     },
     {
       title: "Files",

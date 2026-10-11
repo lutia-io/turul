@@ -215,6 +215,8 @@ export function NodeDefinitionEditor({
   onDone,
   onCancel,
   pipelineTemplateContext,
+  networkId,
+  organizationId,
 }: {
   ref?: Ref<NodeDefinitionEditorHandle>
   node?: PipelineNodeConfig
@@ -222,10 +224,30 @@ export function NodeDefinitionEditor({
   onDone: (node: PipelineNodeConfig) => void
   onCancel: () => void
   pipelineTemplateContext?: PipelineTemplateContext
+  networkId?: string
+  organizationId?: string
 }) {
   const formId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
-  const { schemas } = useWorkspaceSchemas()
+  const { schemas } = useWorkspaceSchemas({
+    networkId,
+    skip: !networkId,
+  })
+  const availableSchemas = useMemo(
+    () =>
+      schemas.filter((schema) => {
+        if (schema.networkId !== networkId) {
+          return false
+        }
+        if (!organizationId) {
+          return !schema.organizationId
+        }
+        return (
+          !schema.organizationId || schema.organizationId === organizationId
+        )
+      }),
+    [schemas, networkId, organizationId]
+  )
   const editing = Boolean(node)
   const startingType =
     node && isNodeType(node.type) ? node.type : (initialType ?? "HTTP")
@@ -306,9 +328,12 @@ export function NodeDefinitionEditor({
   const schemaItems = useMemo(
     () => [
       { value: CHOOSE_SCHEMA, label: "Choose a record type" },
-      ...schemas.map((schema) => ({ value: schema.id, label: schema.name })),
+      ...availableSchemas.map((schema) => ({
+        value: schema.id,
+        label: schema.name,
+      })),
     ],
-    [schemas]
+    [availableSchemas]
   )
 
   function handleDone() {
@@ -780,10 +805,10 @@ export function NodeDefinitionEditor({
                   <FieldLabel htmlFor={`${formId}-schema`}>
                     Record type
                   </FieldLabel>
-                  {schemas.length > 0 ? (
+                  {availableSchemas.length > 0 ? (
                     <Select
                       value={
-                        schemas.some(
+                        availableSchemas.some(
                           (schema) => schema.id === drafts.record.schemaId
                         )
                           ? drafts.record.schemaId
@@ -812,7 +837,7 @@ export function NodeDefinitionEditor({
                         <SelectItem value={CHOOSE_SCHEMA}>
                           Choose a record type
                         </SelectItem>
-                        {schemas.map((schema) => (
+                        {availableSchemas.map((schema) => (
                           <SelectItem key={schema.id} value={schema.id}>
                             {schema.name}
                           </SelectItem>
@@ -820,22 +845,6 @@ export function NodeDefinitionEditor({
                       </SelectContent>
                     </Select>
                   ) : null}
-                  <TemplateValueInput
-                    id={`${formId}-schema-id`}
-                    value={drafts.record.schemaId}
-                    onChange={(schemaId) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        record: { ...current.record, schemaId },
-                      }))
-                    }
-                    groups={templateGroups}
-                    placeholder="{{ .Input.investorSchemaId }}"
-                    disabled={isLoading}
-                  />
-                  <FieldDescription>
-                    Pick a record type or use {"{{ .Input.schemaId }}"}.
-                  </FieldDescription>
                 </Field>
               ) : null}
               {recordNeedsId ? (
@@ -1156,10 +1165,10 @@ export function NodeDefinitionEditor({
                           >
                             Record type
                           </FieldLabel>
-                          {schemas.length > 0 ? (
+                          {availableSchemas.length > 0 ? (
                             <Select
                               value={
-                                schemas.some(
+                                availableSchemas.some(
                                   (schema) => schema.id === record.schemaId
                                 )
                                   ? record.schemaId
@@ -1194,7 +1203,7 @@ export function NodeDefinitionEditor({
                                 <SelectItem value={CHOOSE_SCHEMA}>
                                   Choose a record type
                                 </SelectItem>
-                                {schemas.map((schema) => (
+                                {availableSchemas.map((schema) => (
                                   <SelectItem key={schema.id} value={schema.id}>
                                     {schema.name}
                                   </SelectItem>
@@ -1202,26 +1211,6 @@ export function NodeDefinitionEditor({
                               </SelectContent>
                             </Select>
                           ) : null}
-                          <TemplateValueInput
-                            id={`${formId}-bulk-schema-id-${record.key}`}
-                            value={record.schemaId}
-                            onChange={(schemaId) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                bulk: {
-                                  ...current.bulk,
-                                  records: current.bulk.records.map((item) =>
-                                    item.key === record.key
-                                      ? { ...item, schemaId }
-                                      : item
-                                  ),
-                                },
-                              }))
-                            }
-                            groups={templateGroups}
-                            placeholder="{{ .Input.investorSchemaId }}"
-                            disabled={isLoading}
-                          />
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Field>

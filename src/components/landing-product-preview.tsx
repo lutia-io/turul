@@ -168,6 +168,9 @@ function propertyKind(property: JsonSchemaProperty) {
   if (property.format === "phone") {
     return "Phone"
   }
+  if (property.format === "currency") {
+    return "Currency"
+  }
   if (property.format === "file") {
     return property.type === "array" ? "Files" : "File"
   }

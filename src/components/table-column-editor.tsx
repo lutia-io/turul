@@ -11,6 +11,7 @@ import {
   CalendarClockIcon,
   CalendarIcon,
   ClockIcon,
+  DollarSignIcon,
   FileIcon,
   HashIcon,
   Link2Icon,
@@ -608,6 +609,7 @@ const fieldKindIcons = {
   text: TypeIcon,
   choices: ListChecksIcon,
   number: HashIcon,
+  currency: DollarSignIcon,
   boolean: ToggleLeftIcon,
   date: CalendarIcon,
   time: ClockIcon,
@@ -627,6 +629,7 @@ const listItemIcons = {
   string: TypeIcon,
   number: HashIcon,
   boolean: ToggleLeftIcon,
+  user: UserIcon,
 } satisfies Record<ListItemType, LucideIcon>
 
 function TypeOption({

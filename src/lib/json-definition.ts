@@ -13,6 +13,7 @@ export type JsonSchemaProperty = {
   schemaId?: string
   enumValues?: string[]
   itemsType?: string
+  itemsFormat?: string
   defaultValue?: string
 }
 
@@ -138,7 +139,9 @@ export function getJsonSchemaProperties(
     const property = asObject(spec)
     const enumValues = asStringArray(property?.enum)
     const items = asObject(property?.items)
+    const itemsFormat = asString(items?.format)
     const hasDefault = property != null && Object.hasOwn(property, "default")
+    const itemsType = numericType(asString(items?.type) ?? "")
 
     return {
       name,
@@ -146,10 +149,11 @@ export function getJsonSchemaProperties(
       type: numericType(asString(property?.type) ?? "any"),
       required: required.has(name),
       description: asString(property?.description),
-      format: asString(property?.format) ?? asString(items?.format),
+      format: asString(property?.format),
       schemaId: asString(property?.schemaId),
       enumValues,
-      itemsType: numericType(asString(items?.type) ?? "") || undefined,
+      itemsFormat,
+      itemsType: itemsFormat === "user" ? "user" : itemsType || undefined,
       defaultValue: hasDefault
         ? formatJsonDefault(property.default as JsonValue)
         : undefined,
@@ -305,7 +309,14 @@ export function isFileProperty(property: JsonSchemaProperty) {
 }
 
 export function isUserProperty(property: JsonSchemaProperty) {
-  return property.format === "user"
+  return property.format === "user" && property.type !== "array"
+}
+
+export function isUserArrayProperty(property: JsonSchemaProperty) {
+  return (
+    property.type === "array" &&
+    (property.itemsFormat === "user" || property.itemsType === "user")
+  )
 }
 
 export function userIdFromFormValue(raw: string) {
@@ -331,6 +342,10 @@ export function isEmailProperty(property: JsonSchemaProperty) {
 
 export function isPhoneProperty(property: JsonSchemaProperty) {
   return property.format === "phone"
+}
+
+export function isCurrencyProperty(property: JsonSchemaProperty) {
+  return property.format === "currency" && property.type !== "array"
 }
 
 export function isAddressProperty(property: JsonSchemaProperty) {

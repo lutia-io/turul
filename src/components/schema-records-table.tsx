@@ -28,11 +28,15 @@ import {
   isForeignProperty,
   isPhoneProperty,
   isUriProperty,
+  isUserArrayProperty,
   isUserProperty,
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
-import { organizationUserName, workspaceRecordFromApi } from "@/lib/network-workspace"
+import {
+  organizationUserName,
+  workspaceRecordFromApi,
+} from "@/lib/network-workspace"
 import {
   formatCellValue,
   formatFileSize,
@@ -89,6 +93,31 @@ export function RecordCell({
         </div>
       )
     }
+  }
+
+  if (isUserArrayProperty(property) && Array.isArray(value)) {
+    const ids = value.filter(
+      (item): item is string => typeof item === "string" && item.length > 0
+    )
+    if (ids.length === 0) {
+      return (
+        <Link to={href} className="block text-muted-foreground">
+          —
+        </Link>
+      )
+    }
+    return (
+      <div className="flex max-w-[18rem] min-w-[6rem] flex-wrap gap-1">
+        {ids.map((userId) => (
+          <UserRecordLink
+            key={userId}
+            userId={userId}
+            user={usersById?.get(userId)}
+            href={userHref?.(userId)}
+          />
+        ))}
+      </div>
+    )
   }
 
   if (isUserProperty(property) && typeof value === "string" && value) {

@@ -288,6 +288,8 @@ export function WorkflowPipelineEditor({
           view={definitionView}
           sentence={sentence}
           onNodeSessionChange={setNodeOpen}
+          networkId={networkId}
+          organizationId={organizationId}
         />
       </div>
     </div>

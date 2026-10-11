@@ -101,6 +101,8 @@ export function PipelineDefinitionBuilder({
   sentence,
   onNodeSessionChange,
   className,
+  networkId,
+  organizationId,
 }: {
   ref?: Ref<PipelineDefinitionBuilderHandle>
   levels: PipelineLevelDraft[]
@@ -109,6 +111,8 @@ export function PipelineDefinitionBuilder({
   sentence?: string
   onNodeSessionChange?: (open: boolean) => void
   className?: string
+  networkId?: string
+  organizationId?: string
 }) {
   const editorRef = useRef<NodeDefinitionEditorHandle>(null)
   const sessionIdRef = useRef(0)
@@ -197,6 +201,8 @@ export function PipelineDefinitionBuilder({
             session.mode === "create" ? session.initialType : undefined
           }
           pipelineTemplateContext={session.templateContext}
+          networkId={networkId}
+          organizationId={organizationId}
           onDone={(node) => commitSession(session, node)}
           onCancel={() => setSession(null)}
         />

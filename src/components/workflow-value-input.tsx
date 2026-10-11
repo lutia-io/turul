@@ -394,15 +394,32 @@ function LiteralValueInput({
     )
   }
 
+  const currency = field?.format === "currency"
   const numeric = field?.type === "number"
 
-  return (
+  const input = (
     <Input
       id={id}
       value={value}
       onChange={(event) => onChange(event.target.value)}
       type={numeric ? "number" : "text"}
-      placeholder={placeholder ?? (numeric ? "0" : "Value")}
+      inputMode={currency ? "decimal" : undefined}
+      step={currency ? "any" : undefined}
+      className={currency ? "pl-6 tabular-nums" : undefined}
+      placeholder={placeholder ?? (currency ? "0.00" : numeric ? "0" : "Value")}
     />
+  )
+
+  if (!currency) {
+    return input
+  }
+
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-muted-foreground">
+        $
+      </span>
+      {input}
+    </div>
   )
 }

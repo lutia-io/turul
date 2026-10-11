@@ -355,6 +355,8 @@ export function PipelineDefinitionDialog({
               view={definitionView}
               sentence={sentence}
               onNodeSessionChange={setNodeOpen}
+              networkId={selectedNetworkId}
+              organizationId={selectedOrganizationId || undefined}
             />
           </div>
           <DialogFooter>

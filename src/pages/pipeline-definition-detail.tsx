@@ -487,6 +487,8 @@ function PipelineDefinitionEdit({
             view={definitionView}
             sentence={pipelineDraftSentence(levels)}
             onNodeSessionChange={setNodeOpen}
+            networkId={pipeline.networkId}
+            organizationId={pipeline.organizationId}
           />
         </div>
       </form>

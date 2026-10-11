@@ -6,6 +6,7 @@ import {
   getJsonSchemaProperties,
   getRecordFileIds,
   isAddressProperty,
+  isCurrencyProperty,
   isFileProperty,
   isForeignProperty,
   isPhoneProperty,
@@ -14,6 +15,15 @@ import {
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
+
+const usdFormat = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+})
+
+export function formatCurrency(value: number) {
+  return usdFormat.format(value)
+}
 
 export function formatFileSize(bytes: number) {
   if (bytes < 1024) {
@@ -44,6 +54,10 @@ export function formatCellValue(
   }
 
   if (typeof value === "number") {
+    if (isCurrencyProperty(property)) {
+      return formatCurrency(value)
+    }
+
     if (property.name.toLowerCase().includes("cents")) {
       return new Intl.NumberFormat("en-US", {
         style: "currency",

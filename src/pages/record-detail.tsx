@@ -43,6 +43,7 @@ import {
   isForeignProperty,
   isPhoneProperty,
   isUriProperty,
+  isUserArrayProperty,
   isUserProperty,
   type JsonSchemaProperty,
   type JsonValue,
@@ -391,9 +392,7 @@ function FieldItem({
     <div
       className={cn("min-w-0", isWideField(property, value) && "sm:col-span-2")}
     >
-      <dt className="text-xs text-muted-foreground">
-        {columnLabel(property)}
-      </dt>
+      <dt className="text-xs text-muted-foreground">{columnLabel(property)}</dt>
       <dd className="mt-1.5 text-sm">
         <FieldValue
           property={property}
@@ -428,6 +427,27 @@ function FieldValue({
 }) {
   if (value == null || value === "") {
     return <span className="text-muted-foreground">—</span>
+  }
+
+  if (isUserArrayProperty(property) && Array.isArray(value)) {
+    const ids = value.filter(
+      (item): item is string => typeof item === "string" && item.length > 0
+    )
+    if (ids.length === 0) {
+      return <span className="text-muted-foreground">—</span>
+    }
+    return (
+      <div className="flex flex-wrap gap-1">
+        {ids.map((userId) => (
+          <UserRecordLink
+            key={userId}
+            userId={userId}
+            user={usersById?.get(userId)}
+            href={userHref(userId)}
+          />
+        ))}
+      </div>
+    )
   }
 
   if (isUserProperty(property) && typeof value === "string" && value) {
@@ -510,8 +530,7 @@ function FieldValue({
     <span
       className={cn(
         "break-words",
-        property.type === "number" &&
-          "tabular-nums"
+        property.type === "number" && "tabular-nums"
       )}
     >
       {text || <span className="text-muted-foreground">—</span>}
