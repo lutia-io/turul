@@ -3,6 +3,7 @@ import type {
   TemplateVariableGroup,
 } from "@/components/template-value-input"
 import type { JsonSchemaProperty } from "@/lib/json-definition"
+import { mathTemplateGroup } from "@/lib/template-arithmetic"
 
 export const mockTextTemplate = "{{ mockText }}"
 export const mockNumberTemplate = "{{ mockNumber }}"
@@ -18,27 +19,36 @@ const MOCK_TOKEN_RE =
   /^\{\{\s*mock(Text|Number|Integer|Boolean|DateTime|Date|Time|Email|URL|Phone|Choice)\b[^}]*\}\}$/
 
 export const mockTemplateVariables: TemplateVariable[] = [
-  { label: "Mock text", token: mockTextTemplate, hint: "mock" },
-  { label: "Mock number", token: mockNumberTemplate, hint: "mock" },
-  { label: "Mock yes / no", token: mockBooleanTemplate, hint: "mock" },
-  { label: "Mock date", token: mockDateTemplate, hint: "mock" },
-  { label: "Mock time", token: mockTimeTemplate, hint: "mock" },
-  { label: "Mock date & time", token: mockDateTimeTemplate, hint: "mock" },
-  { label: "Mock email", token: mockEmailTemplate, hint: "mock" },
-  { label: "Mock URL", token: mockURLTemplate, hint: "mock" },
-  { label: "Mock phone", token: mockPhoneTemplate, hint: "mock" },
+  { label: "Text", token: mockTextTemplate },
+  { label: "Number", token: mockNumberTemplate },
+  { label: "Yes / no", token: mockBooleanTemplate },
+  { label: "Date", token: mockDateTemplate },
+  { label: "Time", token: mockTimeTemplate },
+  { label: "Date & time", token: mockDateTimeTemplate },
+  { label: "Email", token: mockEmailTemplate },
+  { label: "URL", token: mockURLTemplate },
+  { label: "Phone", token: mockPhoneTemplate },
   {
-    label: "Mock choice",
+    label: "Choice",
     token: '{{ mockChoice "a" "b" }}',
     caretOffset: '{{ mockChoice "'.length,
-    hint: "mock",
   },
 ]
 
+export const dateTimeTemplateGroup: TemplateVariableGroup = {
+  label: "Date & Time",
+  submenu: true,
+  variables: [{ label: "Current time", token: "{{ now }}" }],
+}
+
 export const mockTemplateGroup: TemplateVariableGroup = {
-  label: "Sample data",
-  description: "Generated values, different each time the template runs.",
+  label: "Mock",
+  submenu: true,
   variables: mockTemplateVariables,
+}
+
+export function utilityTemplateGroups(): TemplateVariableGroup[] {
+  return [dateTimeTemplateGroup, mathTemplateGroup, mockTemplateGroup]
 }
 
 export function mockChoiceTemplate(values: string[]) {

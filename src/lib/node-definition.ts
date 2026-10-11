@@ -36,25 +36,82 @@ export function pipelineOutputTemplate(index: number) {
   return `{{ .Input.${index} }}`
 }
 
+export function pipelineOutputFieldTemplate(index: number, path = "") {
+  return path ? `{{ .Input.${index}.${path} }}` : `{{ .Input.${index}. }}`
+}
+
 export function listItemTemplate(alias: string, path = "") {
   const name = alias.trim() || "item"
   return path ? `{{ .${name}.${path} }}` : `{{ .${name} }}`
 }
 
+export type PipelineOutputField = {
+  label: string
+  path: string
+}
+
 export type PipelineTemplateContext = {
   levelIndex: number
-  previousOutputs: { index: number; label: string }[]
+  previousOutputs: {
+    index: number
+    label: string
+    fields: PipelineOutputField[]
+  }[]
+}
+
+function mappingOutputFields(definition: JsonObject): PipelineOutputField[] {
+  const mapping = asObject(definition.mapping)
+  if (!mapping) {
+    return []
+  }
+  return Object.keys(mapping)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({ label: name, path: name }))
+}
+
+export function pipelineOutputFields(node: {
+  type?: string
+  definition?: JsonObject
+}): PipelineOutputField[] {
+  const definition = node.definition
+  if (!node.type || !definition) {
+    return []
+  }
+  if (node.type === "NOOP") {
+    return [{ label: "Message", path: "message" }]
+  }
+  if (node.type === "FILE" && definition.operation === "WRITE") {
+    return [{ label: "File ID", path: "fileId" }]
+  }
+  if (node.type === "BULK") {
+    return [
+      { label: "Created", path: "created" },
+      { label: "Total", path: "total" },
+    ]
+  }
+  if (node.type === "MAPPER") {
+    return mappingOutputFields(definition)
+  }
+  if (node.type === "LIST_MAPPER") {
+    return [{ label: "Items", path: "items" }]
+  }
+  if (node.type === "RECORD" && definition.operation === "LIST") {
+    return [{ label: "Records", path: "records" }]
+  }
+  return []
 }
 
 export function pipelineTemplateContextForLevel(
   levelIndex: number,
-  previousNodes: { name: string }[]
+  previousNodes: { name: string; type?: string; definition?: JsonObject }[]
 ): PipelineTemplateContext {
   return {
     levelIndex,
     previousOutputs: previousNodes.map((node, index) => ({
       index,
       label: node.name.trim() || `Output ${index}`,
+      fields: pipelineOutputFields(node),
     })),
   }
 }

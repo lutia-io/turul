@@ -1,3 +1,5 @@
+import type { TemplateVariableGroup } from "@/components/template-value-input"
+
 export const addTemplate = "{{ add 1 1 }}"
 export const subTemplate = "{{ sub 1 1 }}"
 export const mulTemplate = "{{ mul 1 1 }}"
@@ -14,3 +16,9 @@ export const arithmeticTemplateVariables = [
   ...item,
   caretOffset: item.token.indexOf("1"),
 }))
+
+export const mathTemplateGroup: TemplateVariableGroup = {
+  label: "Math",
+  submenu: true,
+  variables: arithmeticTemplateVariables,
+}

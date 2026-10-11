@@ -59,9 +59,9 @@ import {
   mappingObjectFromEntries,
   nodeTypeLabels,
   nodeTypes,
-  nowTemplate,
   pipelineInputFieldTemplate,
   pipelineInputTemplate,
+  pipelineOutputFieldTemplate,
   pipelineOutputTemplate,
   recordDefinitionFromDraft,
   recordDraftFromDefinition,
@@ -78,8 +78,7 @@ import {
   type PipelineTemplateContext,
   type RecordDefinitionDraft,
 } from "@/lib/node-definition"
-import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
-import { mockTemplateGroup } from "@/lib/template-mock"
+import { utilityTemplateGroups } from "@/lib/template-mock"
 import type { PipelineNodeConfig } from "@/lib/pipeline-definition"
 
 const CHOOSE_SCHEMA = "__choose_schema__"
@@ -144,48 +143,57 @@ function pipelineTemplateGroups(
   context?: PipelineTemplateContext
 ): TemplateVariableGroup[] {
   const namedField = pipelineInputFieldTemplate()
-  const common: TemplateVariableGroup = {
-    label: "Common values",
+  const input: TemplateVariableGroup = {
+    label: "Pipeline input",
+    submenu: true,
     variables: [
-      { label: "Entire input", token: pipelineInputTemplate, hint: "input" },
-      { label: "Current time", token: nowTemplate, hint: "now" },
-      ...arithmeticTemplateVariables.map((item) => ({
-        ...item,
-        hint: "math",
-      })),
-    ],
-  }
-  const named: TemplateVariableGroup = {
-    label: "Named input fields",
-    variables: [
+      { label: "Entire input", token: pipelineInputTemplate },
       {
-        label: "Field path",
+        label: "Field",
         token: namedField,
         caretOffset: namedField.lastIndexOf(".") + 1,
-        hint: "input",
       },
     ],
   }
-  const previousOutputs =
-    context && context.previousOutputs.length > 0
-      ? context.previousOutputs
-      : [0, 1, 2].map((index) => ({ index, label: `Output ${index}` }))
-  const previous: TemplateVariableGroup = {
-    label: "Previous level",
-    variables: previousOutputs.map((output) => ({
-      label: output.label,
-      token: pipelineOutputTemplate(output.index),
-      hint: "previous",
-    })),
-  }
+  const previousNodes =
+    context && context.levelIndex > 0 ? context.previousOutputs : []
+  const previous: TemplateVariableGroup | undefined =
+    previousNodes.length > 0
+      ? {
+          label: "Previous level",
+          submenu: true,
+          variables: [],
+          groups: previousNodes.map((output) => {
+            const field = pipelineOutputFieldTemplate(output.index)
+            const name = output.label.trim()
+            const ranked =
+              name && name !== `Output ${output.index}`
+                ? `${output.index} · ${name}`
+                : String(output.index)
+            return {
+              label: ranked,
+              submenu: true,
+              variables: [
+                {
+                  label: "Entire output",
+                  token: pipelineOutputTemplate(output.index),
+                },
+                ...output.fields.map((item) => ({
+                  label: item.label,
+                  token: pipelineOutputFieldTemplate(output.index, item.path),
+                })),
+                {
+                  label: "Field",
+                  token: field,
+                  caretOffset: field.lastIndexOf(".") + 1,
+                },
+              ],
+            }
+          }),
+        }
+      : undefined
 
-  if (context?.levelIndex === 0) {
-    return [common, named, mockTemplateGroup]
-  }
-  if (context && context.levelIndex > 0) {
-    return [common, named, previous, mockTemplateGroup]
-  }
-  return [common, named, previous, mockTemplateGroup]
+  return [input, ...(previous ? [previous] : []), ...utilityTemplateGroups()]
 }
 
 function itemFieldToken(alias: string) {
@@ -292,22 +300,22 @@ export function NodeDefinitionEditor({
     [pipelineTemplateContext]
   )
   const listMapperGroups = useMemo(() => {
-    const item = itemFieldToken(drafts.listMapper.as)
+    const alias = drafts.listMapper.as.trim() || "item"
+    const item = itemFieldToken(alias)
     return [
       ...templateGroups,
       {
-        label: `Each ${drafts.listMapper.as.trim() || "item"}`,
+        label: `Each loop item (${alias})`,
+        submenu: true,
         variables: [
           {
-            label: `Current ${drafts.listMapper.as.trim() || "item"}`,
-            token: listItemTemplate(drafts.listMapper.as),
-            hint: "item",
+            label: "Whole item",
+            token: listItemTemplate(alias),
           },
           {
-            label: "Item field",
+            label: "Field",
             token: item.token,
             caretOffset: item.caretOffset,
-            hint: "item",
           },
         ],
       } satisfies TemplateVariableGroup,
@@ -1090,18 +1098,17 @@ export function NodeDefinitionEditor({
                     const groups: TemplateVariableGroup[] = [
                       ...templateGroups,
                       {
-                        label: `Each ${alias}`,
+                        label: `Each loop item (${alias})`,
+                        submenu: true,
                         variables: [
                           {
-                            label: `Current ${alias}`,
+                            label: "Whole item",
                             token: listItemTemplate(alias),
-                            hint: "item",
                           },
                           {
-                            label: "Item field",
+                            label: "Field",
                             token: item.token,
                             caretOffset: item.caretOffset,
-                            hint: "item",
                           },
                         ],
                       },
@@ -1109,6 +1116,7 @@ export function NodeDefinitionEditor({
                         ? [
                             {
                               label: "Existing record",
+                              submenu: true,
                               variables: [
                                 {
                                   label: "Record ID",

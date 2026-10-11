@@ -12,7 +12,10 @@ import {
   ZapIcon,
 } from "lucide-react"
 
-import { type TemplateVariableGroup } from "@/components/template-value-input"
+import {
+  TemplateValueInput,
+  type TemplateVariableGroup,
+} from "@/components/template-value-input"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -29,7 +32,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { FriendlyValueInput } from "@/components/workflow-value-input"
 import { WorkflowSectionHeading } from "@/components/workflow-rule"
 import { columnLabel } from "@/components/schema-records-table"
 import type { PipelineDefinition, Schema } from "@/data/networks"
@@ -37,21 +39,18 @@ import {
   getJsonSchemaProperties,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
-import { arithmeticTemplateVariables } from "@/lib/template-arithmetic"
-import { mockTemplateGroup } from "@/lib/template-mock"
+import { utilityTemplateGroups } from "@/lib/template-mock"
 import { cn } from "@/lib/utils"
 import {
   actionTypeDescriptions,
   actionTypeLabels,
   addContextAndRecordTemplate,
   addContextFieldTemplate,
-  addFieldTemplate,
   contextFieldTemplate,
   contextIDTemplate,
   emptyAction,
   emptyDataEntry,
   newDraftKey,
-  nowTemplate,
   recordFieldTemplate,
   recordIDTemplate,
   workflowActionTypes,
@@ -190,59 +189,51 @@ function namedSchema(name?: string) {
   return trimmed || undefined
 }
 
-function withMathHint(
-  variables: { label: string; token: string; caretOffset?: number }[]
-) {
-  return variables.map((item) => ({ ...item, hint: "math" }))
+function choiceTemplateGroups(
+  field?: JsonSchemaProperty
+): TemplateVariableGroup[] {
+  if (field?.type === "boolean") {
+    return [
+      {
+        label: "Choices",
+        submenu: true,
+        variables: [
+          { label: "Yes", token: "true" },
+          { label: "No", token: "false" },
+        ],
+      },
+    ]
+  }
+  if (field?.enumValues && field.enumValues.length > 0) {
+    return [
+      {
+        label: "Choices",
+        submenu: true,
+        variables: field.enumValues.map((value) => ({
+          label: value,
+          token: value,
+        })),
+      },
+    ]
+  }
+  return []
 }
 
 function recordTemplateGroups(
-  fields: JsonSchemaProperty[],
-  schemaName?: string
+  fields: JsonSchemaProperty[]
 ): TemplateVariableGroup[] {
-  const named = namedSchema(schemaName)
-  const hint = named ?? "started this"
-  const numeric = fields.filter(isNumericField)
   return [
     {
-      label: named
-        ? `The ${named} that started this`
-        : "The record that started this",
-      description: "Values from the record that triggered this workflow.",
-      variables: [
-        {
-          label: named ? `${named} ID` : "Record ID",
-          token: recordIDTemplate,
-          hint,
-        },
-        ...fields.map((field) => ({
-          label: columnLabel(field),
-          token: recordFieldTemplate(field.name),
-          hint,
-        })),
-      ],
+      variables: [{ label: "Record ID", token: recordIDTemplate }],
     },
     {
-      label: named ? `Add to a number on that ${named}` : "Add to a number",
-      description: "Starts with that number so you can add more to it.",
-      variables: numeric.map((field) => {
-        const token = addFieldTemplate(field.name)
-        return {
-          label: columnLabel(field),
-          token,
-          caretOffset: token.length - "1 }}".length,
-          hint,
-        }
-      }),
+      label: "From the Record data",
+      submenu: true,
+      variables: fields.map((field) => ({
+        label: columnLabel(field),
+        token: recordFieldTemplate(field.name),
+      })),
     },
-    {
-      label: "Other",
-      variables: [
-        { label: "Current time", token: nowTemplate, hint: "now" },
-        ...withMathHint(arithmeticTemplateVariables),
-      ],
-    },
-    mockTemplateGroup,
   ]
 }
 
@@ -251,41 +242,37 @@ function contextTemplateGroups(
   schemaName?: string
 ): TemplateVariableGroup[] {
   const named = namedSchema(schemaName)
-  const hint = named ? `this ${named}` : "you're updating"
   const numeric = fields.filter(isNumericField)
   return [
+    {
+      variables: [
+        {
+          label: named ? `This ${named} ID` : "This record ID",
+          token: contextIDTemplate,
+        },
+      ],
+    },
     {
       label: named
         ? `This ${named} you're updating`
         : "The record you're updating",
-      description: named
-        ? `Current values already saved on this ${named}.`
-        : "Current values already saved on the record this step is changing.",
-      variables: [
-        {
-          label: named ? `${named} ID` : "Record ID",
-          token: contextIDTemplate,
-          hint,
-        },
-        ...fields.map((field) => ({
-          label: columnLabel(field),
-          token: contextFieldTemplate(field.name),
-          hint,
-        })),
-      ],
+      submenu: true,
+      variables: fields.map((field) => ({
+        label: columnLabel(field),
+        token: contextFieldTemplate(field.name),
+      })),
     },
     {
       label: named
         ? `Add to this ${named}`
         : "Add to the record you're updating",
-      description: "Starts with the current value so you can add more to it.",
+      submenu: true,
       variables: numeric.map((field) => {
         const token = addContextFieldTemplate(field.name)
         return {
           label: columnLabel(field),
           token,
           caretOffset: token.length - "1 }}".length,
-          hint,
         }
       }),
     },
@@ -296,8 +283,7 @@ function addFromTriggerGroups(
   entryName: string,
   targetFields: JsonSchemaProperty[],
   triggerFields: JsonSchemaProperty[],
-  triggerSchemaName?: string,
-  targetSchemaName?: string
+  triggerSchemaName?: string
 ): TemplateVariableGroup[] {
   const target = targetFields.find((field) => field.name === entryName)
   if (!target || !isNumericField(target)) {
@@ -308,19 +294,15 @@ function addFromTriggerGroups(
     return []
   }
   const named = namedSchema(triggerSchemaName)
-  const targetNamed = namedSchema(targetSchemaName)
   return [
     {
       label: named
         ? `Add from the ${named} that started this`
         : "Add from the record that started this",
-      description: targetNamed
-        ? `Adds that number to this ${targetNamed} field.`
-        : "Adds that number to this field.",
+      submenu: true,
       variables: numericTrigger.map((field) => ({
         label: columnLabel(field),
         token: addContextAndRecordTemplate(entryName, field.name),
-        hint: named ?? "started this",
       })),
     },
   ]
@@ -383,7 +365,6 @@ function DataEntriesEditor({
   triggerFields,
   includeContext,
   triggerSchemaName,
-  targetSchemaName,
   onChange,
 }: {
   entries: DataEntryDraft[]
@@ -392,7 +373,6 @@ function DataEntriesEditor({
   triggerFields: JsonSchemaProperty[]
   includeContext: boolean
   triggerSchemaName?: string
-  targetSchemaName?: string
   onChange: (entries: DataEntryDraft[]) => void
 }) {
   const used = new Set(entries.map((entry) => entry.name).filter(Boolean))
@@ -496,30 +476,24 @@ function DataEntriesEditor({
             </Field>
             <Field className="gap-1">
               <FieldLabel htmlFor={valueId}>Value</FieldLabel>
-              <FriendlyValueInput
+              <TemplateValueInput
                 id={valueId}
                 value={entry.value}
                 onChange={(next) => update(entry.key, { value: next })}
-                triggerFields={triggerFields}
-                targetField={selectedField}
-                includeRecordId
-                includeNow
-                triggerSchemaName={triggerSchemaName}
-                advancedGroups={[
+                groups={[
+                  ...choiceTemplateGroups(selectedField),
                   ...templateGroups,
                   ...(includeContext
                     ? addFromTriggerGroups(
                         entry.name,
                         targetFields,
                         triggerFields,
-                        triggerSchemaName,
-                        targetSchemaName
+                        triggerSchemaName
                       )
                     : []),
+                  ...utilityTemplateGroups(),
                 ]}
-                placeholder={
-                  selectedField?.enumValues?.length ? "Choose a value" : "Value"
-                }
+                placeholder="Value"
               />
             </Field>
             <div className="flex h-8 items-center opacity-100 sm:mt-6 sm:opacity-0 sm:group-focus-within/row:opacity-100 sm:group-hover/row:opacity-100">
@@ -613,16 +587,14 @@ function ActionEditor({
   }, [action.pipeline, onChange, selectedPipeline])
   const dataLabel = action.type === "TRIGGER_PIPELINE" ? "Input" : "Fields"
   const targetSchemaName = targetSchema?.name
-  const triggerTemplateGroups = recordTemplateGroups(
-    triggerFields,
-    triggerSchemaName
-  )
+  const startedGroups = recordTemplateGroups(triggerFields)
+  const triggerTemplateGroups = [...startedGroups, ...utilityTemplateGroups()]
   const dataTemplateGroups = includeContext
     ? [
-        ...triggerTemplateGroups,
+        ...startedGroups,
         ...contextTemplateGroups(targetFields, targetSchemaName),
       ]
-    : triggerTemplateGroups
+    : startedGroups
   const typeId = `${action.key}-type`
   const schemaFieldId = `${action.key}-schema`
   const recordId = `${action.key}-record`
@@ -781,18 +753,13 @@ function ActionEditor({
                     : "If you pick a record, we'll update it when it exists. Otherwise a new one is created."}
                 </FieldDescription>
               ) : null}
-              <FriendlyValueInput
+              <TemplateValueInput
                 id={recordId}
                 value={action.recordId}
                 onChange={(recordIdValue) =>
                   onChange({ recordId: recordIdValue })
                 }
-                triggerFields={triggerFields}
-                includeRecordId
-                includeNow={false}
-                purpose="record"
-                triggerSchemaName={triggerSchemaName}
-                advancedGroups={triggerTemplateGroups}
+                groups={triggerTemplateGroups}
                 placeholder="Record ID"
               />
             </Field>
@@ -884,7 +851,7 @@ function ActionEditor({
                     </Field>
                     <Field className="gap-1">
                       <FieldLabel>Value</FieldLabel>
-                      <FriendlyValueInput
+                      <TemplateValueInput
                         value={entry.value}
                         onChange={(next) =>
                           onChange({
@@ -895,11 +862,8 @@ function ActionEditor({
                             ),
                           })
                         }
-                        triggerFields={triggerFields}
-                        includeRecordId
-                        includeNow
-                        triggerSchemaName={triggerSchemaName}
-                        advancedGroups={dataTemplateGroups}
+                        groups={triggerTemplateGroups}
+                        placeholder="Value"
                       />
                     </Field>
                     <div className="flex h-8 items-center sm:mt-6">
@@ -947,7 +911,6 @@ function ActionEditor({
                 triggerFields={triggerFields}
                 includeContext={includeContext}
                 triggerSchemaName={triggerSchemaName}
-                targetSchemaName={targetSchemaName}
                 onChange={(data) => onChange({ data })}
               />
             </div>

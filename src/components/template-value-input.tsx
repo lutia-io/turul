@@ -8,6 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -31,7 +34,9 @@ export type TemplateVariable = {
 export type TemplateVariableGroup = {
   label?: string
   description?: string
+  submenu?: boolean
   variables: TemplateVariable[]
+  groups?: TemplateVariableGroup[]
 }
 
 export type TemplateValueOption = {
@@ -40,6 +45,13 @@ export type TemplateValueOption = {
 }
 
 const CHOOSE_VALUE = "__choose_value__"
+
+function groupIsVisible(group: TemplateVariableGroup): boolean {
+  if (group.variables.length > 0) {
+    return true
+  }
+  return (group.groups ?? []).some(groupIsVisible)
+}
 
 function unwrapTemplateToken(token: string) {
   const trimmed = token.trim()
@@ -115,7 +127,7 @@ export function TemplateValueInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const selectionRef = useRef({ start: value.length, end: value.length })
   const pendingCaret = useRef<number | null>(null)
-  const visibleGroups = groups.filter((group) => group.variables.length > 0)
+  const visibleGroups = groups.filter(groupIsVisible)
   const presetOptions = options ?? []
   const hasPresets = presetOptions.length > 0
   const knownValues = new Set(presetOptions.map((option) => option.value))
@@ -165,6 +177,57 @@ export function TemplateValueInput({
     pendingCaret.current = next.caret
     selectionRef.current = { start: next.caret, end: next.caret }
     onChange(next.value)
+  }
+
+  function renderInsertGroup(
+    group: TemplateVariableGroup,
+    groupKey: string,
+    separated: boolean
+  ) {
+    const nested = (group.groups ?? []).filter(groupIsVisible)
+    const items = (
+      <>
+        {group.variables.map((variable) => (
+          <DropdownMenuItem
+            key={`${groupKey}-${variable.label}-${variable.token}`}
+            title={variable.token}
+            onClick={() => insert(variable)}
+            className="px-2.5"
+          >
+            <span className="min-w-0 flex-1 truncate">{variable.label}</span>
+          </DropdownMenuItem>
+        ))}
+        {nested.map((child, index) =>
+          renderInsertGroup(child, child.label ?? `${groupKey}-${index}`, false)
+        )}
+      </>
+    )
+    const useSubmenu = Boolean(group.submenu && group.label)
+
+    return (
+      <DropdownMenuGroup key={groupKey}>
+        {separated ? <DropdownMenuSeparator /> : null}
+        {useSubmenu ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="px-2.5">
+              <span className="min-w-0 flex-1 truncate">{group.label}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-56">
+              {items}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : (
+          <>
+            {group.label ? (
+              <DropdownMenuLabel className="px-2.5">
+                {group.label}
+              </DropdownMenuLabel>
+            ) : null}
+            {items}
+          </>
+        )}
+      </DropdownMenuGroup>
+    )
   }
 
   return (
@@ -278,49 +341,14 @@ export function TemplateValueInput({
             >
               Insert
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <div className="px-2.5 py-2">
-                <p className="text-sm font-medium">
-                  {hasPresets ? "Choose a value" : "Insert a value"}
-                </p>
-                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                  {hasPresets
-                    ? "Replaces whatever is selected now."
-                    : "Adds it where your cursor is in the field."}
-                </p>
-              </div>
-              {visibleGroups.map((group, index) => (
-                <DropdownMenuGroup key={group.label ?? `group-${index}`}>
-                  <DropdownMenuSeparator />
-                  {group.label ? (
-                    <DropdownMenuLabel className="px-2.5 py-1.5 text-foreground">
-                      {group.label}
-                      {group.description ? (
-                        <span className="mt-0.5 block font-normal text-muted-foreground">
-                          {group.description}
-                        </span>
-                      ) : null}
-                    </DropdownMenuLabel>
-                  ) : null}
-                  {group.variables.map((variable) => (
-                    <DropdownMenuItem
-                      key={`${group.label ?? index}-${variable.label}`}
-                      title={variable.token}
-                      onClick={() => insert(variable)}
-                      className="gap-2 px-2.5 py-1.5"
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {variable.label}
-                      </span>
-                      {variable.hint ? (
-                        <span className="max-w-[9rem] shrink-0 truncate rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground group-focus/dropdown-menu-item:bg-background/70">
-                          {variable.hint}
-                        </span>
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              ))}
+            <DropdownMenuContent align="end" className="w-64">
+              {visibleGroups.map((group, index) =>
+                renderInsertGroup(
+                  group,
+                  group.label ?? `group-${index}`,
+                  index > 0
+                )
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </>
