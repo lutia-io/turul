@@ -23,6 +23,7 @@ import {
   DefinitionStatusPage,
   PublicationPills,
 } from "@/components/definition-detail"
+import { JsonDefinitionCard } from "@/components/json-definition-card"
 import {
   PipelineDefinitionBuilder,
   type PipelineDefinitionBuilderHandle,
@@ -321,9 +322,17 @@ export default function PipelineDefinitionDetail() {
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <DefinitionColumns aside={aside}>
-              <DefinitionCard>
-                <PipelineLevelsView levels={levels} />
-              </DefinitionCard>
+              {pipelineView === "json" ? (
+                <JsonDefinitionCard
+                  definition={visiblePipeline.definition}
+                  label="JSONB definition"
+                  description="Levels and node configs stored on this pipeline."
+                />
+              ) : (
+                <DefinitionCard>
+                  <PipelineLevelsView levels={levels} />
+                </DefinitionCard>
+              )}
             </DefinitionColumns>
           </div>
         )}
@@ -361,11 +370,13 @@ function PipelineDefinitionEdit({
   const [levels, setLevels] = useState<PipelineLevelDraft[]>(() =>
     levelsFromApi(parsed)
   )
+  const [jsonError, setJsonError] = useState<string | null>(null)
   const isLoading = updateState.isLoading
   const error = updateState.error
 
   const definition = useMemo(() => levelsToApi(levels), [levels])
-  const canSubmit = Boolean(name.trim()) && (Boolean(definition) || nodeOpen)
+  const canSubmit =
+    Boolean(name.trim()) && !jsonError && (Boolean(definition) || nodeOpen)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -374,7 +385,7 @@ function PipelineDefinitionEdit({
       return
     }
     const body = levelsToApi(committed.levels)
-    if (!name.trim() || !body) {
+    if (!name.trim() || !body || jsonError) {
       return
     }
     try {
@@ -463,7 +474,7 @@ function PipelineDefinitionEdit({
             <Button
               type="submit"
               size="sm"
-              disabled={isLoading || !canSubmit}
+              disabled={isLoading || !canSubmit || Boolean(jsonError)}
               aria-busy={isLoading}
               className={isLoading ? "disabled:opacity-100" : undefined}
             >
@@ -486,7 +497,9 @@ function PipelineDefinitionEdit({
             onChange={setLevels}
             view={definitionView}
             sentence={pipelineDraftSentence(levels)}
+            jsonInputId={`${formId}-json`}
             onNodeSessionChange={setNodeOpen}
+            onJsonErrorChange={setJsonError}
             networkId={pipeline.networkId}
             organizationId={pipeline.organizationId}
           />

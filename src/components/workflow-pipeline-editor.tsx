@@ -78,6 +78,7 @@ export function WorkflowPipelineEditor({
   const [active, setActive] = useState(
     mode === "edit" ? (pipeline?.active ?? true) : true
   )
+  const [jsonError, setJsonError] = useState<string | null>(null)
   const [levels, setLevels] = useState<PipelineLevelDraft[]>(() =>
     levelsFromApi(
       mode === "edit" && pipeline
@@ -92,6 +93,7 @@ export function WorkflowPipelineEditor({
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(networkId) &&
+    !jsonError &&
     (Boolean(definition) || nodeOpen)
   const missingPipeline = mode === "edit" && !pipeline
 
@@ -124,7 +126,7 @@ export function WorkflowPipelineEditor({
       return
     }
     const body = levelsToApi(committed.levels)
-    if (!name.trim() || !networkId || !body) {
+    if (!name.trim() || !networkId || !body || jsonError) {
       return
     }
     const saved = {
@@ -227,7 +229,7 @@ export function WorkflowPipelineEditor({
           <Button
             type="button"
             size="sm"
-            disabled={isLoading || !canSubmit}
+            disabled={isLoading || !canSubmit || Boolean(jsonError)}
             aria-busy={isLoading}
             className={isLoading ? "disabled:opacity-100" : undefined}
             onClick={() => {
@@ -287,7 +289,9 @@ export function WorkflowPipelineEditor({
           onChange={setLevels}
           view={definitionView}
           sentence={sentence}
+          jsonInputId={`${formId}-json`}
           onNodeSessionChange={setNodeOpen}
+          onJsonErrorChange={setJsonError}
           networkId={networkId}
           organizationId={organizationId}
         />

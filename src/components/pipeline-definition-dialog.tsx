@@ -95,6 +95,7 @@ export function PipelineDefinitionDialog({
   const [active, setActive] = useState(true)
   const [levels, setLevels] =
     useState<PipelineLevelDraft[]>(emptyPipelineLevels)
+  const [jsonError, setJsonError] = useState<string | null>(null)
   const firstNetworkId = networks[0]?.id ?? ""
   const networkOrganizations = organizations.filter(
     (organization) => organization.networkId === selectedNetworkId
@@ -118,6 +119,7 @@ export function PipelineDefinitionDialog({
     setActive(true)
     setDefinitionView("levels")
     setNodeOpen(false)
+    setJsonError(null)
     setLevels(emptyPipelineLevels())
     setBuilderKey((key) => key + 1)
   }, [open, organizationId])
@@ -142,6 +144,7 @@ export function PipelineDefinitionDialog({
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(selectedNetworkId) &&
+    !jsonError &&
     (Boolean(definition) || nodeOpen)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -151,7 +154,7 @@ export function PipelineDefinitionDialog({
       return
     }
     const body = levelsToApi(committed.levels)
-    if (!name.trim() || !selectedNetworkId || !body) {
+    if (!name.trim() || !selectedNetworkId || !body || jsonError) {
       return
     }
 
@@ -354,7 +357,9 @@ export function PipelineDefinitionDialog({
               onChange={setLevels}
               view={definitionView}
               sentence={sentence}
+              jsonInputId={`${formId}-json`}
               onNodeSessionChange={setNodeOpen}
+              onJsonErrorChange={setJsonError}
               networkId={selectedNetworkId}
               organizationId={selectedOrganizationId || undefined}
             />
@@ -367,7 +372,7 @@ export function PipelineDefinitionDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={isLoading || !canSubmit}
+              disabled={isLoading || !canSubmit || Boolean(jsonError)}
               aria-busy={isLoading}
               className={isLoading ? "disabled:opacity-100" : undefined}
             >

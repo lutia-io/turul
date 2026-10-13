@@ -314,12 +314,6 @@ export default function RecordsPage() {
           renderMenu={(schema) => {
             const canEdit = canNetwork("schema", "update") && !schema.internal
             const canDelete = canNetwork("schema", "delete") && !schema.internal
-            const canWorkflow =
-              canNetwork("workflow_definition", "read") ||
-              canNetwork("workflow_definition", "create")
-            if (!canEdit && !canDelete && !canWorkflow) {
-              return null
-            }
             return (
               <TableSheetMenu
                 schema={schema}
