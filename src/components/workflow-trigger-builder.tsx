@@ -10,7 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { WorkflowSectionHeading } from "@/components/workflow-rule"
+import {
+  WorkflowSectionHeading,
+  WorkflowTriggerBadges,
+  workflowTriggerIconTone,
+  workflowTriggerKindTone,
+} from "@/components/workflow-rule"
 import { columnLabel } from "@/components/schema-records-table"
 import type { JsonSchemaProperty } from "@/lib/json-definition"
 import { cn } from "@/lib/utils"
@@ -54,11 +59,13 @@ export function WorkflowTriggerBuilder({
   value,
   fields,
   schemaField,
+  compact = false,
   onChange,
 }: {
   value: TriggerDraft
   fields: JsonSchemaProperty[]
   schemaField?: ReactNode
+  compact?: boolean
   onChange: (next: TriggerDraft) => void
 }) {
   const includesUpdate =
@@ -70,6 +77,10 @@ export function WorkflowTriggerBuilder({
   const hourChoices = hours.includes(value.hour)
     ? hours
     : [...hours, value.hour].sort()
+  const chipClass = cn(
+    "rounded-full border transition-colors",
+    compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"
+  )
 
   return (
     <>
@@ -77,8 +88,16 @@ export function WorkflowTriggerBuilder({
         icon={value.kind === "schedule" ? ClockIcon : WorkflowIcon}
         title="When"
         description={triggerSummary(triggerToApi(value), fields)}
+        compact={compact}
+        iconClassName={workflowTriggerIconTone(value.kind)}
+        action={<WorkflowTriggerBadges trigger={value} />}
       />
-      <div className="mt-6 flex flex-col gap-4">
+      <div
+        className={cn(
+          "flex flex-col",
+          compact ? "mt-3 gap-3" : "mt-6 gap-4"
+        )}
+      >
         {schemaField ? (
           <div className="max-w-sm">{schemaField}</div>
         ) : null}
@@ -91,9 +110,9 @@ export function WorkflowTriggerBuilder({
                 type="button"
                 onClick={() => onChange({ ...value, kind: item.value })}
                 className={cn(
-                  "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                  chipClass,
                   selected
-                    ? "border-foreground/15 bg-muted font-medium"
+                    ? workflowTriggerKindTone[item.value]
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 )}
               >
@@ -104,13 +123,13 @@ export function WorkflowTriggerBuilder({
         </div>
 
         {includesUpdate ? (
-          <Field>
+          <Field className={compact ? "gap-1" : undefined}>
             <FieldLabel>Only if these fields change</FieldLabel>
             <FieldDescription>
               Leave empty to run on any update.
             </FieldDescription>
             {fields.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {fields.map((field) => {
                   const selected = value.changed.includes(field.name)
                   return (
@@ -124,7 +143,7 @@ export function WorkflowTriggerBuilder({
                         onChange({ ...value, changed: next })
                       }}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                        chipClass,
                         selected
                           ? "border-foreground/15 bg-muted font-medium"
                           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
@@ -136,7 +155,7 @@ export function WorkflowTriggerBuilder({
                 })}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-1.5 text-sm text-muted-foreground">
                 Pick a table to choose columns.
               </p>
             )}
@@ -144,7 +163,7 @@ export function WorkflowTriggerBuilder({
         ) : null}
 
         {value.kind === "schedule" ? (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className={cn("grid sm:grid-cols-2", compact ? "gap-3" : "gap-4")}>
             <Field>
               <FieldLabel>Repeat</FieldLabel>
               <Select

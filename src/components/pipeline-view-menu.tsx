@@ -3,6 +3,7 @@ import {
   ChevronDownIcon,
   FileJsonIcon,
   LayersIcon,
+  ListTreeIcon,
   WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export type PipelineView = "canvas" | "levels" | "json"
+export type WorkflowDefinitionView = "rule" | "canvas" | "json"
 
 const pipelineViews: {
   id: PipelineView
@@ -27,15 +29,26 @@ const pipelineViews: {
   { id: "json", label: "JSON", icon: FileJsonIcon },
 ]
 
-export function PipelineViewMenu({
+const workflowViews: {
+  id: WorkflowDefinitionView
+  label: string
+  icon: LucideIcon
+}[] = [
+  { id: "rule", label: "Rule", icon: ListTreeIcon },
+  { id: "canvas", label: "Canvas", icon: WorkflowIcon },
+  { id: "json", label: "JSON", icon: FileJsonIcon },
+]
+
+function ViewMenu<T extends string>({
   value,
   onChange,
+  views,
 }: {
-  value: PipelineView
-  onChange: (view: PipelineView) => void
+  value: T
+  onChange: (view: T) => void
+  views: { id: T; label: string; icon: LucideIcon }[]
 }) {
-  const current =
-    pipelineViews.find((view) => view.id === value) ?? pipelineViews[0]
+  const current = views.find((view) => view.id === value) ?? views[0]
   const Icon = current.icon
 
   return (
@@ -48,7 +61,7 @@ export function PipelineViewMenu({
         <ChevronDownIcon data-icon="inline-end" className="opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-36">
-        {pipelineViews.map((view) => {
+        {views.map((view) => {
           const ViewIcon = view.icon
           const selected = view.id === value
 
@@ -63,4 +76,24 @@ export function PipelineViewMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+export function PipelineViewMenu({
+  value,
+  onChange,
+}: {
+  value: PipelineView
+  onChange: (view: PipelineView) => void
+}) {
+  return <ViewMenu value={value} onChange={onChange} views={pipelineViews} />
+}
+
+export function WorkflowViewMenu({
+  value,
+  onChange,
+}: {
+  value: WorkflowDefinitionView
+  onChange: (view: WorkflowDefinitionView) => void
+}) {
+  return <ViewMenu value={value} onChange={onChange} views={workflowViews} />
 }

@@ -48,17 +48,6 @@ export type UpdateWorkflowDefinitionResponse = {
   id: string
 }
 
-export type TestWorkflowDefinitionRequest = {
-  definition: WorkflowDefinitionBody
-  input?: JsonObject
-}
-
-export type TestWorkflowDefinitionResponse = {
-  status: string
-  nodes?: ApiWorkflowNode[]
-  error?: string
-}
-
 export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
 export type NumberFilterOp = "eq" | "gte" | "lte" | "empty"
 export type WorkflowDefinitionListSort =
@@ -380,16 +369,6 @@ const workflowApi = api.injectEndpoints({
               { type: "WorkflowDefinition", id: "LIST" },
             ],
     }),
-    testWorkflowDefinition: build.mutation<
-      TestWorkflowDefinitionResponse,
-      TestWorkflowDefinitionRequest
-    >({
-      query: (body) => ({
-        url: "/workflow-definition/test",
-        method: "POST",
-        body,
-      }),
-    }),
     listWorkflows: build.query<ApiWorkflowList, ListWorkflowsParams | void>({
       query: (params) => ({
         url: "/workflow",
@@ -490,7 +469,6 @@ export const {
   useGetWorkflowDefinitionQuery,
   useCreateWorkflowDefinitionMutation,
   useUpdateWorkflowDefinitionMutation,
-  useTestWorkflowDefinitionMutation,
   useListWorkflowsQuery,
   useGetWorkflowQuery,
   useCreateWorkflowMutation,

@@ -60,7 +60,6 @@ import {
   triggerFromApi,
   schemaFieldOptions,
   triggerToApi,
-  workflowDraftSentence,
   workflowNodesFromApi,
   workflowNodesToApi,
   type CriteriaGroupDraft,
@@ -278,12 +277,6 @@ export function WorkflowDefinitionDialog({
 
   const showNetwork = networks.length > 0 && !lockNetwork
   const showOrganization = true
-  const sentence = workflowDraftSentence(
-    trigger,
-    criteria,
-    levels,
-    triggerFields
-  )
 
   const canSubmit =
     Boolean(name.trim()) &&
@@ -339,14 +332,17 @@ export function WorkflowDefinitionDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         size="full"
-        className="sm:inset-x-[8vw] lg:inset-x-16 xl:inset-x-[12vw]"
+        className="inset-y-4 inset-x-3 sm:inset-x-6 sm:inset-y-4 lg:inset-x-10 xl:inset-x-12"
       >
         <>
-            <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1.5">
+            <DialogHeader className="shrink-0 border-b px-4 py-3 pr-12">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 space-y-1">
                   <DialogTitle>Create a workflow definition</DialogTitle>
-                  <DialogDescription>{sentence}</DialogDescription>
+                  <DialogDescription className="text-xs">
+                    Configure the rule on the left. The preview updates as you
+                    edit.
+                  </DialogDescription>
                 </div>
                 <Button
                   type="button"
@@ -369,11 +365,11 @@ export function WorkflowDefinitionDialog({
               autoComplete="off"
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-muted/40 px-6 py-5">
-                <FieldGroup className="shrink-0 gap-3 rounded-2xl bg-card p-4 shadow-xs ring-1 ring-foreground/10">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden bg-muted/40 px-4 py-3">
+                <FieldGroup className="shrink-0 gap-2 rounded-xl bg-card p-3 shadow-xs ring-1 ring-foreground/10">
                   <div
                     className={cn(
-                      "grid gap-3",
+                      "grid gap-2",
                       showNetwork
                         ? "sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
                         : "sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]"
@@ -500,7 +496,7 @@ export function WorkflowDefinitionDialog({
                 </FieldGroup>
 
                 {definitionView === "json" ? (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/10">
                     <DefinitionJsonPane
                       id={`${formId}-json`}
                       title="JSON"
@@ -512,8 +508,9 @@ export function WorkflowDefinitionDialog({
                     />
                   </div>
                 ) : (
-                  <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <WorkflowRuleEditor
+                      compact
                       trigger={trigger}
                       criteria={criteria}
                       levels={levels}
@@ -556,7 +553,7 @@ export function WorkflowDefinitionDialog({
                   </div>
                 )}
               </div>
-              <DialogFooter>
+              <DialogFooter className="py-3 [[data-size=full]_&]:px-4">
                 <DialogClose
                   render={<Button variant="outline" disabled={isLoading} />}
                 >

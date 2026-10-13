@@ -286,7 +286,7 @@ function LeafEditor({
   const customId = `${leaf.key}-custom`
 
   return (
-    <div className="group/row relative rounded-xl border bg-background p-4 shadow-xs">
+    <div className="group/row relative rounded-xl border bg-background p-3 shadow-xs">
       <div className="absolute top-2 right-2 flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within/row:opacity-100 sm:group-hover/row:opacity-100">
         <IconTooltipButton
           label="Move up"
@@ -492,8 +492,8 @@ function GroupEditor({
         depth > 0 && "border-dashed bg-background"
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
-        <div className="min-w-0 space-y-1">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b px-3 py-2">
+        <div className="min-w-0 space-y-0.5">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={cn(
@@ -628,11 +628,13 @@ export function WorkflowCriteriaBuilder({
   value,
   fields,
   schemaName,
+  compact = false,
   onChange,
 }: {
   value: CriteriaGroupDraft
   fields: JsonSchemaProperty[]
   schemaName?: string
+  compact?: boolean
   onChange: (next: CriteriaGroupDraft) => void
 }) {
   const empty = value.conditions.length === 0
@@ -647,12 +649,15 @@ export function WorkflowCriteriaBuilder({
             ? `These conditions are evaluated against the ${schemaName} record after the trigger fires.`
             : "These conditions are evaluated against the triggering record after the trigger fires."
         }
+        compact={compact}
+        iconClassName="bg-sky-500/10 text-sky-700 dark:text-sky-300"
       />
-      <div className="mt-6">
+      <div className={compact ? "mt-3" : "mt-6"}>
         {empty ? (
           <WorkflowEmptyAdd
             title="No extra conditions"
             description="The workflow runs whenever the trigger fires. Add a condition to narrow it down."
+            compact={compact}
             onClick={() => onChange(addToGroup(value, value.key, emptyLeaf()))}
           />
         ) : (

@@ -37,6 +37,11 @@ import {
 } from "@/components/definition-detail"
 import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { JsonDefinitionCard } from "@/components/json-definition-card"
+import { PipelineFlowCanvas } from "@/components/pipeline-flow"
+import {
+  WorkflowViewMenu,
+  type WorkflowDefinitionView,
+} from "@/components/pipeline-view-menu"
 import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -45,6 +50,8 @@ import {
   WorkflowCriteriaView,
   WorkflowNodesView,
   WorkflowSectionHeading,
+  WorkflowTriggerBadges,
+  workflowTriggerIconTone,
 } from "@/components/workflow-rule"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
 import type { Schema, WorkflowDefinition } from "@/data/networks"
@@ -64,7 +71,9 @@ import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
 import {
   countCriteriaLeaves,
   criteriaFromApi,
+  criteriaSummary,
   criteriaToApi,
+  hasCriteria,
   logicLabels,
   parseWorkflowDefinition,
   schemaFieldOptions,
@@ -94,7 +103,7 @@ import {
   useUpdateWorkflowDefinitionMutation,
 } from "@/store/workflow-slice"
 
-type DefinitionView = "rule" | "json"
+type DefinitionView = WorkflowDefinitionView
 
 function workflowDefinitionError(text: string) {
   try {
@@ -155,6 +164,31 @@ export default function WorkflowDefinitionDetail() {
   const nodeCount = parsed ? workflowNodeCount(parsed) : 0
   const rootLogic = parsed?.criteria?.logic as CriteriaLogic | undefined
   const conditionCount = countCriteriaLeaves(parsed?.criteria)
+  const viewLevels = useMemo(
+    () => (parsed ? workflowNodesFromApi(parsed.nodes) : []),
+    [parsed]
+  )
+  const canvasSentence = workflowRuleSentence(
+    parsed?.trigger,
+    parsed?.criteria,
+    nodeCount,
+    fields
+  )
+  const canvasPreamble = useMemo(
+    () => ({
+      when: {
+        title: "When",
+        subtitle: triggerSummary(parsed?.trigger, fields),
+      },
+      if: {
+        title: "If",
+        subtitle: hasCriteria(parsed?.criteria)
+          ? criteriaSummary(parsed?.criteria, fields)
+          : "Always",
+      },
+    }),
+    [fields, parsed?.criteria, parsed?.trigger]
+  )
   const relatedRuns = visibleWorkflow
     ? runs
         .filter(
@@ -349,8 +383,8 @@ export default function WorkflowDefinitionDetail() {
   }
 
   return (
-    <DefinitionPage>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <DefinitionPage fill>
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 px-4 pt-5 sm:px-6 lg:px-8">
         <div className="min-w-0 space-y-1.5">
           <Link
             to={tableHref}
@@ -368,13 +402,7 @@ export default function WorkflowDefinitionDetail() {
             />
           </div>
           <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-            {visibleWorkflow.description ||
-              workflowRuleSentence(
-                parsed?.trigger,
-                parsed?.criteria,
-                nodeCount,
-                fields
-              )}
+            {visibleWorkflow.description || canvasSentence}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -402,17 +430,10 @@ export default function WorkflowDefinitionDetail() {
             <PlayIcon />
             Run
           </Button>
-          <Button
-            type="button"
-            variant={definitionView === "json" ? "secondary" : "outline"}
-            size="sm"
-            onClick={() =>
-              setDefinitionView((view) => (view === "rule" ? "json" : "rule"))
-            }
-          >
-            <FileJsonIcon />
-            {definitionView === "json" ? "Rule" : "JSON"}
-          </Button>
+          <WorkflowViewMenu
+            value={definitionView}
+            onChange={setDefinitionView}
+          />
           <Button
             variant="outline"
             size="sm"
@@ -425,56 +446,77 @@ export default function WorkflowDefinitionDetail() {
         </div>
       </div>
 
-      <DefinitionColumns aside={aside}>
-        {definitionView === "json" ? (
-          <JsonDefinitionCard
-            definition={visibleWorkflow.definition}
-            label="Workflow JSON"
-            description="Trigger, criteria, and nodes stored on this workflow."
+      <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 pb-4 sm:px-6 lg:px-8">
+        {definitionView === "canvas" ? (
+          <PipelineFlowCanvas
+            className="h-full min-h-0 flex-1"
+            levels={viewLevels}
+            sentence={canvasSentence}
+            preamble={canvasPreamble}
           />
         ) : (
-          <>
-            <DefinitionCard>
-              <WorkflowSectionHeading
-                icon={
-                  parsed?.trigger.on?.includes("schedule")
-                    ? ClockIcon
-                    : WorkflowIcon
-                }
-                title="When"
-                description={triggerSummary(parsed?.trigger, fields)}
-              />
-            </DefinitionCard>
-
-            <DefinitionCard>
-              <WorkflowSectionHeading
-                icon={FilterIcon}
-                title="If"
-                description={
-                  schema
-                    ? `These conditions are evaluated against the ${schema.name} record after the trigger fires.`
-                    : "These conditions are evaluated against the triggering record after the trigger fires."
-                }
-              />
-              <div className="mt-6">
-                <WorkflowCriteriaView
-                  criteria={parsed?.criteria}
-                  fields={fields}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <DefinitionColumns aside={aside}>
+              {definitionView === "json" ? (
+                <JsonDefinitionCard
+                  definition={visibleWorkflow.definition}
+                  label="Workflow JSON"
+                  description="Trigger, criteria, and nodes stored on this workflow."
                 />
-              </div>
-            </DefinitionCard>
+              ) : (
+                <>
+                  <DefinitionCard>
+                    <WorkflowSectionHeading
+                      icon={
+                        parsed?.trigger.on?.includes("schedule")
+                          ? ClockIcon
+                          : WorkflowIcon
+                      }
+                      title="When"
+                      description={triggerSummary(parsed?.trigger, fields)}
+                      iconClassName={workflowTriggerIconTone(
+                        triggerFromApi(parsed?.trigger).kind
+                      )}
+                      action={
+                        <WorkflowTriggerBadges trigger={parsed?.trigger} />
+                      }
+                    />
+                  </DefinitionCard>
 
-            <DefinitionCard>
-              <WorkflowSectionHeading
-                icon={ZapIcon}
-                title="Then"
-                description="These steps run in order after the trigger and conditions match."
-              />
-              <WorkflowNodesView definition={parsed} />
-            </DefinitionCard>
-          </>
+                  <DefinitionCard>
+                    <WorkflowSectionHeading
+                      icon={FilterIcon}
+                      title="If"
+                      description={
+                        schema
+                          ? `These conditions are evaluated against the ${schema.name} record after the trigger fires.`
+                          : "These conditions are evaluated against the triggering record after the trigger fires."
+                      }
+                      iconClassName="bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                    />
+                    <div className="mt-6">
+                      <WorkflowCriteriaView
+                        criteria={parsed?.criteria}
+                        fields={fields}
+                      />
+                    </div>
+                  </DefinitionCard>
+
+                  <DefinitionCard>
+                    <WorkflowSectionHeading
+                      icon={ZapIcon}
+                      title="Then"
+                      description="These steps run in order after the trigger and conditions match."
+                      iconClassName="bg-violet-500/10 text-violet-700 dark:text-violet-300"
+                    />
+                    <WorkflowNodesView definition={parsed} />
+                  </DefinitionCard>
+                </>
+              )}
+            </DefinitionColumns>
+          </div>
         )}
-      </DefinitionColumns>
+      </div>
     </DefinitionPage>
   )
 }

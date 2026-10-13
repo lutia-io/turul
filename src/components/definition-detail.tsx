@@ -41,9 +41,11 @@ export function DefinitionPage({
 export function DefinitionColumns({
   children,
   aside,
+  asideWide = false,
 }: {
   children: ReactNode
   aside?: ReactNode
+  asideWide?: boolean
 }) {
   if (!aside) {
     return (
@@ -52,7 +54,14 @@ export function DefinitionColumns({
   }
 
   return (
-    <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+    <div
+      className={cn(
+        "grid min-w-0 items-start gap-6",
+        asideWide
+          ? "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]"
+          : "xl:grid-cols-[minmax(0,1fr)_18rem]"
+      )}
+    >
       <div className="flex min-w-0 flex-col gap-6">{children}</div>
       <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-6">
         {aside}

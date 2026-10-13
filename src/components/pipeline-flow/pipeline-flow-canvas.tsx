@@ -20,6 +20,7 @@ import {
 
 import {
   PipelineAddCard,
+  PipelineCriteriaCard,
   PipelineFlowActionsProvider,
   PipelineGateCard,
   PipelineInputCard,
@@ -50,6 +51,7 @@ import {
   snapNodeIndex,
   type FlowItem,
   type FlowLayout,
+  type FlowPreamble,
 } from "@/lib/pipeline-flow"
 import {
   insertCreatedNode,
@@ -94,6 +96,7 @@ export function PipelineFlowCanvas({
   onEditNode,
   details,
   sentence,
+  preamble,
   className,
 }: {
   levels: PipelineLevelDraft[]
@@ -102,6 +105,7 @@ export function PipelineFlowCanvas({
   onEditNode?: (nodeKey: string, levelKey: string) => void
   details?: ReactNode
   sentence?: string
+  preamble?: FlowPreamble
   className?: string
 }) {
   const gradientId = useId()
@@ -150,8 +154,8 @@ export function PipelineFlowCanvas({
     sourceId: string
   } | null>(null)
   const layout = useMemo(
-    () => levelsToFlow(levels, { editable }),
-    [editable, levels]
+    () => levelsToFlow(levels, { editable, preamble }),
+    [editable, levels, preamble]
   )
   const nodeCount = levels.reduce(
     (count, level) => count + level.nodes.length,
@@ -374,7 +378,13 @@ export function PipelineFlowCanvas({
         x: point.x - nodeDrag.current.offsetX,
         y: point.y - nodeDrag.current.offsetY,
       })
-      setDropLevel(snapLevelIndex(point.x, levelsRef.current.length))
+      setDropLevel(
+        snapLevelIndex(
+          point.x,
+          levelsRef.current.length,
+          layout.preambleSlots
+        )
+      )
       return
     }
     if (
@@ -400,7 +410,11 @@ export function PipelineFlowCanvas({
     }
     const point = clientToFlow(clientX, clientY)
     const current = levelsRef.current
-    const nextLevel = snapLevelIndex(point.x, current.length)
+    const nextLevel = snapLevelIndex(
+      point.x,
+      current.length,
+      layout.preambleSlots
+    )
     const targetLevel = current[Math.min(nextLevel, current.length - 1)]
     const count = targetLevel
       ? targetLevel.nodes.filter((item) => item.key !== drag.nodeKey).length
@@ -430,7 +444,11 @@ export function PipelineFlowCanvas({
       return
     }
     if (source?.kind === "node") {
-      const snapped = snapLevelIndex(point.x, levelsRef.current.length)
+      const snapped = snapLevelIndex(
+        point.x,
+        levelsRef.current.length,
+        layout.preambleSlots
+      )
       if (snapped === source.data.levelIndex) {
         requestCreate(
           { kind: "level", levelKey: source.data.levelKey },
@@ -475,7 +493,9 @@ export function PipelineFlowCanvas({
     event.preventDefault()
     event.dataTransfer.dropEffect = "move"
     const point = clientToFlow(event.clientX, event.clientY)
-    setDropLevel(snapLevelIndex(point.x, levelsRef.current.length))
+    setDropLevel(
+      snapLevelIndex(point.x, levelsRef.current.length, layout.preambleSlots)
+    )
   }
 
   function onDrop(event: DragEvent<HTMLDivElement>) {
@@ -493,7 +513,11 @@ export function PipelineFlowCanvas({
     }
     const point = clientToFlow(event.clientX, event.clientY)
     const current = levelsRef.current
-    const levelIndex = snapLevelIndex(point.x, current.length)
+    const levelIndex = snapLevelIndex(
+      point.x,
+      current.length,
+      layout.preambleSlots
+    )
     const last = current[current.length - 1]
     const target: CreatePipelineNodeTarget =
       levelIndex >= current.length && last
@@ -535,7 +559,11 @@ export function PipelineFlowCanvas({
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               }}
             >
-              <LevelBands count={highlightColumns} active={dropLevel} />
+              <LevelBands
+                count={highlightColumns}
+                active={dropLevel}
+                preambleSlots={layout.preambleSlots}
+              />
               <svg
                 className="pointer-events-none absolute inset-0 overflow-visible"
                 width={layout.width}
@@ -618,6 +646,7 @@ export function PipelineFlowCanvas({
                   >
                     {item.kind === "input" ? (
                       <PipelineInputCard
+                        data={item.data}
                         onConnectStart={(event) => {
                           event.stopPropagation()
                           event.preventDefault()
@@ -639,6 +668,9 @@ export function PipelineFlowCanvas({
                           })
                         }}
                       />
+                    ) : null}
+                    {item.kind === "criteria" ? (
+                      <PipelineCriteriaCard data={item.data} />
                     ) : null}
                     {item.kind === "label" ? (
                       <PipelineLabelCard data={item.data} />
@@ -819,9 +851,11 @@ export function PipelineFlowCanvas({
 function LevelBands({
   count,
   active,
+  preambleSlots = 0,
 }: {
   count: number
   active: number | null
+  preambleSlots?: number
 }) {
   return (
     <>
@@ -835,7 +869,7 @@ function LevelBands({
               : "bg-violet-500/[0.04] ring-1 ring-violet-500/10"
           )}
           style={{
-            left: levelColumnX(index) - 16,
+            left: levelColumnX(index, preambleSlots) - 16,
             width: FLOW.nodeWidth + 32,
             height: 920,
           }}
@@ -977,9 +1011,11 @@ function MiniMapCard({
                 ? (minimapFill[item.data.nodeType] ?? "#8b5cf6")
                 : item.kind === "input"
                   ? "var(--primary)"
-                  : item.kind === "gate"
-                    ? "color-mix(in oklch, var(--primary) 55%, transparent)"
-                    : "color-mix(in oklch, var(--foreground) 18%, transparent)"
+                  : item.kind === "criteria"
+                    ? "#0ea5e9"
+                    : item.kind === "gate"
+                      ? "color-mix(in oklch, var(--primary) 55%, transparent)"
+                      : "color-mix(in oklch, var(--foreground) 18%, transparent)"
             return (
               <rect
                 key={item.id}

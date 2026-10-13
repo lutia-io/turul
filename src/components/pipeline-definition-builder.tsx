@@ -16,7 +16,10 @@ import {
   type NodeDefinitionEditorHandle,
 } from "@/components/node-definition-editor"
 import { PipelineFlowCanvas } from "@/components/pipeline-flow"
-import { PipelineLevelsEditor } from "@/components/pipeline-levels-editor"
+import {
+  PipelineLevelsEditor,
+  type PipelineLevelsVariant,
+} from "@/components/pipeline-levels-editor"
 import type { PipelineView } from "@/components/pipeline-view-menu"
 import {
   parseJsonObject,
@@ -132,6 +135,10 @@ export function PipelineDefinitionBuilder({
   className,
   networkId,
   organizationId,
+  variant = "pipeline",
+  compact = false,
+  framed = true,
+  showHeading = true,
 }: {
   ref?: Ref<PipelineDefinitionBuilderHandle>
   levels: PipelineLevelDraft[]
@@ -144,6 +151,10 @@ export function PipelineDefinitionBuilder({
   className?: string
   networkId?: string
   organizationId?: string
+  variant?: PipelineLevelsVariant
+  compact?: boolean
+  framed?: boolean
+  showHeading?: boolean
 }) {
   const fallbackJsonId = useId()
   const editorRef = useRef<NodeDefinitionEditorHandle>(null)
@@ -320,14 +331,29 @@ export function PipelineDefinitionBuilder({
         </div>
       ) : view === "levels" ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <DefinitionCard>
+          {framed ? (
+            <DefinitionCard>
+              <PipelineLevelsEditor
+                levels={levels}
+                onChange={(next) => publish(next, "builder")}
+                onCreateNode={openCreate}
+                onEditNode={openEdit}
+                variant={variant}
+                compact={compact}
+                showHeading={showHeading}
+              />
+            </DefinitionCard>
+          ) : (
             <PipelineLevelsEditor
               levels={levels}
               onChange={(next) => publish(next, "builder")}
               onCreateNode={openCreate}
               onEditNode={openEdit}
+              variant={variant}
+              compact={compact}
+              showHeading={showHeading}
             />
-          </DefinitionCard>
+          )}
         </div>
       ) : (
         <PipelineFlowCanvas

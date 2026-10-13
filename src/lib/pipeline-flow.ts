@@ -51,6 +51,16 @@ export type PipelineLabelData = {
   parallel: boolean
 }
 
+export type FlowPreambleData = {
+  title: string
+  subtitle: string
+}
+
+export type FlowPreamble = {
+  when: FlowPreambleData
+  if: FlowPreambleData
+}
+
 export type FlowItem =
   | {
       id: string
@@ -59,6 +69,16 @@ export type FlowItem =
       y: number
       width: number
       height: number
+      data?: FlowPreambleData
+    }
+  | {
+      id: string
+      kind: "criteria"
+      x: number
+      y: number
+      width: number
+      height: number
+      data: FlowPreambleData
     }
   | {
       id: string
@@ -109,13 +129,15 @@ export type FlowLayout = {
   width: number
   height: number
   columnCount: number
+  preambleSlots: number
 }
 
-export function levelColumnX(levelIndex: number) {
+export function levelColumnX(levelIndex: number, preambleSlots = 0) {
   return (
     FLOW.originX +
     FLOW.inputWidth +
     FLOW.levelGap +
+    preambleSlots * (FLOW.inputWidth + FLOW.levelGap) +
     levelIndex * (FLOW.nodeWidth + FLOW.levelGap)
   )
 }
@@ -124,9 +146,13 @@ export function nodeStackY(index: number) {
   return FLOW.contentY + index * (FLOW.nodeHeight + FLOW.nodeYGap)
 }
 
-export function snapLevelIndex(x: number, levelCount: number) {
+export function snapLevelIndex(
+  x: number,
+  levelCount: number,
+  preambleSlots = 0
+) {
   const columns = Math.max(levelCount, 1)
-  const col0 = levelColumnX(0)
+  const col0 = levelColumnX(0, preambleSlots)
   const pitch = FLOW.nodeWidth + FLOW.levelGap
   const raw = Math.round((x - col0) / pitch)
   return Math.max(0, Math.min(columns, raw))
@@ -224,12 +250,16 @@ function draftType(node: PipelineNodeDraft) {
 
 export function levelsToFlow(
   levels: PipelineLevelDraft[],
-  options: { editable: boolean }
+  options: { editable: boolean; preamble?: FlowPreamble }
 ): FlowLayout {
   const items: FlowItem[] = []
   const edges: FlowEdge[] = []
   const populated = levels.some((level) => level.nodes.length > 0)
   const firstLevel = levels[0]
+  const preamble = options.preamble
+  const preambleSlots = preamble ? 1 : 0
+  const columnX = (levelIndex: number) =>
+    levelColumnX(levelIndex, preambleSlots)
   const inputY =
     FLOW.contentY +
     (firstLevel && firstLevel.nodes.length > 1
@@ -247,11 +277,32 @@ export function levelsToFlow(
     y: inputY,
     width: FLOW.inputWidth,
     height: FLOW.inputHeight,
+    data: preamble?.when,
   })
+
+  if (preamble) {
+    items.push({
+      id: "workflow-criteria",
+      kind: "criteria",
+      x: FLOW.originX + FLOW.inputWidth + FLOW.levelGap,
+      y: inputY,
+      width: FLOW.inputWidth,
+      height: FLOW.inputHeight,
+      data: preamble.if,
+    })
+    edges.push({
+      id: "e-when-if",
+      sourceId: "pipeline-input",
+      targetId: "workflow-criteria",
+      animated: true,
+    })
+  }
+
+  const feedId = preamble ? "workflow-criteria" : "pipeline-input"
 
   levels.forEach((level, levelIndex) => {
     const parallel = level.nodes.length > 1
-    const x = levelColumnX(levelIndex)
+    const x = columnX(levelIndex)
     items.push({
       id: `label-${level.key}`,
       kind: "label",
@@ -313,7 +364,7 @@ export function levelsToFlow(
   if (options.editable && populated) {
     const last = levels[levels.length - 1]
     if (last && last.nodes.length > 0) {
-      const x = levelColumnX(levels.length)
+      const x = columnX(levels.length)
       items.push({
         id: "label-next",
         kind: "label",
@@ -348,7 +399,7 @@ export function levelsToFlow(
     for (const node of firstNodes) {
       edges.push({
         id: `e-in-${node.key}`,
-        sourceId: "pipeline-input",
+        sourceId: feedId,
         targetId: node.key,
         animated: true,
       })
@@ -356,7 +407,7 @@ export function levelsToFlow(
   } else if (options.editable && firstLevel) {
     edges.push({
       id: "e-in-add",
-      sourceId: "pipeline-input",
+      sourceId: feedId,
       targetId: `add-${firstLevel.key}`,
       animated: true,
     })
@@ -383,11 +434,7 @@ export function levelsToFlow(
     items.push({
       id: gateId,
       kind: "gate",
-      x:
-        levelColumnX(index) +
-        FLOW.nodeWidth +
-        FLOW.levelGap / 2 -
-        FLOW.gate / 2,
+      x: columnX(index) + FLOW.nodeWidth + FLOW.levelGap / 2 - FLOW.gate / 2,
       y: (leftCenter + rightCenter) / 2 - FLOW.gate / 2,
       width: FLOW.gate,
       height: FLOW.gate,
@@ -444,6 +491,7 @@ export function levelsToFlow(
     items,
     edges,
     columnCount,
+    preambleSlots,
     width: right + FLOW.pad,
     height: bottom + FLOW.pad,
   }

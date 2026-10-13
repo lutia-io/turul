@@ -8,6 +8,7 @@ import {
   ArrowLeftRightIcon,
   ChevronRightIcon,
   FileTextIcon,
+  FilterIcon,
   GlobeIcon,
   Layers2Icon,
   ListTreeIcon,
@@ -16,6 +17,7 @@ import {
   PlusIcon,
   Table2Icon,
   Trash2Icon,
+  WorkflowIcon,
   type LucideIcon,
 } from "lucide-react"
 
@@ -34,6 +36,7 @@ import {
   type NodeType,
 } from "@/lib/node-definition"
 import type {
+  FlowPreambleData,
   PipelineAddData,
   PipelineLabelData,
   PipelineNodeData,
@@ -278,12 +281,17 @@ export function PipelineNodeCard({
 }
 
 export function PipelineInputCard({
+  data,
   onConnectStart,
 }: {
+  data?: FlowPreambleData
   onConnectStart?: (event: PointerEvent<HTMLSpanElement>) => void
 }) {
   const actions = usePipelineFlowActions()
   const editable = Boolean(actions?.editable)
+  const title = data?.title ?? "Input"
+  const subtitle = data?.subtitle ?? "Payload for level 1"
+  const Icon = data ? WorkflowIcon : PlayIcon
 
   return (
     <Card
@@ -292,12 +300,12 @@ export function PipelineInputCard({
     >
       <div className="flex items-center gap-3 px-3.5">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-          <PlayIcon className="size-4" />
+          <Icon className="size-4" />
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold tracking-tight">Input</p>
-          <p className="text-[11px] text-muted-foreground">
-            Payload for level 1
+          <p className="text-sm font-semibold tracking-tight">{title}</p>
+          <p className="line-clamp-2 text-[11px] text-muted-foreground">
+            {subtitle}
           </p>
         </div>
       </div>
@@ -306,6 +314,29 @@ export function PipelineInputCard({
         connectable={editable}
         onPointerDown={onConnectStart}
       />
+    </Card>
+  )
+}
+
+export function PipelineCriteriaCard({ data }: { data: FlowPreambleData }) {
+  return (
+    <Card
+      size="sm"
+      className="relative h-full w-full justify-center gap-0 overflow-visible border-0 bg-sky-500/8 py-3 ring-1 ring-sky-500/25"
+    >
+      <div className="flex items-center gap-3 px-3.5">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-700 dark:text-sky-300">
+          <FilterIcon className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold tracking-tight">{data.title}</p>
+          <p className="line-clamp-2 text-[11px] text-muted-foreground">
+            {data.subtitle}
+          </p>
+        </div>
+      </div>
+      <FlowHandle side="left" />
+      <FlowHandle side="right" />
     </Card>
   )
 }
