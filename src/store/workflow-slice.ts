@@ -153,8 +153,6 @@ function listWorkflowDefinitionQueryParams(
 export type ApiWorkflowStatus = "pending" | "running" | "completed" | "failed"
 
 export type ApiSnapshotNode = {
-  name: string
-  slug: string
   type: string
   definition: JsonObject
 }
@@ -280,7 +278,6 @@ export type ApiWorkflowNode = {
   levelIndex: number
   nodeIndex: number
   attempt: number
-  nodeSlug: string
   nodeType: string
   status: ApiWorkflowNodeStatus | string
   input?: JsonObject

@@ -10,10 +10,7 @@ import { WorkflowCriteriaBuilder } from "@/components/workflow-criteria-builder"
 import { WorkflowDefinitionPreview } from "@/components/workflow-definition-preview"
 import { WorkflowTriggerBuilder } from "@/components/workflow-trigger-builder"
 import type { JsonSchemaProperty } from "@/lib/json-definition"
-import {
-  pipelineDraftSentence,
-  type PipelineLevelDraft,
-} from "@/lib/pipeline-definition"
+import type { PipelineLevelDraft } from "@/lib/pipeline-definition"
 import type {
   CriteriaGroupDraft,
   TriggerDraft,
@@ -125,13 +122,10 @@ export function WorkflowRuleEditor({
                 <LayersIcon className="size-4" />
               </span>
               <div className="min-w-0">
-                <h2 className="text-sm font-medium">Then</h2>
+                <h2 className="text-sm font-medium">Actions</h2>
                 <p className="text-sm text-muted-foreground">
                   Nodes run level by level after the trigger and conditions
                   match.
-                </p>
-                <p className="mt-1 text-sm text-pretty text-muted-foreground">
-                  {pipelineDraftSentence(levels)}
                 </p>
               </div>
             </div>

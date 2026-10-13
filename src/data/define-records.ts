@@ -138,7 +138,6 @@ function mockNodesFromSteps(
     return [
       [
         {
-          name: "Create record",
           type: "RECORD",
           definition: {
             operation: "CREATE",
@@ -151,7 +150,6 @@ function mockNodesFromSteps(
   }
   return [
     steps.map((step) => ({
-      name: step.name,
       type: "NOOP" as const,
       definition: { message: step.name },
     })),

@@ -1,6 +1,5 @@
-import { type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import {
-  BoxIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   LayersIcon,
@@ -9,6 +8,8 @@ import {
   Trash2Icon,
 } from "lucide-react"
 
+import { pipelineNodeVisuals } from "@/components/pipeline-flow/pipeline-flow-nodes"
+import { NodeTypePicker } from "@/components/node-type-picker"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -18,7 +19,12 @@ import {
 } from "@/components/ui/tooltip"
 import { WorkflowSectionHeading } from "@/components/workflow-rule"
 import type { PipelineLevelNode } from "@/lib/json-definition"
-import { nodeConfigSummary, nodeTypeLabel } from "@/lib/node-definition"
+import {
+  isNodeType,
+  nodeConfigSummary,
+  nodeTypeLabel,
+  type NodeType,
+} from "@/lib/node-definition"
 import {
   movePipelineLevel,
   newPipelineLevel,
@@ -73,19 +79,30 @@ export function PipelineLevelsEditor({
 }: {
   levels: PipelineLevelDraft[]
   onChange: (levels: PipelineLevelDraft[]) => void
-  onCreateNode: (target: CreatePipelineNodeTarget) => void
+  onCreateNode: (target: CreatePipelineNodeTarget, type: NodeType) => void
   onEditNode: (nodeKey: string, levelKey: string) => void
   variant?: PipelineLevelsVariant
   compact?: boolean
   showHeading?: boolean
 }) {
+  const [pickingTarget, setPickingTarget] =
+    useState<CreatePipelineNodeTarget | null>(null)
   const hasAssignedNodes = levels.some((level) => level.nodes.length > 0)
   const tone = pipelineLevelTone[variant]
   const isWorkflow = variant === "workflow"
+  const pickingEmpty = pickingTarget?.kind === "empty"
+
+  function pickType(type: NodeType) {
+    if (!pickingTarget) {
+      return
+    }
+    onCreateNode(pickingTarget, type)
+    setPickingTarget(null)
+  }
   const heading = showHeading ? (
     <WorkflowSectionHeading
       icon={LayersIcon}
-      title={isWorkflow ? "Then" : "Levels"}
+      title={isWorkflow ? "Actions" : "Levels"}
       description={
         isWorkflow
           ? hasAssignedNodes
@@ -124,6 +141,7 @@ export function PipelineLevelsEditor({
           tone={tone}
           compact={compact}
           flush={!showHeading}
+          picking={pickingEmpty}
           copy={
             isWorkflow
               ? {
@@ -135,7 +153,9 @@ export function PipelineLevelsEditor({
                   body: "Add a node to start this pipeline. Node config is stored on the pipeline.",
                 }
           }
-          onCreate={() => onCreateNode({ kind: "empty" })}
+          onStartPick={() => setPickingTarget({ kind: "empty" })}
+          onCancelPick={() => setPickingTarget(null)}
+          onPick={pickType}
         />
       </TooltipProvider>
     )
@@ -167,6 +187,10 @@ export function PipelineLevelsEditor({
               compact={compact}
               canMoveUp={levelIndex > 0}
               canMoveDown={levelIndex < levels.length - 1}
+              picking={
+                pickingTarget?.kind === "level" &&
+                pickingTarget.levelKey === level.key
+              }
               onChange={(nodes) => updateLevel(level.key, nodes)}
               onMove={(offset) =>
                 onChange(movePipelineLevel(levels, levelIndex, offset))
@@ -174,9 +198,11 @@ export function PipelineLevelsEditor({
               onRemove={() =>
                 onChange(levels.filter((item) => item.key !== level.key))
               }
-              onCreateNode={() =>
-                onCreateNode({ kind: "level", levelKey: level.key })
-              }
+              onStartPick={() => {
+                setPickingTarget({ kind: "level", levelKey: level.key })
+              }}
+              onCancelPick={() => setPickingTarget(null)}
+              onPick={pickType}
               onEditNode={(nodeKey) => onEditNode(nodeKey, level.key)}
             />
           </div>
@@ -199,13 +225,19 @@ export function PipelineLevelsEditor({
 }
 
 function EmptyPipelineStart({
-  onCreate,
+  onStartPick,
+  onCancelPick,
+  onPick,
+  picking,
   tone,
   compact,
   flush = false,
   copy,
 }: {
-  onCreate: () => void
+  onStartPick: () => void
+  onCancelPick: () => void
+  onPick: (type: NodeType) => void
+  picking: boolean
   tone: PipelineLevelTone
   compact: boolean
   flush?: boolean
@@ -235,21 +267,36 @@ function EmptyPipelineStart({
           This level runs first. You can add the next level after it.
         </p>
       </div>
-      <div className={cn("flex flex-col gap-2", compact ? "p-2.5" : "gap-3 p-3")}>
-        <p className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>
-          {copy.body}
-        </p>
-        <button
-          type="button"
-          onClick={onCreate}
-          className={cn(
-            "flex w-full items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground",
-            compact ? "px-3 py-2" : "px-3 py-3"
-          )}
-        >
-          <PlusIcon className="size-3.5" />
-          Add a node
-        </button>
+      <div className={cn(compact ? "p-2.5" : "p-3")}>
+        {picking ? (
+          <NodeTypePicker
+            compact={compact}
+            onSelect={onPick}
+            onCancel={onCancelPick}
+          />
+        ) : (
+          <div className="flex flex-col gap-2">
+            <p
+              className={cn(
+                "text-muted-foreground",
+                compact ? "text-xs" : "text-sm"
+              )}
+            >
+              {copy.body}
+            </p>
+            <button
+              type="button"
+              onClick={onStartPick}
+              className={cn(
+                "flex w-full items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/40 hover:text-foreground",
+                compact ? "px-3 py-2" : "px-3 py-3"
+              )}
+            >
+              <PlusIcon className="size-3.5" />
+              Add a node
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -263,10 +310,13 @@ function StepCard({
   compact,
   canMoveUp,
   canMoveDown,
+  picking,
   onChange,
   onMove,
   onRemove,
-  onCreateNode,
+  onStartPick,
+  onCancelPick,
+  onPick,
   onEditNode,
 }: {
   level: PipelineLevelDraft
@@ -276,10 +326,13 @@ function StepCard({
   compact: boolean
   canMoveUp: boolean
   canMoveDown: boolean
+  picking: boolean
   onChange: (nodes: PipelineNodeDraft[]) => void
   onMove: (offset: number) => void
   onRemove: () => void
-  onCreateNode: () => void
+  onStartPick: () => void
+  onCancelPick: () => void
+  onPick: (type: NodeType) => void
   onEditNode: (nodeKey: string) => void
 }) {
   const parallel = level.nodes.length > 1
@@ -321,13 +374,6 @@ function StepCard({
             >
               {pipelineLevelTitle(levelIndex).toUpperCase()}
             </span>
-            {levelIndex === 0 ? (
-              <p className="text-sm font-medium">Runs first</p>
-            ) : (
-              <p className="text-sm font-medium">
-                After {pipelineLevelTitle(levelIndex - 1).toLowerCase()}
-              </p>
-            )}
             {parallel ? (
               <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                 Same level · together
@@ -373,38 +419,47 @@ function StepCard({
           <NodeSlot
             key={node.key}
             node={node}
-            tone={tone}
             compact={compact}
             canRemove={level.nodes.length > 1 || canRemoveStep}
             onRemove={() => removeSlot(nodeIndex)}
             onEdit={() => onEditNode(node.key)}
           />
         ))}
-        <button
-          type="button"
-          onClick={onCreateNode}
-          className={cn(
-            "flex min-w-0 items-start gap-3 rounded-xl border border-dashed bg-transparent text-left transition-colors hover:bg-muted/40",
-            compact ? "p-3" : "p-4"
-          )}
-        >
-          <span
+        {picking ? (
+          <div className="col-span-full">
+            <NodeTypePicker
+              compact={compact}
+              onSelect={onPick}
+              onCancel={onCancelPick}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onStartPick}
             className={cn(
-              "flex shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground",
-              compact ? "size-7" : "size-9"
+              "flex min-w-0 items-start rounded-xl border border-dashed bg-transparent text-left transition-colors hover:bg-muted/40",
+              compact ? "gap-2 p-3" : "gap-3 p-4"
             )}
           >
-            <PlusIcon className="size-3.5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-medium">
-              {compact ? "Add node" : "Add another node in this level"}
+            <span
+              className={cn(
+                "flex shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground",
+                compact ? "size-7" : "size-9"
+              )}
+            >
+              <PlusIcon className="size-3.5" />
             </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              Runs at the same time as the other nodes here
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">
+                {compact ? "Add node" : "Add another node in this level"}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Runs at the same time as the other nodes here
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -412,20 +467,22 @@ function StepCard({
 
 function NodeSlot({
   node,
-  tone,
   compact,
   canRemove,
   onRemove,
   onEdit,
 }: {
   node: PipelineNodeDraft
-  tone: PipelineLevelTone
   compact: boolean
   canRemove: boolean
   onRemove: () => void
   onEdit: () => void
 }) {
   const summary = nodeConfigSummary(node.type, node.definition)
+  const visual = isNodeType(node.type)
+    ? pipelineNodeVisuals[node.type]
+    : pipelineNodeVisuals.NOOP
+  const Icon = visual.icon
 
   return (
     <div
@@ -438,17 +495,14 @@ function NodeSlot({
         <span
           className={cn(
             "flex shrink-0 items-center justify-center rounded-md",
-            tone.icon,
+            visual.wrap,
             compact ? "size-7" : "size-9"
           )}
         >
-          <BoxIcon className="size-3.5" />
+          <Icon className="size-3.5" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
-            {node.name.trim() || "Untitled node"}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
             {nodeTypeLabel(node.type)}
           </p>
         </div>
@@ -535,13 +589,6 @@ function LevelViewCard({
             <span className="inline-flex items-center rounded-md bg-violet-500/10 px-2 py-0.5 font-mono text-xs font-semibold tracking-wider text-violet-800 dark:text-violet-300">
               {pipelineLevelTitle(levelIndex).toUpperCase()}
             </span>
-            {levelIndex === 0 ? (
-              <p className="text-sm font-medium">Runs first</p>
-            ) : (
-              <p className="text-sm font-medium">
-                After {pipelineLevelTitle(levelIndex - 1).toLowerCase()}
-              </p>
-            )}
             {parallel ? (
               <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                 Same level · together
@@ -560,7 +607,7 @@ function LevelViewCard({
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2">
         {level.map((node, nodeIndex) => (
-          <LevelViewNode key={`${node.name}-${nodeIndex}`} node={node} />
+          <LevelViewNode key={`${node.type}-${nodeIndex}`} node={node} />
         ))}
       </div>
     </div>
@@ -569,16 +616,24 @@ function LevelViewCard({
 
 function LevelViewNode({ node }: { node: PipelineLevelNode }) {
   const summary = nodeConfigSummary(node.type, node.definition)
+  const visual = isNodeType(node.type)
+    ? pipelineNodeVisuals[node.type]
+    : pipelineNodeVisuals.NOOP
+  const Icon = visual.icon
 
   return (
     <div className="rounded-xl border bg-background p-4 shadow-xs">
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300">
-          <BoxIcon className="size-3.5" />
+        <span
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-md",
+            visual.wrap
+          )}
+        >
+          <Icon className="size-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{node.name}</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-sm font-medium">
             {nodeTypeLabel(node.type)}
           </p>
         </div>

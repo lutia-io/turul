@@ -64,7 +64,7 @@ export function PipelineNodesJournal({
         const snap = snapshot[node.levelIndex]?.[node.nodeIndex]
         return {
           node,
-          name: snap?.name ?? node.nodeSlug ?? `Node ${node.nodeIndex}`,
+          name: nodeTypeLabel(snap?.type ?? node.nodeType),
           type: snap?.type ?? node.nodeType,
         }
       }),
@@ -180,7 +180,7 @@ function NodeRows({
           {name}
         </TableCell>
         <TableCell className="font-mono text-xs text-muted-foreground">
-          {nodeTypeLabel(type)}
+          {type}
         </TableCell>
         <TableCell className="tabular-nums">{node.attempt}</TableCell>
         <TableCell>

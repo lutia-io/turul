@@ -11,8 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { RunStatus } from "@/data/runs"
-import type { DefinitionStep } from "@/lib/json-definition"
 import { stringifyDefinition, type JsonObject } from "@/lib/json-definition"
+import { nodeTypeLabel } from "@/lib/node-definition"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
@@ -37,25 +37,11 @@ function asJsonObject(value: unknown): JsonObject | undefined {
   return undefined
 }
 
-function stepForNode(steps: DefinitionStep[], node: ApiWorkflowNode) {
-  const flatIndex = steps.findIndex(
-    (item) => item.order === node.levelIndex + 1
-  )
-  if (flatIndex >= 0) {
-    return steps[flatIndex]
-  }
-  return steps.find(
-    (item) => item.id === `${node.levelIndex}-${node.nodeIndex}`
-  )
-}
-
 export function WorkflowNodesJournal({
   workflowId,
-  steps,
   pollingInterval = 0,
 }: {
   workflowId: string
-  steps: DefinitionStep[]
   pollingInterval?: number
 }) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
@@ -67,18 +53,12 @@ export function WorkflowNodesJournal({
   const [expandedId, setExpandedId] = useState<string>()
   const rows = useMemo(
     () =>
-      nodes.map((node) => {
-        const step = stepForNode(steps, node)
-        return {
-          node,
-          name:
-            step?.name ??
-            (node.nodeSlug ||
-              `Level ${node.levelIndex + 1} · Node ${node.nodeIndex + 1}`),
-          type: step?.type ?? node.nodeType,
-        }
-      }),
-    [nodes, steps]
+      nodes.map((node) => ({
+        node,
+        name: nodeTypeLabel(node.nodeType),
+        type: node.nodeType,
+      })),
+    [nodes]
   )
 
   return (

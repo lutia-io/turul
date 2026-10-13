@@ -8,7 +8,6 @@ export const nodeTypes = [
   "FILE",
   "RECORD",
   "BULK",
-  "TRIGGER_WORKFLOW",
 ] as const
 
 export type NodeType = (typeof nodeTypes)[number]
@@ -21,7 +20,16 @@ export const nodeTypeLabels: Record<NodeType, string> = {
   FILE: "File",
   RECORD: "Record API",
   BULK: "Bulk records",
-  TRIGGER_WORKFLOW: "Run a workflow",
+}
+
+export const nodeTypeDescriptions: Record<NodeType, string> = {
+  NOOP: "Return a fixed message without calling anything.",
+  HTTP: "Call an HTTP API with method, URL, headers, and body.",
+  MAPPER: "Build one object from mapped fields and templates.",
+  LIST_MAPPER: "Map each item in a list into a new shape.",
+  FILE: "Read or write a file in the workspace.",
+  RECORD: "List, get, create, or update a single record.",
+  BULK: "Create or upsert many records from a list.",
 }
 
 export const executableNodeTypes = new Set<NodeType>(nodeTypes)
@@ -106,13 +114,13 @@ export function pipelineOutputFields(node: {
 
 export function pipelineTemplateContextForLevel(
   levelIndex: number,
-  previousNodes: { name: string; type?: string; definition?: JsonObject }[]
+  previousNodes: { type?: string; definition?: JsonObject }[]
 ): PipelineTemplateContext {
   return {
     levelIndex,
     previousOutputs: previousNodes.map((node, index) => ({
       index,
-      label: node.name.trim() || `Output ${index}`,
+      label: (node.type ? nodeTypeLabel(node.type) : "") || `Output ${index}`,
       fields: pipelineOutputFields(node),
     })),
   }
@@ -274,8 +282,6 @@ export function defaultDefinition(type: NodeType): JsonObject {
           },
         ],
       }
-    case "TRIGGER_WORKFLOW":
-      return { workflow: "", input: {} }
   }
 }
 
@@ -367,11 +373,6 @@ export function nodeConfigSummary(type: string, definition: JsonObject) {
       : 0
     const types = records === 1 ? "1 record type" : `${records} record types`
     return `${operation} · ${types}`
-  }
-  if (type === "TRIGGER_WORKFLOW") {
-    const workflow =
-      typeof definition.workflow === "string" ? definition.workflow.trim() : ""
-    return workflow ? `Workflow ${workflow}` : "Run a workflow"
   }
   return nodeTypeLabel(type)
 }

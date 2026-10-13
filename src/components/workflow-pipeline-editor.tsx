@@ -30,7 +30,6 @@ import {
   levelsFromApi,
   levelsToApi,
   parsePipelineDefinition,
-  pipelineDraftSentence,
   type PipelineLevelDraft,
 } from "@/lib/pipeline-definition"
 import type { SavedWorkflowPipeline } from "@/lib/workflow-pipeline"
@@ -88,7 +87,6 @@ export function WorkflowPipelineEditor({
   )
   const isLoading = createState.isLoading || updateState.isLoading
   const error = createState.error ?? updateState.error
-  const sentence = pipelineDraftSentence(levels)
   const definition = useMemo(() => levelsToApi(levels), [levels])
   const canSubmit =
     Boolean(name.trim()) &&
@@ -196,7 +194,7 @@ export function WorkflowPipelineEditor({
           <p className="text-sm text-pretty text-muted-foreground">
             {mode === "edit"
               ? "Changes apply everywhere this pipeline is used."
-              : sentence}
+              : "Configure levels and nodes for this pipeline."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -288,7 +286,6 @@ export function WorkflowPipelineEditor({
           levels={levels}
           onChange={setLevels}
           view={definitionView}
-          sentence={sentence}
           jsonInputId={`${formId}-json`}
           onNodeSessionChange={setNodeOpen}
           onJsonErrorChange={setJsonError}

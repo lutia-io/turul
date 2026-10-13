@@ -1,3 +1,5 @@
+import { nodeTypeLabel } from "@/lib/node-definition"
+
 export type JsonValue =
   string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
@@ -207,7 +209,7 @@ export function getWorkflowSteps(definition: JsonObject) {
       type: "level",
       name:
         level
-          .map((node) => node.name.trim())
+          .map((node) => nodeTypeLabel(node.type))
           .filter(Boolean)
           .join(", ") || `Level ${levelIndex + 1}`,
       order: levelIndex + 1,
@@ -217,7 +219,6 @@ export function getWorkflowSteps(definition: JsonObject) {
 }
 
 export type PipelineLevelNode = {
-  name: string
   type: string
   definition: JsonObject
 }
@@ -235,13 +236,12 @@ export function getPipelineLevels(
     }
     const nodes = level.flatMap((item) => {
       const node = asObject(item)
-      const name = asString(node?.name)
       const type = asString(node?.type)
       const nodeDefinition = asObject(node?.definition)
-      if (!name || !type || !nodeDefinition) {
+      if (!type || !nodeDefinition) {
         return []
       }
-      return [{ name, type, definition: nodeDefinition }]
+      return [{ type, definition: nodeDefinition }]
     })
     return nodes.length > 0 ? [nodes] : []
   })
@@ -253,7 +253,7 @@ export function getPipelineStages(definition: JsonObject) {
     return levels.map((level, index) => ({
       id: `level-${index}`,
       type: "level",
-      name: level.map((node) => node.name.trim() || node.type).join(", "),
+      name: level.map((node) => nodeTypeLabel(node.type)).join(", "),
       order: index + 1,
     }))
   }

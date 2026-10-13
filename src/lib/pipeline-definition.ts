@@ -2,11 +2,11 @@ import { getPipelineLevels, type JsonObject } from "@/lib/json-definition"
 import {
   defaultDefinition,
   isNodeType,
+  nodeTypeLabel,
   type NodeType,
 } from "@/lib/node-definition"
 
 export type PipelineNodeConfig = {
-  name: string
   type: NodeType
   definition: JsonObject
 }
@@ -47,7 +47,6 @@ export function newPipelineNode(
   const type = node?.type && isNodeType(node.type) ? node.type : "HTTP"
   return {
     key: newDraftKey("node"),
-    name: node?.name?.trim() ?? "",
     type,
     definition: node?.definition ?? defaultDefinition(type),
   }
@@ -75,12 +74,8 @@ function parseNodeConfig(value: unknown): PipelineNodeConfig | undefined {
     return undefined
   }
   const item = value as {
-    name?: unknown
     type?: unknown
     definition?: unknown
-  }
-  if (typeof item.name !== "string" || !item.name.trim()) {
-    return undefined
   }
   if (typeof item.type !== "string" || !isNodeType(item.type)) {
     return undefined
@@ -93,7 +88,6 @@ function parseNodeConfig(value: unknown): PipelineNodeConfig | undefined {
     return undefined
   }
   return {
-    name: item.name.trim(),
     type: item.type,
     definition: item.definition as JsonObject,
   }
@@ -146,13 +140,10 @@ export function levelsToApi(
 ): PipelineDefinitionBody | undefined {
   const nodes = levels
     .map((level) =>
-      level.nodes
-        .filter((node) => node.name.trim())
-        .map((node) => ({
-          name: node.name.trim(),
-          type: node.type,
-          definition: node.definition,
-        }))
+      level.nodes.map((node) => ({
+        type: node.type,
+        definition: node.definition,
+      }))
     )
     .filter((level) => level.length > 0)
   if (nodes.length === 0) {
@@ -292,9 +283,7 @@ export function replacePipelineNode(
       ? {
           ...level,
           nodes: level.nodes.map((item) =>
-            item.key === nodeKey
-              ? { ...item, ...node, key: item.key, name: node.name.trim() }
-              : item
+            item.key === nodeKey ? { ...item, ...node, key: item.key } : item
           ),
         }
       : level
@@ -316,22 +305,22 @@ export function movePipelineLevel(
   return next
 }
 
-function joinNames(names: string[]) {
-  if (names.length === 0) {
+function joinLabels(labels: string[]) {
+  if (labels.length === 0) {
     return ""
   }
-  if (names.length === 1) {
-    return names[0]
+  if (labels.length === 1) {
+    return labels[0]
   }
-  if (names.length === 2) {
-    return `${names[0]} and ${names[1]} together`
+  if (labels.length === 2) {
+    return `${labels[0]} and ${labels[1]} together`
   }
-  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]} together`
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]} together`
 }
 
-export function pipelineFlowSentence(levels: { names: string[] }[]) {
+export function pipelineFlowSentence(levels: { labels: string[] }[]) {
   const parts = levels.flatMap((level) =>
-    level.names.length > 0 ? [joinNames(level.names)] : []
+    level.labels.length > 0 ? [joinLabels(level.labels)] : []
   )
   if (parts.length === 0) {
     return "Add the first level to start this pipeline."
@@ -371,7 +360,7 @@ export function pipelineLevelExplanation(
 export function pipelineDraftSentence(levels: PipelineLevelDraft[]) {
   return pipelineFlowSentence(
     levels.map((level) => ({
-      names: level.nodes.map((node) => node.name.trim() || "a node"),
+      labels: level.nodes.map((node) => nodeTypeLabel(node.type) || "a node"),
     }))
   )
 }
@@ -383,7 +372,7 @@ export function pipelineSummary(definition: JsonObject) {
   }
   return pipelineFlowSentence(
     levels.map((level) => ({
-      names: level.map((node) => node.name.trim() || "a node"),
+      labels: level.map((node) => nodeTypeLabel(node.type) || "a node"),
     }))
   )
 }

@@ -276,7 +276,7 @@ export function apiWorkflowSteps(
     type: "level",
     name:
       level
-        .map((node) => node.name.trim() || nodeTypeLabel(node.type))
+        .map((node) => nodeTypeLabel(node.type))
         .filter(Boolean)
         .join(", ") || `Level ${levelIndex + 1}`,
     order: levelIndex + 1,
@@ -327,14 +327,14 @@ export function apiPipelineStatus(status: string): RunStatus {
 }
 
 export function apiPipelineLevelSteps(
-  definition: { nodes?: { name?: string; type?: string }[][] } | undefined
+  definition: { nodes?: { type?: string }[][] } | undefined
 ): DefinitionStep[] {
   return (definition?.nodes ?? []).map((level, index) => ({
     id: `level-${index}`,
     type: "level",
     name:
       level
-        .map((node) => node.name)
+        .map((node) => (node.type ? nodeTypeLabel(node.type) : ""))
         .filter(Boolean)
         .join(", ") || `Level ${index}`,
     order: index + 1,

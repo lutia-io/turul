@@ -8,7 +8,18 @@ import {
   emptyTableDefinition,
   kindFromProperty,
 } from "@/lib/table-columns"
-import { isMockTemplate, mockTokenForProperty } from "@/lib/template-mock"
+import {
+  dateTimeTemplateGroup,
+  dateTimeTemplateVariables,
+  isMockTemplate,
+  mockTokenForProperty,
+  nowDateTemplate,
+  nowDateTimeTemplate,
+  nowTemplate,
+  nowTimeTemplate,
+  nowTokenForProperty,
+  nowVariableForProperty,
+} from "@/lib/template-mock"
 import {
   formatTimeValue,
   fromTimeInputValue,
@@ -33,9 +44,54 @@ describe("time field", () => {
       })
     ).toBe("time")
     expect(mockTokenForProperty(property)).toBe("{{ mockTime }}")
+    expect(nowTokenForProperty(property)).toBe(nowTimeTemplate)
     expect(isMockTemplate("{{ mockTime }}")).toBe(true)
     expect(isMockTemplate("{{ mockDate }}")).toBe(true)
     expect(isMockTemplate("{{ mockDateTime }}")).toBe(true)
+  })
+
+  it("maps now tokens to date, time, and date-time formats", () => {
+    expect(nowVariableForProperty({ type: "string", format: "date" })).toEqual({
+      label: "Current date",
+      token: nowDateTemplate,
+      hint: "now",
+    })
+    expect(nowVariableForProperty({ type: "string", format: "time" })).toEqual({
+      label: "Current time",
+      token: nowTimeTemplate,
+      hint: "now",
+    })
+    expect(
+      nowVariableForProperty({ type: "string", format: "date-time" })
+    ).toEqual({
+      label: "Current date & time",
+      token: nowTemplate,
+      hint: "now",
+    })
+    expect(nowTokenForProperty({ type: "string" })).toBeUndefined()
+  })
+
+  it("exposes now, extractors, and aliases in the Date & Time picker", () => {
+    const tokens = dateTimeTemplateVariables.map((item) => item.token)
+    expect(dateTimeTemplateGroup.variables).toBe(dateTimeTemplateVariables)
+    expect(tokens).toEqual(
+      expect.arrayContaining([
+        nowTemplate,
+        nowDateTimeTemplate,
+        nowDateTemplate,
+        nowTimeTemplate,
+        "{{ dateOf  }}",
+        "{{ timeOf  }}",
+      ])
+    )
+    expect(
+      dateTimeTemplateVariables.find((item) => item.token === "{{ dateOf  }}")
+        ?.caretOffset
+    ).toBe("{{ dateOf ".length)
+    expect(
+      dateTimeTemplateVariables.find((item) => item.token === "{{ timeOf  }}")
+        ?.caretOffset
+    ).toBe("{{ timeOf ".length)
   })
 
   it("stores a local clock time as UTC full-time and reads it back", () => {

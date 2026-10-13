@@ -200,7 +200,6 @@ export default function WorkflowRunDetail() {
 
           <WorkflowNodesJournal
             workflowId={resolved.id}
-            steps={steps}
             pollingInterval={live ? 2000 : 0}
           />
         </div>

@@ -15,6 +15,13 @@ export const mockEmailTemplate = "{{ mockEmail }}"
 export const mockURLTemplate = "{{ mockURL }}"
 export const mockPhoneTemplate = "{{ mockPhone }}"
 
+export const nowTemplate = "{{ now }}"
+export const nowDateTemplate = "{{ nowDate }}"
+export const nowTimeTemplate = "{{ nowTime }}"
+export const nowDateTimeTemplate = "{{ nowDateTime }}"
+export const dateOfTemplate = "{{ dateOf  }}"
+export const timeOfTemplate = "{{ timeOf  }}"
+
 const MOCK_TOKEN_RE =
   /^\{\{\s*mock(Text|Number|Integer|Boolean|DateTime|Date|Time|Email|URL|Phone|Choice)\b[^}]*\}\}$/
 
@@ -35,10 +42,27 @@ export const mockTemplateVariables: TemplateVariable[] = [
   },
 ]
 
+export const dateTimeTemplateVariables: TemplateVariable[] = [
+  { label: "Current date & time", token: nowTemplate },
+  { label: "Current date & time (nowDateTime)", token: nowDateTimeTemplate },
+  { label: "Current date", token: nowDateTemplate },
+  { label: "Current time of day", token: nowTimeTemplate },
+  {
+    label: "Date of…",
+    token: dateOfTemplate,
+    caretOffset: "{{ dateOf ".length,
+  },
+  {
+    label: "Time of…",
+    token: timeOfTemplate,
+    caretOffset: "{{ timeOf ".length,
+  },
+]
+
 export const dateTimeTemplateGroup: TemplateVariableGroup = {
   label: "Date & Time",
   submenu: true,
-  variables: [{ label: "Current time", token: "{{ now }}" }],
+  variables: dateTimeTemplateVariables,
 }
 
 export const mockTemplateGroup: TemplateVariableGroup = {
@@ -64,6 +88,34 @@ export function mockTokenForProperty(
   property?: Pick<JsonSchemaProperty, "type" | "format" | "enumValues">
 ) {
   return mockVariableForProperty(property)?.token
+}
+
+export function nowTokenForProperty(
+  property?: Pick<JsonSchemaProperty, "type" | "format">
+) {
+  return nowVariableForProperty(property)?.token
+}
+
+export function nowVariableForProperty(
+  property?: Pick<JsonSchemaProperty, "type" | "format">
+): TemplateVariable | undefined {
+  if (!property) {
+    return undefined
+  }
+  if (property.format === "date") {
+    return { label: "Current date", token: nowDateTemplate, hint: "now" }
+  }
+  if (property.format === "time") {
+    return { label: "Current time", token: nowTimeTemplate, hint: "now" }
+  }
+  if (property.format === "date-time") {
+    return {
+      label: "Current date & time",
+      token: nowTemplate,
+      hint: "now",
+    }
+  }
+  return undefined
 }
 
 export function mockVariableForProperty(

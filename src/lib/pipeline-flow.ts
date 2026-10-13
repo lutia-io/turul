@@ -1,7 +1,6 @@
 import {
   nodeConfigSummary,
-  nodeTypeLabels,
-  type NodeType,
+  nodeTypeLabel,
   isNodeType,
 } from "@/lib/node-definition"
 import {
@@ -167,25 +166,6 @@ export function snapNodeIndex(y: number, count: number) {
   return Math.max(0, Math.min(count, index))
 }
 
-export function defaultCreatedNodeName(
-  type: NodeType,
-  levels: PipelineLevelDraft[]
-) {
-  const label = nodeTypeLabels[type]
-  const used = levels
-    .flatMap((level) => level.nodes)
-    .map((node) => node.name.trim())
-    .filter(Boolean)
-  if (!used.includes(label)) {
-    return label
-  }
-  let suffix = 2
-  while (used.includes(`${label} ${suffix}`)) {
-    suffix += 1
-  }
-  return `${label} ${suffix}`
-}
-
 export function createTargetForSource(
   levels: PipelineLevelDraft[],
   source:
@@ -329,7 +309,7 @@ export function levelsToFlow(
           nodeKey: node.key,
           levelKey: level.key,
           levelIndex,
-          name: node.name.trim() || "Untitled node",
+          name: nodeTypeLabel(draftType(node)),
           nodeType: draftType(node),
           summary: nodeConfigSummary(node.type, node.definition),
           parallel,

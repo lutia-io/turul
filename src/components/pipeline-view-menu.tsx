@@ -1,6 +1,7 @@
 import {
   CheckIcon,
   ChevronDownIcon,
+  EyeIcon,
   FileJsonIcon,
   LayersIcon,
   ListTreeIcon,
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export type PipelineView = "canvas" | "levels" | "json"
-export type WorkflowDefinitionView = "rule" | "canvas" | "json"
+export type WorkflowDefinitionView = "rule" | "canvas" | "preview" | "json"
 
 const pipelineViews: {
   id: PipelineView
@@ -36,6 +37,7 @@ const workflowViews: {
 }[] = [
   { id: "rule", label: "Rule", icon: ListTreeIcon },
   { id: "canvas", label: "Canvas", icon: WorkflowIcon },
+  { id: "preview", label: "Preview", icon: EyeIcon },
   { id: "json", label: "JSON", icon: FileJsonIcon },
 ]
 

@@ -119,11 +119,6 @@ export const pipelineNodeVisuals: Record<NodeType, NodeVisual> = {
     color: "teal",
     wrap: "bg-teal-500/10 text-teal-800 dark:text-teal-300",
   },
-  TRIGGER_WORKFLOW: {
-    icon: PlayIcon,
-    color: "green",
-    wrap: "bg-green-500/10 text-green-800 dark:text-green-300",
-  },
 }
 
 export function visualForNodeType(type: string): NodeVisual {
@@ -252,11 +247,6 @@ export function PipelineNodeCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold tracking-tight">
             {data.name}
-          </p>
-          <p className="truncate text-[11px] font-medium text-muted-foreground">
-            {isNodeType(data.nodeType)
-              ? nodeTypeLabels[data.nodeType]
-              : data.nodeType}
           </p>
         </div>
         {data.parallel ? (

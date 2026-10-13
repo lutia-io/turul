@@ -50,7 +50,6 @@ import {
 import {
   emptyPipelineLevels,
   levelsToApi,
-  pipelineDraftSentence,
   type PipelineDefinitionBody,
   type PipelineLevelDraft,
 } from "@/lib/pipeline-definition"
@@ -140,7 +139,6 @@ export function PipelineDefinitionDialog({
 
   const showNetwork = networks.length > 0 && !lockNetwork
   const showOrganization = true
-  const sentence = pipelineDraftSentence(levels)
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(selectedNetworkId) &&
@@ -203,7 +201,9 @@ export function PipelineDefinitionDialog({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-1.5">
               <DialogTitle>Create a pipeline</DialogTitle>
-              <DialogDescription>{sentence}</DialogDescription>
+              <DialogDescription>
+                Configure levels and nodes for this pipeline.
+              </DialogDescription>
             </div>
             {nodeOpen ? null : (
               <PipelineViewMenu
@@ -356,7 +356,6 @@ export function PipelineDefinitionDialog({
               levels={levels}
               onChange={setLevels}
               view={definitionView}
-              sentence={sentence}
               jsonInputId={`${formId}-json`}
               onNodeSessionChange={setNodeOpen}
               onJsonErrorChange={setJsonError}

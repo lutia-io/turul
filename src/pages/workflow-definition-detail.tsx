@@ -21,7 +21,7 @@ import {
   ZapIcon,
 } from "lucide-react"
 
-import { CheckboxField } from "@/components/checkbox-field"
+import { EnabledField } from "@/components/checkbox-field"
 import { useCreateEntity } from "@/components/create-entity"
 import {
   AsideRow,
@@ -42,6 +42,7 @@ import {
   WorkflowViewMenu,
   type WorkflowDefinitionView,
 } from "@/components/pipeline-view-menu"
+import { WorkflowDefinitionPreview } from "@/components/workflow-definition-preview"
 import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -463,6 +464,16 @@ export default function WorkflowDefinitionDetail() {
                   label="Workflow JSON"
                   description="Trigger, criteria, and nodes stored on this workflow."
                 />
+              ) : definitionView === "preview" ? (
+                <WorkflowDefinitionPreview
+                  trigger={triggerFromApi(parsed?.trigger)}
+                  criteria={criteriaFromApi(parsed?.criteria)}
+                  levels={viewLevels}
+                  fields={fields}
+                  schemaName={schema?.name}
+                  className="min-h-[28rem]"
+                  emptyThenHint="No nodes configured yet"
+                />
               ) : (
                 <>
                   <DefinitionCard>
@@ -505,7 +516,7 @@ export default function WorkflowDefinitionDetail() {
                   <DefinitionCard>
                     <WorkflowSectionHeading
                       icon={ZapIcon}
-                      title="Then"
+                      title="Actions"
                       description="These steps run in order after the trigger and conditions match."
                       iconClassName="bg-violet-500/10 text-violet-700 dark:text-violet-300"
                     />
@@ -671,46 +682,42 @@ function WorkflowDefinitionEdit({
         className="flex min-w-0 flex-1 flex-col gap-8"
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="min-w-0 flex-1 space-y-3">
             <Link
               to={tableHref}
               className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {schema?.name ?? "Records"}
             </Link>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Field className="max-w-md min-w-56 gap-1">
-                <FieldLabel htmlFor={`${formId}-name`} className="sr-only">
-                  Name
-                </FieldLabel>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(2,minmax(0,1fr))_auto]">
+              <Field className="gap-1">
+                <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
                 <Input
                   id={`${formId}-name`}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  className="h-10 text-lg font-semibold"
                   required
                   disabled={isLoading}
                 />
               </Field>
-              <CheckboxField
-                id={`${formId}-active`}
+              <Field className="gap-1">
+                <FieldLabel htmlFor={`${formId}-description`}>
+                  Description
+                </FieldLabel>
+                <Input
+                  id={`${formId}-description`}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="What this workflow does"
+                  disabled={isLoading}
+                />
+              </Field>
+              <EnabledField
+                formId={formId}
                 checked={active}
                 onChange={setActive}
-                label="Enabled"
               />
             </div>
-            <Field className="max-w-2xl gap-1">
-              <FieldLabel htmlFor={`${formId}-description`} className="sr-only">
-                Description
-              </FieldLabel>
-              <Input
-                id={`${formId}-description`}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="What this workflow does"
-                disabled={isLoading}
-              />
-            </Field>
             <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
               {workflowDraftSentence(trigger, criteria, levels, triggerFields)}
             </p>

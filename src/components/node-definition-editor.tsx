@@ -11,6 +11,8 @@ import { FileJsonIcon, PlusIcon, Trash2Icon } from "lucide-react"
 
 import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { MappingFields } from "@/components/mapping-fields"
+import { pipelineNodeVisuals } from "@/components/pipeline-flow/pipeline-flow-nodes"
+import { NodeTypePicker } from "@/components/node-type-picker"
 import {
   TemplateValueInput,
   type TemplateVariableGroup,
@@ -31,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import {
   parseJsonObject,
   stringifyDefinition,
@@ -62,8 +65,8 @@ import {
   listMapperDraftFromDefinition,
   mappingEntriesFromObject,
   mappingObjectFromEntries,
+  nodeTypeDescriptions,
   nodeTypeLabels,
-  nodeTypes,
   pipelineInputFieldTemplate,
   pipelineInputTemplate,
   pipelineOutputFieldTemplate,
@@ -88,11 +91,6 @@ import type { PipelineNodeConfig } from "@/lib/pipeline-definition"
 
 const CHOOSE_SCHEMA = "__choose_schema__"
 
-type TriggerWorkflowDefinitionDraft = {
-  workflow: string
-  input: MappingEntry[]
-}
-
 type NodeDrafts = {
   http: HttpDefinitionDraft
   message: string
@@ -101,7 +99,6 @@ type NodeDrafts = {
   file: FileDefinitionDraft
   record: RecordDefinitionDraft
   bulk: BulkDefinitionDraft
-  triggerWorkflow: TriggerWorkflowDefinitionDraft
 }
 
 function draftsFromDefinition(
@@ -123,17 +120,6 @@ function draftsFromDefinition(
     file: fileDraftFromDefinition(definition),
     record: recordDraftFromDefinition(definition),
     bulk: bulkDraftFromDefinition(definition),
-    triggerWorkflow: {
-      workflow:
-        typeof definition.workflow === "string" ? definition.workflow : "",
-      input: mappingEntriesFromObject(
-        definition.input &&
-          typeof definition.input === "object" &&
-          !Array.isArray(definition.input)
-          ? (definition.input as JsonObject)
-          : undefined
-      ),
-    },
   }
 }
 
@@ -158,18 +144,6 @@ function definitionFromDrafts(
       return { definition: recordDefinitionFromDraft(drafts.record) }
     case "BULK":
       return bulkDefinitionFromDraft(drafts.bulk)
-    case "TRIGGER_WORKFLOW": {
-      const workflow = drafts.triggerWorkflow.workflow.trim()
-      if (!workflow) {
-        return { error: "Workflow slug or ID is required" }
-      }
-      return {
-        definition: {
-          workflow,
-          input: mappingObjectFromEntries(drafts.triggerWorkflow.input),
-        },
-      }
-    }
   }
 }
 
@@ -291,51 +265,57 @@ export function NodeDefinitionEditor({
     [schemas, networkId, organizationId]
   )
   const editing = Boolean(node)
-  const startingType =
-    node && isNodeType(node.type) ? node.type : (initialType ?? "HTTP")
-  const [name, setName] = useState(node?.name ?? "")
-  const [nameError, setNameError] = useState<string | null>(null)
-  const [type, setType] = useState<NodeType>(startingType)
+  const startingType: NodeType | null =
+    node && isNodeType(node.type) ? node.type : (initialType ?? null)
+  const [type, setType] = useState<NodeType | null>(startingType)
+  const [pickingType, setPickingType] = useState(!startingType)
   const [drafts, setDrafts] = useState<NodeDrafts>(() =>
     draftsFromDefinition(
-      startingType,
-      node?.definition ?? defaultDefinition(startingType)
+      startingType ?? "HTTP",
+      node?.definition ??
+        (startingType ? defaultDefinition(startingType) : {})
     )
   )
   const [definitionView, setDefinitionView] = useState<"config" | "json">(
     "config"
   )
   const [jsonText, setJsonText] = useState(() =>
-    stringifyDefinition(node?.definition ?? defaultDefinition(startingType))
+    stringifyDefinition(
+      node?.definition ??
+        (startingType ? defaultDefinition(startingType) : {})
+    )
   )
   const [definitionTextError, setDefinitionTextError] = useState<string | null>(
     null
   )
   const isLoading = false
 
-  const composed = definitionFromDrafts(type, drafts)
+  const composed = type
+    ? definitionFromDrafts(type, drafts)
+    : { definition: undefined, error: undefined }
   const jsonError = composed.error ?? null
 
   const commit = useCallback((): PipelineNodeConfig | null => {
-    if (!name.trim()) {
-      setNameError("Enter a name")
-      return null
-    }
-    if (!composed.definition) {
+    if (!type || !composed.definition) {
       return null
     }
     return {
-      name: name.trim(),
       type,
       definition: composed.definition,
     }
-  }, [composed.definition, name, type])
+  }, [composed.definition, type])
 
   useImperativeHandle(ref, () => ({ commit }), [commit])
 
   function applyType(next: NodeType) {
+    if (next === type) {
+      setPickingType(false)
+      return
+    }
     const nextDrafts = draftsFromDefinition(next, defaultDefinition(next))
     setType(next)
+    setPickingType(false)
+    setDefinitionView("config")
     setDrafts(nextDrafts)
     setJsonText(
       stringifyDefinition(
@@ -346,6 +326,9 @@ export function NodeDefinitionEditor({
   }
 
   function showDefinitionJson() {
+    if (!type) {
+      return
+    }
     if (definitionView === "json") {
       setDefinitionTextError(null)
       setDefinitionView("config")
@@ -358,6 +341,9 @@ export function NodeDefinitionEditor({
   }
 
   function handleJsonChange(text: string) {
+    if (!type) {
+      return
+    }
     setJsonText(text)
     const parsed = parseJsonObject(text)
     if (!parsed) {
@@ -406,14 +392,6 @@ export function NodeDefinitionEditor({
       } satisfies TemplateVariableGroup,
     ]
   }, [drafts.listMapper.as, templateGroups])
-  const typeItems = useMemo(
-    () =>
-      nodeTypes.map((item) => ({
-        value: item,
-        label: nodeTypeLabels[item],
-      })),
-    []
-  )
   const methodItems = useMemo(
     () => httpMethods.map((item) => ({ value: item, label: item })),
     []
@@ -461,13 +439,20 @@ export function NodeDefinitionEditor({
     drafts.record.operation === "CREATE" ||
     drafts.record.operation === "UPDATE" ||
     drafts.record.operation === "UPSERT"
+  const showTypePicker = pickingType || !type
+  const selectedVisual = type ? pipelineNodeVisuals[type] : null
+  const SelectedIcon = selectedVisual?.icon
 
   return (
     <div
       ref={rootRef}
       className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10"
       onKeyDown={(event) => {
-        if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+        if (
+          event.key === "Enter" &&
+          event.target instanceof HTMLInputElement &&
+          event.target.type !== "search"
+        ) {
           event.preventDefault()
         }
       }}
@@ -475,101 +460,113 @@ export function NodeDefinitionEditor({
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
         <div className="min-w-0 space-y-1">
           <h2 className="text-base font-medium">
-            {editing ? "Edit node" : "Add a node"}
+            {showTypePicker
+              ? "Choose a node"
+              : editing
+                ? "Edit node"
+                : "Add a node"}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {stepDescription(pipelineTemplateContext)}
+            {showTypePicker
+              ? "Search and pick what this step should do."
+              : stepDescription(pipelineTemplateContext)}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={definitionView === "json" ? "secondary" : "outline"}
-            size="sm"
-            onClick={showDefinitionJson}
-          >
-            <FileJsonIcon />
-            {definitionView === "json" ? "Config" : "JSON"}
-          </Button>
+          {!showTypePicker ? (
+            <Button
+              type="button"
+              variant={definitionView === "json" ? "secondary" : "outline"}
+              size="sm"
+              disabled={!type}
+              onClick={showDefinitionJson}
+            >
+              <FileJsonIcon />
+              {definitionView === "json" ? "Config" : "JSON"}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
             size="sm"
             disabled={isLoading}
-            onClick={onCancel}
+            onClick={() => {
+              if (showTypePicker && type) {
+                setPickingType(false)
+                return
+              }
+              onCancel()
+            }}
           >
             Back
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={isLoading || Boolean(definitionTextError)}
-            onClick={handleDone}
-          >
-            Done
-          </Button>
+          {!showTypePicker ? (
+            <Button
+              type="button"
+              size="sm"
+              disabled={isLoading || !type || Boolean(definitionTextError)}
+              onClick={handleDone}
+            >
+              Done
+            </Button>
+          ) : null}
         </div>
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-        <FieldGroup className="gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor={`${formId}-name`}>Name</FieldLabel>
-              <Input
-                id={`${formId}-name`}
-                value={name}
-                onChange={(event) => {
-                  setName(event.target.value)
-                  setNameError(null)
-                }}
-                placeholder="Fetch users"
-                autoFocus
-                required
-                disabled={isLoading}
-                aria-invalid={nameError ? true : undefined}
-              />
-              {nameError ? <FieldError>{nameError}</FieldError> : null}
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${formId}-type`}>Type</FieldLabel>
-              <Select
-                value={type}
-                disabled={isLoading}
-                modal={false}
-                items={typeItems}
-                onValueChange={(value) => {
-                  if (isNodeType(value)) {
-                    applyType(value)
-                  }
-                }}
-              >
-                <SelectTrigger id={`${formId}-type`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {nodeTypes.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {nodeTypeLabels[item]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          {definitionView === "json" ? (
-            <div className="flex min-h-[28rem] flex-col overflow-hidden rounded-xl ring-1 ring-foreground/10">
-              <DefinitionJsonPane
-                id={`${formId}-json`}
-                title="JSON"
-                description="Configuration stored on this node. Paste JSON to fill the form."
-                value={jsonText}
-                onChange={handleJsonChange}
-                onBlur={handleJsonBlur}
-                error={definitionTextError}
-              />
-            </div>
-          ) : null}
-          <div className={definitionView === "json" ? "hidden" : "contents"}>
+        {showTypePicker ? (
+          <NodeTypePicker
+            selectedType={type}
+            onSelect={applyType}
+            onCancel={type ? () => setPickingType(false) : undefined}
+          />
+        ) : (
+          <FieldGroup className="gap-4">
+            {type && selectedVisual && SelectedIcon ? (
+              <div className="flex items-center gap-3 rounded-xl border border-foreground/10 bg-muted/20 p-3">
+                <span
+                  className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-md",
+                    selectedVisual.wrap
+                  )}
+                >
+                  <SelectedIcon className="size-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {nodeTypeLabels[type]}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {nodeTypeDescriptions[type]}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoading}
+                  onClick={() => {
+                    setPickingType(true)
+                    setDefinitionView("config")
+                  }}
+                >
+                  Change
+                </Button>
+              </div>
+            ) : null}
+            {definitionView === "json" ? (
+              <div className="flex min-h-[28rem] flex-col overflow-hidden rounded-xl ring-1 ring-foreground/10">
+                <DefinitionJsonPane
+                  id={`${formId}-json`}
+                  title="JSON"
+                  description="Configuration stored on this node. Paste JSON to fill the form."
+                  value={jsonText}
+                  onChange={handleJsonChange}
+                  onBlur={handleJsonBlur}
+                  error={definitionTextError}
+                />
+              </div>
+            ) : null}
+            <div className={definitionView === "json" ? "hidden" : "contents"}>
           {type === "HTTP" ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1482,51 +1479,10 @@ export function NodeDefinitionEditor({
               </Field>
             </>
           ) : null}
-          {type === "TRIGGER_WORKFLOW" ? (
-            <>
-              <Field>
-                <FieldLabel htmlFor={`${formId}-trigger-workflow`}>
-                  Workflow
-                </FieldLabel>
-                <Input
-                  id={`${formId}-trigger-workflow`}
-                  value={drafts.triggerWorkflow.workflow}
-                  onChange={(event) =>
-                    setDrafts((current) => ({
-                      ...current,
-                      triggerWorkflow: {
-                        ...current.triggerWorkflow,
-                        workflow: event.target.value,
-                      },
-                    }))
-                  }
-                  placeholder="workflow slug or ID"
-                  disabled={isLoading}
-                  required
-                />
-                <FieldDescription>
-                  Runs another workflow definition in this network.
-                </FieldDescription>
-              </Field>
-              <Field>
-                <FieldLabel>Input</FieldLabel>
-                <MappingFields
-                  entries={drafts.triggerWorkflow.input}
-                  onChange={(input) =>
-                    setDrafts((current) => ({
-                      ...current,
-                      triggerWorkflow: { ...current.triggerWorkflow, input },
-                    }))
-                  }
-                  groups={templateGroups}
-                  disabled={isLoading}
-                />
-              </Field>
-            </>
-          ) : null}
-          {jsonError ? <FieldError>{jsonError}</FieldError> : null}
-          </div>
-        </FieldGroup>
+              {jsonError ? <FieldError>{jsonError}</FieldError> : null}
+            </div>
+          </FieldGroup>
+        )}
       </div>
     </div>
   )

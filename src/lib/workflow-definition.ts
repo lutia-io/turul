@@ -9,7 +9,6 @@ import {
   levelsFromApi,
   levelsToApi,
   parsePipelineDefinition,
-  pipelineDraftSentence,
   pipelineNodeCount,
   pipelineSummary,
   type PipelineLevelDraft,
@@ -678,14 +677,12 @@ export function workflowDraftSentence(
   fields: JsonSchemaProperty[]
 ) {
   const nodeCount = levels.reduce((count, level) => count + level.nodes.length, 0)
-  const flow =
-    nodeCount > 0 ? ` ${pipelineDraftSentence(levels)}` : ""
-  return `${workflowRuleSentence(
+  return workflowRuleSentence(
     triggerToApi(trigger),
     criteriaToApi(criteria, fields),
     nodeCount,
     fields
-  )}${flow}`
+  )
 }
 
 export function workflowColumnNames(

@@ -126,8 +126,6 @@ function listPipelineDefinitionQueryParams(
 export type ApiPipelineStatus = "pending" | "running" | "completed" | "failed"
 
 export type ApiSnapshotNode = {
-  name: string
-  slug: string
   type: string
   definition: JsonObject
 }
@@ -248,7 +246,6 @@ export type ApiPipelineNode = {
   levelIndex: number
   nodeIndex: number
   attempt: number
-  nodeSlug: string
   nodeType: string
   status: ApiPipelineNodeStatus | string
   input?: JsonObject

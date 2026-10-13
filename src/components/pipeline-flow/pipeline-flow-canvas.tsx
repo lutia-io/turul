@@ -39,7 +39,6 @@ import {
 import { defaultDefinition, type NodeType } from "@/lib/node-definition"
 import {
   createTargetForSource,
-  defaultCreatedNodeName,
   FLOW,
   flowBezierPath,
   hitItem,
@@ -271,7 +270,6 @@ export function PipelineFlowCanvas({
         insertCreatedNode(
           current,
           {
-            name: defaultCreatedNodeName(type, current),
             type,
             definition: defaultDefinition(type),
           },
