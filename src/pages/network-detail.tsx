@@ -4,7 +4,6 @@ import {
   Building2Icon,
   FileIcon,
   GalleryVerticalEndIcon,
-  LayersIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -191,12 +190,6 @@ export default function NetworkDetail() {
           label="Workflows"
           color="teal"
           icon={PlayIcon}
-        />
-        <Shortcut
-          to={href("pipelines")}
-          label="Pipelines"
-          color="pink"
-          icon={LayersIcon}
         />
         {organization ? (
           <Shortcut

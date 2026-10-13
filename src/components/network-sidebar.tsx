@@ -3,7 +3,6 @@
 import { useState, type ComponentProps } from "react"
 import { Link, useLocation, useNavigate } from "react-router"
 import {
-  ActivityIcon,
   ArrowLeftIcon,
   Building2Icon,
   FileIcon,
@@ -171,13 +170,8 @@ export function NetworkSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       title: "Workflows",
       url: href("workflows"),
       icon: <PlayIcon />,
-      isActive: section === "workflows",
-    },
-    {
-      title: "Pipelines",
-      url: href("pipelines"),
-      icon: <ActivityIcon />,
-      isActive: section === "pipelines",
+      isActive:
+        section === "workflow-definitions" || section === "workflows",
     },
   ]
 

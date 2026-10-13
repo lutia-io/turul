@@ -12,7 +12,7 @@ import {
 import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { WorkflowActionsJournal } from "@/components/workflow-actions"
+import { WorkflowNodesJournal } from "@/components/workflow-actions"
 import type { RunStatus } from "@/data/runs"
 import type { DefinitionStep } from "@/lib/json-definition"
 import {
@@ -166,7 +166,7 @@ export default function WorkflowRunDetail() {
                 <h2 className="text-sm font-medium">Steps</h2>
                 <p className="text-sm text-muted-foreground">
                   {steps.length === 0
-                    ? "This workflow has no actions."
+                    ? "This workflow has no levels."
                     : `${progress}% complete`}
                 </p>
               </div>
@@ -198,7 +198,7 @@ export default function WorkflowRunDetail() {
             ) : null}
           </section>
 
-          <WorkflowActionsJournal
+          <WorkflowNodesJournal
             workflowId={resolved.id}
             steps={steps}
             pollingInterval={live ? 2000 : 0}

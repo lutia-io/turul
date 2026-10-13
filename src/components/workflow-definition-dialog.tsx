@@ -37,32 +37,21 @@ import {
 } from "@/components/ui/select"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
 import {
-  WorkflowPipelineEditor,
-  type WorkflowPipelineEditorHandle,
-} from "@/components/workflow-pipeline-editor"
-import { useAuthorization } from "@/lib/authorization"
-import {
-  mergeWorkspacePipelines,
-  workspacePipelineFromSaved,
-  type SavedWorkflowPipeline,
-  type WorkflowPipelineSession,
-} from "@/lib/workflow-pipeline"
-import type { PipelineDefinition } from "@/data/networks"
-import {
   parseJsonObject,
   stringifyDefinition,
   type JsonObject,
 } from "@/lib/json-definition"
 import {
+  emptyPipelineLevels,
+  type PipelineLevelDraft,
+} from "@/lib/pipeline-definition"
+import {
   networkWorkspacePath,
   useWorkspaceNetworkList,
   useWorkspaceOrganizations,
-  useWorkspacePipelines,
   useWorkspaceSchemas,
 } from "@/lib/network-workspace"
 import {
-  actionsFromApi,
-  actionsToApi,
   criteriaFromApi,
   criteriaToApi,
   emptyGroup,
@@ -72,7 +61,8 @@ import {
   schemaFieldOptions,
   triggerToApi,
   workflowDraftSentence,
-  type ActionDraft,
+  workflowNodesFromApi,
+  workflowNodesToApi,
   type CriteriaGroupDraft,
   type TriggerDraft,
   type WorkflowDefinitionBody,
@@ -92,7 +82,7 @@ function workflowDefinitionError(text: string) {
       return "JSON must be a workflow object"
     }
     if (!parseWorkflowDefinition(parsed as JsonObject)) {
-      return "JSON must include actions"
+      return "JSON must include at least one level with a node"
     }
     return null
   } catch {
@@ -120,7 +110,6 @@ export function WorkflowDefinitionDialog({
   const { networks } = useWorkspaceNetworkList()
   const { organizations } = useWorkspaceOrganizations({ skip: !open })
   const { schemas } = useWorkspaceSchemas({ skip: !open })
-  const { pipelines } = useWorkspacePipelines({ skip: !open })
   const [createWorkflow, createState] = useCreateWorkflowDefinitionMutation()
   const isLoading = createState.isLoading
   const error = createState.error
@@ -138,19 +127,11 @@ export function WorkflowDefinitionDialog({
   const [active, setActive] = useState(true)
   const [trigger, setTrigger] = useState<TriggerDraft>(presetTrigger(field))
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
-  const [actions, setActions] = useState<ActionDraft[]>([])
+  const [levels, setLevels] = useState<PipelineLevelDraft[]>(emptyPipelineLevels)
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
   const [jsonText, setJsonText] = useState("")
   const [jsonError, setJsonError] = useState<string | null>(null)
   const jsonSourceRef = useRef<"builder" | "json">("builder")
-  const [pipelineSession, setPipelineSession] =
-    useState<WorkflowPipelineSession | null>(null)
-  const [savedPipelines, setSavedPipelines] = useState<PipelineDefinition[]>([])
-  const pipelineEditorRef = useRef<WorkflowPipelineEditorHandle>(null)
-  const { canNetwork } = useAuthorization({
-    networkId: selectedNetworkId || undefined,
-    organizationId: selectedOrganizationId || null,
-  })
 
   const firstNetworkId = networks[0]?.id ?? ""
   const networkOrganizations = organizations.filter(
@@ -172,33 +153,6 @@ export function WorkflowDefinitionDialog({
       }),
     [schemas, selectedNetworkId, selectedOrganizationId]
   )
-  const networkPipelines = useMemo(
-    () =>
-      mergeWorkspacePipelines(pipelines, savedPipelines)
-        .filter((pipeline) => {
-          if (pipeline.networkId !== selectedNetworkId) {
-            return false
-          }
-          if (!selectedOrganizationId) {
-            return !pipeline.organizationId
-          }
-          return (
-            !pipeline.organizationId ||
-            pipeline.organizationId === selectedOrganizationId
-          )
-        })
-        .sort((left, right) => left.name.localeCompare(right.name)),
-    [pipelines, savedPipelines, selectedNetworkId, selectedOrganizationId]
-  )
-  const canCreatePipeline =
-    Boolean(selectedNetworkId) && canNetwork("pipeline_definition", "create")
-  const canUpdatePipeline = canNetwork("pipeline_definition", "update")
-  const editingPipeline =
-    pipelineSession?.mode === "edit"
-      ? networkPipelines.find(
-          (pipeline) => pipeline.id === pipelineSession.pipelineId
-        )
-      : undefined
   const triggerSchema = schemas.find((schema) => schema.id === schemaId)
   const triggerFields = schemaFieldOptions(triggerSchema?.definition)
 
@@ -221,12 +175,10 @@ export function WorkflowDefinitionDialog({
     setActive(true)
     setTrigger(presetTrigger(field))
     setCriteria(emptyGroup())
-    setActions([])
+    setLevels(emptyPipelineLevels())
     setDefinitionView("rule")
     jsonSourceRef.current = "builder"
     setJsonError(null)
-    setPipelineSession(null)
-    setSavedPipelines([])
   }, [open, organizationId, lockedSchemaId, field])
 
   useEffect(() => {
@@ -254,19 +206,19 @@ export function WorkflowDefinitionDialog({
   }, [lockedSchemaId, networkSchemas, open])
 
   const definition = useMemo<WorkflowDefinitionBody | undefined>(() => {
-    const nextActions = actionsToApi(actions)
-    if (nextActions.length === 0) {
+    const nodes = workflowNodesToApi(levels)
+    if (!nodes?.length) {
       return undefined
     }
     return {
       trigger: triggerToApi(trigger),
       criteria: criteriaToApi(criteria, triggerFields) ?? {},
-      actions: nextActions,
+      nodes,
     }
-  }, [actions, criteria, trigger, triggerFields])
+  }, [criteria, levels, trigger, triggerFields])
 
   const generatedJson = stringifyDefinition(
-    definition ?? { trigger: triggerToApi(trigger), criteria: {}, actions: [] }
+    definition ?? { trigger: triggerToApi(trigger), criteria: {}, nodes: [] }
   )
 
   useEffect(() => {
@@ -285,7 +237,7 @@ export function WorkflowDefinitionDialog({
     jsonSourceRef.current = "json"
     setTrigger(triggerFromApi(body.trigger))
     setCriteria(criteriaFromApi(body.criteria))
-    setActions(actionsFromApi(body.actions))
+    setLevels(workflowNodesFromApi(body.nodes))
   }
 
   function handleJsonChange(text: string) {
@@ -298,7 +250,7 @@ export function WorkflowDefinitionDialog({
     }
     const body = parseWorkflowDefinition(parsedJson)
     if (!body) {
-      setJsonError("JSON must include actions")
+      setJsonError("JSON must include at least one level with a node")
       return
     }
     setJsonError(null)
@@ -329,7 +281,7 @@ export function WorkflowDefinitionDialog({
   const sentence = workflowDraftSentence(
     trigger,
     criteria,
-    actions,
+    levels,
     triggerFields
   )
 
@@ -338,7 +290,7 @@ export function WorkflowDefinitionDialog({
     Boolean(selectedNetworkId) &&
     Boolean(schemaId) &&
     Boolean(definition) &&
-    (definition?.actions.length ?? 0) > 0 &&
+    (definition?.nodes.length ?? 0) > 0 &&
     !jsonError
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -348,41 +300,14 @@ export function WorkflowDefinitionDialog({
     }
     const parsedJson = parseJsonObject(jsonText)
     const body = parsedJson ? parseWorkflowDefinition(parsedJson) : definition
-    if (!body || body.actions.length === 0) {
+    if (!body || body.nodes.length === 0) {
       return
     }
 
     void submitDefinition(body)
   }
 
-  function rememberPipeline(saved: SavedWorkflowPipeline) {
-    const actionKey = pipelineSession?.actionKey
-    if (!actionKey) {
-      return
-    }
-    const pipeline = workspacePipelineFromSaved(saved)
-    setSavedPipelines((current) => [
-      pipeline,
-      ...current.filter((item) => item.id !== pipeline.id),
-    ])
-    jsonSourceRef.current = "builder"
-    setDefinitionView("rule")
-    setActions((current) =>
-      current.map((action) =>
-        action.key === actionKey ? { ...action, pipeline: saved.id } : action
-      )
-    )
-    setPipelineSession(null)
-  }
-
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen && pipelineEditorRef.current?.cancelNode()) {
-      return
-    }
-    if (!nextOpen && pipelineSession) {
-      setPipelineSession(null)
-      return
-    }
     onOpenChange(nextOpen)
   }
 
@@ -416,27 +341,11 @@ export function WorkflowDefinitionDialog({
         size="full"
         className="sm:inset-x-[8vw] lg:inset-x-16 xl:inset-x-[12vw]"
       >
-        {pipelineSession ? (
-          <WorkflowPipelineEditor
-            key={`${pipelineSession.mode}-${pipelineSession.pipelineId ?? pipelineSession.actionKey}`}
-            ref={pipelineEditorRef}
-            mode={pipelineSession.mode}
-            pipeline={editingPipeline}
-            networkId={selectedNetworkId}
-            organizationId={selectedOrganizationId || undefined}
-            onDone={rememberPipeline}
-            onCancel={() => {
-              setDefinitionView("rule")
-              setPipelineSession(null)
-            }}
-          />
-        ) : null}
-        {pipelineSession ? null : (
-          <>
+        <>
             <DialogHeader className="shrink-0 border-b px-6 py-4 pr-14">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 space-y-1.5">
-                  <DialogTitle>Create a workflow</DialogTitle>
+                  <DialogTitle>Create a workflow definition</DialogTitle>
                   <DialogDescription>{sentence}</DialogDescription>
                 </div>
                 <Button
@@ -466,8 +375,8 @@ export function WorkflowDefinitionDialog({
                     className={cn(
                       "grid gap-3",
                       showNetwork
-                        ? "sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]"
-                        : "sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
+                        ? "sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]"
+                        : "sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]"
                     )}
                   >
                     <Field className="gap-1">
@@ -579,22 +488,6 @@ export function WorkflowDefinitionDialog({
                         </Select>
                       </Field>
                     ) : null}
-                    {lockedSchemaId ? (
-                      <Field className="gap-1">
-                        <FieldLabel>Table</FieldLabel>
-                        <p className="text-sm">
-                          {triggerSchema?.name ?? "Selected table"}
-                        </p>
-                      </Field>
-                    ) : (
-                      <SchemaSelect
-                        formId={formId}
-                        schemaId={schemaId}
-                        schemas={networkSchemas}
-                        isLoading={isLoading}
-                        onChange={setSchemaId}
-                      />
-                    )}
                     <EnabledField
                       formId={formId}
                       checked={active}
@@ -623,12 +516,29 @@ export function WorkflowDefinitionDialog({
                     <WorkflowRuleEditor
                       trigger={trigger}
                       criteria={criteria}
-                      actions={actions}
+                      levels={levels}
                       fields={triggerFields}
-                      schemas={networkSchemas}
-                      pipelines={networkPipelines}
-                      triggerSchemaId={schemaId}
                       schemaName={triggerSchema?.name}
+                      networkId={selectedNetworkId}
+                      organizationId={selectedOrganizationId || undefined}
+                      schemaField={
+                        lockedSchemaId ? (
+                          <Field className="gap-1">
+                            <FieldLabel>Table</FieldLabel>
+                            <p className="text-sm">
+                              {triggerSchema?.name ?? "Selected table"}
+                            </p>
+                          </Field>
+                        ) : (
+                          <SchemaSelect
+                            formId={formId}
+                            schemaId={schemaId}
+                            schemas={networkSchemas}
+                            isLoading={isLoading}
+                            onChange={setSchemaId}
+                          />
+                        )
+                      }
                       onTriggerChange={(next) => {
                         markBuilderSource()
                         setTrigger(next)
@@ -637,22 +547,11 @@ export function WorkflowDefinitionDialog({
                         markBuilderSource()
                         setCriteria(next)
                       }}
-                      onActionsChange={(next) => {
+                      onLevelsChange={(next) => {
                         markBuilderSource()
-                        setActions(next)
+                        setLevels(next)
                       }}
-                      canCreatePipeline={canCreatePipeline}
-                      canUpdatePipeline={canUpdatePipeline}
-                      onCreatePipeline={(actionKey) =>
-                        setPipelineSession({ actionKey, mode: "create" })
-                      }
-                      onEditPipeline={(actionKey, pipelineId) =>
-                        setPipelineSession({
-                          actionKey,
-                          mode: "edit",
-                          pipelineId,
-                        })
-                      }
+                      onJsonErrorChange={setJsonError}
                     />
                   </div>
                 )}
@@ -680,8 +579,7 @@ export function WorkflowDefinitionDialog({
                 </Button>
               </DialogFooter>
             </form>
-          </>
-        )}
+        </>
       </DialogContent>
     </Dialog>
   )

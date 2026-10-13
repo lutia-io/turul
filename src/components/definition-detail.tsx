@@ -43,8 +43,14 @@ export function DefinitionColumns({
   aside,
 }: {
   children: ReactNode
-  aside: ReactNode
+  aside?: ReactNode
 }) {
+  if (!aside) {
+    return (
+      <div className="flex min-w-0 flex-col gap-6">{children}</div>
+    )
+  }
+
   return (
     <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="flex min-w-0 flex-col gap-6">{children}</div>

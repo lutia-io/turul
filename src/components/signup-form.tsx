@@ -10,12 +10,26 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { getHumaErrorMessage, useCreateUserMutation } from "@/store/api"
+import {
+  getHumaErrorMessage,
+  useCreateUserMutation,
+  useLoginUserMutation,
+} from "@/store/api"
+import { setCredentials } from "@/store/auth-slice"
+import { useAppDispatch } from "@/store/hooks"
 import { Loader } from "lucide-react"
 
+const APP_HOME = "/app/networks"
+
 export function SignupForm() {
-  const [createUser, { isLoading, error }] = useCreateUserMutation()
+  const dispatch = useAppDispatch()
+  const [createUser, { isLoading: isCreating, error: createError }] =
+    useCreateUserMutation()
+  const [loginUser, { isLoading: isLoggingIn, error: loginError }] =
+    useLoginUserMutation()
   const navigate = useNavigate()
+  const isLoading = isCreating || isLoggingIn
+  const error = createError ?? loginError
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -27,7 +41,9 @@ export function SignupForm() {
 
     try {
       await createUser({ firstName, lastName, email, password }).unwrap()
-      navigate("/app/login", { replace: true })
+      const tokens = await loginUser({ email, password }).unwrap()
+      dispatch(setCredentials({ ...tokens, email }))
+      navigate(APP_HOME, { replace: true })
     } catch {
       // Error is rendered from the mutation state.
     }

@@ -97,12 +97,13 @@ function headerPin(column: {
 }
 
 function workflowActionCount(workflow: WorkflowDefinition) {
-  return parseWorkflowDefinition(workflow.definition)?.actions.length ?? 0
+  const parsed = parseWorkflowDefinition(workflow.definition)
+  return parsed?.nodes.reduce((count, level) => count + level.length, 0) ?? 0
 }
 
 export default function WorkflowDefinitionList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const { network, organization, organizationId } = useNetworkWorkspace()
+  const { network, organization, organizationId, href } = useNetworkWorkspace()
   const { openCreateWorkflow } = useCreateEntity()
   const { canNetwork } = useAuthorization()
   const { schemas } = useWorkspaceSchemas()
@@ -359,7 +360,10 @@ export default function WorkflowDefinitionList() {
             ]
           : []),
         helper.accessor(
-          (workflow) => schemasById.get(workflow.schemaId)?.name ?? "Record",
+          (workflow) =>
+            (workflow.schemaId
+              ? schemasById.get(workflow.schemaId)?.name
+              : undefined) ?? "Manual",
           {
             id: "schema",
             header: ({ column }) => (
@@ -384,7 +388,9 @@ export default function WorkflowDefinitionList() {
                 to={hrefFor(row.original)}
                 className="text-muted-foreground"
               >
-                {schemasById.get(row.original.schemaId)?.name ?? "Record"}
+                {(row.original.schemaId
+                  ? schemasById.get(row.original.schemaId)?.name
+                  : undefined) ?? "Manual"}
               </DataTableCellLink>
             ),
             size: 180,
@@ -417,7 +423,9 @@ export default function WorkflowDefinitionList() {
               {workflowSummary(
                 row.original.definition,
                 schemaFieldOptions(
-                  schemasById.get(row.original.schemaId)?.definition
+                  row.original.schemaId
+                    ? schemasById.get(row.original.schemaId)?.definition
+                    : undefined
                 )
               )}
             </DataTableCellLink>
@@ -647,28 +655,36 @@ export default function WorkflowDefinitionList() {
 
   return (
     <DataTablePage
-      title="Workflows"
+      title="Workflow definitions"
       description={
         organization
-          ? `Network-wide workflows shared with ${organization.name}, plus workflows that belong only to this organization.`
+          ? `Definitions for ${organization.name}: the rules that run when records change, on a schedule, or when enqueued. Each execution appears under Runs.`
           : network
-            ? `Workflows for ${network.name} run when their trigger fires.`
-            : "Workflows that run when their trigger fires."
+            ? `Definitions for ${network.name}: the rules that run when records change, on a schedule, or when enqueued. Each execution appears under Runs.`
+            : "Definitions are the rules that run when records change, on a schedule, or when enqueued. Each execution appears under Runs."
       }
       action={
-        canNetwork("workflow_definition", "create") ? (
+        <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() =>
-              openCreateWorkflow({
-                networkId: network?.id,
-                organizationId,
-              })
-            }
+            variant="outline"
+            render={<Link to={href("workflows")} />}
           >
-            <PlusIcon />
-            Create workflow
+            View runs
           </Button>
-        ) : null
+          {canNetwork("workflow_definition", "create") ? (
+            <Button
+              onClick={() =>
+                openCreateWorkflow({
+                  networkId: network?.id,
+                  organizationId,
+                })
+              }
+            >
+              <PlusIcon />
+              Create definition
+            </Button>
+          ) : null}
+        </div>
       }
     >
       <DataTableToolbar
@@ -680,18 +696,18 @@ export default function WorkflowDefinitionList() {
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading workflows...",
+          loadingLabel: "Loading definitions...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
-          singular: "workflow",
+          singular: "definition",
         })}
         onRefresh={refetch}
         isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
-          {getHumaErrorMessage(error, "Failed to load workflows")}
+          {getHumaErrorMessage(error, "Failed to load workflow definitions")}
         </p>
       ) : (
         <>
@@ -700,10 +716,10 @@ export default function WorkflowDefinitionList() {
             isRefreshing={isFetching}
             empty={
               isLoading
-                ? "Loading workflows..."
+                ? "Loading definitions..."
                 : filtersActive
-                  ? "No workflows match this view."
-                  : "No workflows yet. Create one to automate what happens when records are created, updated, or on a schedule."
+                  ? "No definitions match this view."
+                  : "No workflow definitions yet. Create one to automate what happens when records are created, updated, or on a schedule."
             }
           />
           <DataTablePagination table={table} />

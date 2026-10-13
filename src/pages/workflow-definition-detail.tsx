@@ -5,9 +5,8 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type ReactNode,
 } from "react"
-import { Link, useParams, useSearchParams } from "react-router"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import {
   ClockIcon,
   FileJsonIcon,
@@ -16,6 +15,7 @@ import {
   GalleryVerticalEndIcon,
   Building2Icon,
   Loader,
+  PlayIcon,
   PencilIcon,
   WorkflowIcon,
   ZapIcon,
@@ -42,27 +42,12 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
-  WorkflowActionView,
   WorkflowCriteriaView,
+  WorkflowNodesView,
   WorkflowSectionHeading,
 } from "@/components/workflow-rule"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
-import {
-  WorkflowPipelineEditor,
-  type WorkflowPipelineEditorHandle,
-} from "@/components/workflow-pipeline-editor"
-import { useAuthorization } from "@/lib/authorization"
-import {
-  mergeWorkspacePipelines,
-  workspacePipelineFromSaved,
-  type SavedWorkflowPipeline,
-  type WorkflowPipelineSession,
-} from "@/lib/workflow-pipeline"
-import type {
-  PipelineDefinition,
-  Schema,
-  WorkflowDefinition,
-} from "@/data/networks"
+import type { Schema, WorkflowDefinition } from "@/data/networks"
 import {
   parseJsonObject,
   stringifyDefinition,
@@ -71,15 +56,12 @@ import {
 import {
   useNetworkWorkspace,
   useWorkspaceOrganizations,
-  useWorkspacePipelines,
   useWorkspaceSchemas,
   useWorkspaceWorkflowRuns,
   workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
 import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
 import {
-  actionsFromApi,
-  actionsToApi,
   countCriteriaLeaves,
   criteriaFromApi,
   criteriaToApi,
@@ -90,18 +72,25 @@ import {
   triggerSummary,
   triggerToApi,
   workflowDraftSentence,
+  workflowNodeCount,
+  workflowNodesFromApi,
+  workflowNodesToApi,
   workflowRuleSentence,
-  type ActionDraft,
   type CriteriaGroupDraft,
   type CriteriaLogic,
   type TriggerDraft,
   type WorkflowDefinitionBody,
 } from "@/lib/workflow-definition"
+import {
+  emptyPipelineLevels,
+  type PipelineLevelDraft,
+} from "@/lib/pipeline-definition"
 import { getHumaErrorMessage, getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
   useGetWorkflowDefinitionQuery,
+  useCreateWorkflowMutation,
   useUpdateWorkflowDefinitionMutation,
 } from "@/store/workflow-slice"
 
@@ -114,7 +103,7 @@ function workflowDefinitionError(text: string) {
       return "JSON must be a workflow object"
     }
     if (!parseWorkflowDefinition(parsed as JsonObject)) {
-      return "JSON must include actions"
+      return "JSON must include at least one level with a node"
     }
     return null
   } catch {
@@ -132,11 +121,12 @@ export default function WorkflowDefinitionDetail() {
     href,
   } = useNetworkWorkspace()
   const { schemas } = useWorkspaceSchemas()
-  const { pipelines } = useWorkspacePipelines()
   const { organizations } = useWorkspaceOrganizations()
   const { runs } = useWorkspaceWorkflowRuns()
   const { openEditWorkflow } = useCreateEntity()
+  const navigate = useNavigate()
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
+  const [createWorkflow, createWorkflowState] = useCreateWorkflowMutation()
   const workflowQuery = useGetWorkflowDefinitionQuery(
     workflowDefinitionId ?? "",
     { skip: !isAuthenticated || !workflowDefinitionId }
@@ -162,7 +152,7 @@ export default function WorkflowDefinitionDetail() {
   const parsed = visibleWorkflow
     ? parseWorkflowDefinition(visibleWorkflow.definition)
     : undefined
-  const actions = parsed?.actions ?? []
+  const nodeCount = parsed ? workflowNodeCount(parsed) : 0
   const rootLogic = parsed?.criteria?.logic as CriteriaLogic | undefined
   const conditionCount = countCriteriaLeaves(parsed?.criteria)
   const relatedRuns = visibleWorkflow
@@ -269,9 +259,9 @@ export default function WorkflowDefinitionDetail() {
               {conditionCount === 1 ? "condition" : "conditions"}
             </span>
           </AsideRow>
-          <AsideRow label="Actions">
+          <AsideRow label="Nodes">
             <span className="tabular-nums">
-              {actions.length} {actions.length === 1 ? "action" : "actions"}
+              {nodeCount} {nodeCount === 1 ? "node" : "nodes"}
             </span>
           </AsideRow>
           {organization ? (
@@ -352,14 +342,7 @@ export default function WorkflowDefinitionDetail() {
         key={visibleWorkflow.id}
         workflow={visibleWorkflow}
         schema={schema}
-        schemas={schemas.filter(
-          (item) => item.networkId === visibleWorkflow.networkId
-        )}
-        pipelines={pipelines.filter(
-          (item) => item.networkId === visibleWorkflow.networkId
-        )}
         href={href}
-        aside={aside}
         onCancel={() => setSearchParams({})}
       />
     )
@@ -389,12 +372,36 @@ export default function WorkflowDefinitionDetail() {
               workflowRuleSentence(
                 parsed?.trigger,
                 parsed?.criteria,
-                actions.length,
+                nodeCount,
                 fields
               )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              visibleWorkflow.internal ||
+              !visibleWorkflow.active ||
+              createWorkflowState.isLoading
+            }
+            onClick={async () => {
+              try {
+                const { id } = await createWorkflow({
+                  workflowDefinitionId: visibleWorkflow.id,
+                  input: {},
+                }).unwrap()
+                navigate(href(`workflows/${id}`))
+              } catch {
+                // createWorkflowState surfaces errors if needed later
+              }
+            }}
+          >
+            <PlayIcon />
+            Run
+          </Button>
           <Button
             type="button"
             variant={definitionView === "json" ? "secondary" : "outline"}
@@ -423,7 +430,7 @@ export default function WorkflowDefinitionDetail() {
           <JsonDefinitionCard
             definition={visibleWorkflow.definition}
             label="Workflow JSON"
-            description="Trigger, criteria, and actions stored on this workflow."
+            description="Trigger, criteria, and nodes stored on this workflow."
           />
         ) : (
           <>
@@ -463,25 +470,7 @@ export default function WorkflowDefinitionDetail() {
                 title="Then"
                 description="These steps run in order after the trigger and conditions match."
               />
-              {actions.length > 0 ? (
-                <ol className="mt-6">
-                  {actions.map((action, index) => (
-                    <WorkflowActionView
-                      key={`${action.type}-${index}`}
-                      action={action}
-                      index={index}
-                      last={index === actions.length - 1}
-                      schemas={schemas}
-                      pipelines={pipelines}
-                      href={href}
-                    />
-                  ))}
-                </ol>
-              ) : (
-                <p className="mt-6 text-sm text-muted-foreground">
-                  This workflow does not declare any actions.
-                </p>
-              )}
+              <WorkflowNodesView definition={parsed} />
             </DefinitionCard>
           </>
         )}
@@ -493,18 +482,12 @@ export default function WorkflowDefinitionDetail() {
 function WorkflowDefinitionEdit({
   workflow,
   schema,
-  schemas,
-  pipelines,
   href,
-  aside,
   onCancel,
 }: {
   workflow: WorkflowDefinition
   schema?: Schema
-  schemas: Schema[]
-  pipelines: PipelineDefinition[]
   href: (rest?: string) => string
-  aside: ReactNode
   onCancel: () => void
 }) {
   const formId = useId()
@@ -512,14 +495,6 @@ function WorkflowDefinitionEdit({
     ? `${href("records")}?schema=${encodeURIComponent(schema.id)}`
     : href("records")
   const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
-  const pipelineEditorRef = useRef<WorkflowPipelineEditorHandle>(null)
-  const [pipelineSession, setPipelineSession] =
-    useState<WorkflowPipelineSession | null>(null)
-  const [savedPipelines, setSavedPipelines] = useState<PipelineDefinition[]>([])
-  const { canNetwork } = useAuthorization({
-    networkId: workflow.networkId,
-    organizationId: workflow.organizationId ?? null,
-  })
   const parsed = parseWorkflowDefinition(workflow.definition)
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
   const [name, setName] = useState(workflow.name)
@@ -531,8 +506,10 @@ function WorkflowDefinitionEdit({
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(() =>
     criteriaFromApi(parsed?.criteria)
   )
-  const [actions, setActions] = useState<ActionDraft[]>(() =>
-    actionsFromApi(parsed?.actions)
+  const [levels, setLevels] = useState<PipelineLevelDraft[]>(() =>
+    workflowNodesFromApi(parsed?.nodes).length > 0
+      ? workflowNodesFromApi(parsed?.nodes)
+      : emptyPipelineLevels()
   )
   const [jsonText, setJsonText] = useState("")
   const [jsonError, setJsonError] = useState<string | null>(null)
@@ -540,31 +517,21 @@ function WorkflowDefinitionEdit({
   const triggerFields = schemaFieldOptions(schema?.definition)
   const isLoading = updateState.isLoading
   const error = updateState.error
-  const availablePipelines = useMemo(
-    () =>
-      mergeWorkspacePipelines(pipelines, savedPipelines).sort((left, right) =>
-        left.name.localeCompare(right.name)
-      ),
-    [pipelines, savedPipelines]
-  )
-  const canCreatePipeline =
-    Boolean(workflow.networkId) && canNetwork("pipeline_definition", "create")
-  const canUpdatePipeline = canNetwork("pipeline_definition", "update")
 
   const definition = useMemo<WorkflowDefinitionBody | undefined>(() => {
-    const nextActions = actionsToApi(actions)
-    if (nextActions.length === 0) {
+    const nodes = workflowNodesToApi(levels)
+    if (!nodes?.length) {
       return undefined
     }
     return {
       trigger: triggerToApi(trigger),
       criteria: criteriaToApi(criteria, triggerFields) ?? {},
-      actions: nextActions,
+      nodes,
     }
-  }, [actions, criteria, trigger, triggerFields])
+  }, [criteria, levels, trigger, triggerFields])
 
   const generatedJson = stringifyDefinition(
-    definition ?? { trigger: triggerToApi(trigger), criteria: {}, actions: [] }
+    definition ?? { trigger: triggerToApi(trigger), criteria: {}, nodes: [] }
   )
 
   useEffect(() => {
@@ -583,7 +550,7 @@ function WorkflowDefinitionEdit({
     jsonSourceRef.current = "json"
     setTrigger(triggerFromApi(body.trigger))
     setCriteria(criteriaFromApi(body.criteria))
-    setActions(actionsFromApi(body.actions))
+    setLevels(workflowNodesFromApi(body.nodes))
   }
 
   function handleJsonChange(text: string) {
@@ -596,7 +563,7 @@ function WorkflowDefinitionEdit({
     }
     const body = parseWorkflowDefinition(parsedJson)
     if (!body) {
-      setJsonError("JSON must include actions")
+      setJsonError("JSON must include at least one level with a node")
       return
     }
     setJsonError(null)
@@ -625,7 +592,7 @@ function WorkflowDefinitionEdit({
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(definition) &&
-    (definition?.actions.length ?? 0) > 0 &&
+    (definition?.nodes.length ?? 0) > 0 &&
     !jsonError
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -635,7 +602,7 @@ function WorkflowDefinitionEdit({
     }
     const parsedJson = parseJsonObject(jsonText)
     const body = parsedJson ? parseWorkflowDefinition(parsedJson) : definition
-    if (!body || body.actions.length === 0) {
+    if (!body || body.nodes.length === 0) {
       return
     }
     try {
@@ -651,53 +618,6 @@ function WorkflowDefinitionEdit({
     } catch {
       // Error is rendered from the mutation state.
     }
-  }
-
-  function rememberPipeline(saved: SavedWorkflowPipeline) {
-    const actionKey = pipelineSession?.actionKey
-    if (!actionKey) {
-      return
-    }
-    const pipeline = workspacePipelineFromSaved(saved)
-    setSavedPipelines((current) => [
-      pipeline,
-      ...current.filter((item) => item.id !== pipeline.id),
-    ])
-    jsonSourceRef.current = "builder"
-    setActions((current) =>
-      current.map((action) =>
-        action.key === actionKey ? { ...action, pipeline: saved.id } : action
-      )
-    )
-    setDefinitionView("rule")
-    setPipelineSession(null)
-  }
-
-  if (pipelineSession && workflow.networkId) {
-    const editingPipeline =
-      pipelineSession.mode === "edit"
-        ? availablePipelines.find(
-            (pipeline) => pipeline.id === pipelineSession.pipelineId
-          )
-        : undefined
-    return (
-      <DefinitionPage fill>
-        <WorkflowPipelineEditor
-          key={`${pipelineSession.mode}-${pipelineSession.pipelineId ?? pipelineSession.actionKey}`}
-          ref={pipelineEditorRef}
-          mode={pipelineSession.mode}
-          pipeline={editingPipeline}
-          networkId={workflow.networkId}
-          organizationId={workflow.organizationId}
-          layeredCancel
-          onDone={rememberPipeline}
-          onCancel={() => {
-            setDefinitionView("rule")
-            setPipelineSession(null)
-          }}
-        />
-      </DefinitionPage>
-    )
   }
 
   return (
@@ -750,7 +670,7 @@ function WorkflowDefinitionEdit({
               />
             </Field>
             <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-              {workflowDraftSentence(trigger, criteria, actions, triggerFields)}
+              {workflowDraftSentence(trigger, criteria, levels, triggerFields)}
             </p>
             {error ? (
               <FieldError>{getHumaErrorMessage(error)}</FieldError>
@@ -796,7 +716,7 @@ function WorkflowDefinitionEdit({
           </div>
         </div>
 
-        <DefinitionColumns aside={aside}>
+        <DefinitionColumns>
           {definitionView === "json" ? (
             <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
               <DefinitionJsonPane
@@ -813,20 +733,11 @@ function WorkflowDefinitionEdit({
             <WorkflowRuleEditor
               trigger={trigger}
               criteria={criteria}
-              actions={actions}
+              levels={levels}
               fields={triggerFields}
-              schemas={schemas}
-              pipelines={availablePipelines}
-              triggerSchemaId={workflow.schemaId}
               schemaName={schema?.name}
-              canCreatePipeline={canCreatePipeline}
-              canUpdatePipeline={canUpdatePipeline}
-              onCreatePipeline={(actionKey) =>
-                setPipelineSession({ actionKey, mode: "create" })
-              }
-              onEditPipeline={(actionKey, pipelineId) =>
-                setPipelineSession({ actionKey, mode: "edit", pipelineId })
-              }
+              networkId={workflow.networkId}
+              organizationId={workflow.organizationId}
               onTriggerChange={(next) => {
                 markBuilderSource()
                 setTrigger(next)
@@ -835,10 +746,11 @@ function WorkflowDefinitionEdit({
                 markBuilderSource()
                 setCriteria(next)
               }}
-              onActionsChange={(next) => {
+              onLevelsChange={(next) => {
                 markBuilderSource()
-                setActions(next)
+                setLevels(next)
               }}
+              onJsonErrorChange={setJsonError}
             />
           )}
         </DefinitionColumns>

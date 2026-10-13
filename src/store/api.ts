@@ -191,7 +191,7 @@ export const api = createApi({
     "File",
     "WorkflowDefinition",
     "Workflow",
-    "WorkflowAction",
+    "WorkflowNode",
     "PipelineDefinition",
     "Pipeline",
     "PipelineNode",

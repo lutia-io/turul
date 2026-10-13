@@ -19,11 +19,11 @@ import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
-  useListWorkflowActionsQuery,
-  type ApiWorkflowAction,
+  useListWorkflowNodesQuery,
+  type ApiWorkflowNode,
 } from "@/store/workflow-slice"
 
-const actionStatusLabel: Record<string, RunStatus> = {
+const nodeStatusLabel: Record<string, RunStatus> = {
   completed: "Succeeded",
   failed: "Failed",
   succeeded: "Succeeded",
@@ -37,7 +37,19 @@ function asJsonObject(value: unknown): JsonObject | undefined {
   return undefined
 }
 
-export function WorkflowActionsJournal({
+function stepForNode(steps: DefinitionStep[], node: ApiWorkflowNode) {
+  const flatIndex = steps.findIndex(
+    (item) => item.order === node.levelIndex + 1
+  )
+  if (flatIndex >= 0) {
+    return steps[flatIndex]
+  }
+  return steps.find(
+    (item) => item.id === `${node.levelIndex}-${node.nodeIndex}`
+  )
+}
+
+export function WorkflowNodesJournal({
   workflowId,
   steps,
   pollingInterval = 0,
@@ -47,56 +59,60 @@ export function WorkflowActionsJournal({
   pollingInterval?: number
 }) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
-  const query = useListWorkflowActionsQuery(workflowId, {
+  const query = useListWorkflowNodesQuery(workflowId, {
     skip: !isAuthenticated || !workflowId,
     pollingInterval,
   })
-  const actions = query.data ?? []
+  const nodes = query.data ?? []
   const [expandedId, setExpandedId] = useState<string>()
   const rows = useMemo(
     () =>
-      actions.map((action) => {
-        const step = steps.find((item) => item.order - 1 === action.actionIndex)
+      nodes.map((node) => {
+        const step = stepForNode(steps, node)
         return {
-          action,
-          name: step?.name ?? `Action ${action.actionIndex}`,
-          type: step?.type ?? action.actionType,
+          node,
+          name:
+            step?.name ??
+            (node.nodeSlug ||
+              `Level ${node.levelIndex + 1} · Node ${node.nodeIndex + 1}`),
+          type: step?.type ?? node.nodeType,
         }
       }),
-    [actions, steps]
+    [nodes, steps]
   )
 
   return (
     <section className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">Actions</h2>
+          <h2 className="text-base font-semibold tracking-tight">Nodes</h2>
           <p className="text-sm text-muted-foreground">
-            Append-only journal of action attempts. Failed attempts are kept.
+            Append-only journal of node attempts. Failed attempts are kept.
           </p>
         </div>
         <p className="text-sm text-muted-foreground tabular-nums">
           {query.isLoading
             ? "Loading..."
-            : `${actions.length} attempt${actions.length === 1 ? "" : "s"}`}
+            : `${nodes.length} attempt${nodes.length === 1 ? "" : "s"}`}
         </p>
       </div>
 
       {query.isError ? (
         <p className="text-sm text-destructive">
-          {getHumaErrorMessage(query.error, "Failed to load workflow actions")}
+          {getHumaErrorMessage(query.error, "Failed to load workflow nodes")}
         </p>
       ) : query.isLoading ? (
         <p className="text-sm text-muted-foreground">
-          Loading action attempts...
+          Loading node attempts...
         </p>
-      ) : actions.length > 0 ? (
+      ) : nodes.length > 0 ? (
         <div className="overflow-auto rounded-xl border bg-background">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10">#</TableHead>
-                <TableHead>Action</TableHead>
+                <TableHead className="w-16">Level</TableHead>
+                <TableHead className="w-16">Node</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Attempt</TableHead>
                 <TableHead>Status</TableHead>
@@ -106,22 +122,22 @@ export function WorkflowActionsJournal({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map(({ action, name, type }) => {
+              {rows.map(({ node, name, type }) => {
                 const durationMs =
-                  new Date(action.completedAt).getTime() -
-                  new Date(action.startedAt).getTime()
-                const expanded = expandedId === action.id
+                  new Date(node.completedAt).getTime() -
+                  new Date(node.startedAt).getTime()
+                const expanded = expandedId === node.id
 
                 return (
-                  <ActionRows
-                    key={action.id}
-                    action={action}
+                  <NodeRows
+                    key={node.id}
+                    node={node}
                     name={name}
                     type={type}
                     durationMs={durationMs}
                     expanded={expanded}
                     onToggle={() =>
-                      setExpandedId(expanded ? undefined : action.id)
+                      setExpandedId(expanded ? undefined : node.id)
                     }
                   />
                 )
@@ -131,7 +147,7 @@ export function WorkflowActionsJournal({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          No action attempts yet. Queued workflows wait until the first step
+          No node attempts yet. Queued workflows wait until the first step
           starts.
         </p>
       )}
@@ -139,15 +155,18 @@ export function WorkflowActionsJournal({
   )
 }
 
-function ActionRows({
-  action,
+/** @deprecated Use WorkflowNodesJournal */
+export const WorkflowActionsJournal = WorkflowNodesJournal
+
+function NodeRows({
+  node,
   name,
   type,
   durationMs,
   expanded,
   onToggle,
 }: {
-  action: ApiWorkflowAction
+  node: ApiWorkflowNode
   name: string
   type: string
   durationMs: number
@@ -162,7 +181,10 @@ function ActionRows({
         onClick={onToggle}
       >
         <TableCell className="font-mono text-muted-foreground tabular-nums">
-          {action.actionIndex}
+          {node.levelIndex + 1}
+        </TableCell>
+        <TableCell className="font-mono text-muted-foreground tabular-nums">
+          {node.nodeIndex + 1}
         </TableCell>
         <TableCell className="max-w-[16rem] truncate font-medium">
           {name}
@@ -170,39 +192,39 @@ function ActionRows({
         <TableCell className="font-mono text-xs text-muted-foreground">
           {type}
         </TableCell>
-        <TableCell className="tabular-nums">{action.attempt}</TableCell>
+        <TableCell className="tabular-nums">{node.attempt}</TableCell>
         <TableCell>
           <RunStatusPill
-            status={actionStatusLabel[action.status] ?? "Queued"}
+            status={nodeStatusLabel[node.status] ?? "Queued"}
           />
         </TableCell>
         <TableCell className="text-muted-foreground tabular-nums">
           {formatDuration(durationMs)}
         </TableCell>
         <TableCell className="whitespace-nowrap text-muted-foreground">
-          {formatRelativeTime(action.startedAt)}
+          {formatRelativeTime(node.startedAt)}
         </TableCell>
         <TableCell className="max-w-[18rem] truncate text-red-700 dark:text-red-400">
-          {action.error ?? <span className="text-muted-foreground">—</span>}
+          {node.error ?? <span className="text-muted-foreground">—</span>}
         </TableCell>
       </TableRow>
       {expanded ? (
         <TableRow className="hover:bg-transparent">
-          <TableCell colSpan={8} className="bg-muted/30">
+          <TableCell colSpan={9} className="bg-muted/30">
             <div className="flex items-center justify-between pb-2">
               <p className="text-xs font-medium text-muted-foreground">
                 Attempt details
               </p>
               <ChevronDownIcon className="size-3.5 rotate-180 text-muted-foreground" />
             </div>
-            {action.error ? (
+            {node.error ? (
               <p className="mb-2 text-sm text-red-700 dark:text-red-400">
-                {action.error}
+                {node.error}
               </p>
             ) : null}
             <div className="grid gap-2 sm:grid-cols-2">
-              <JsonBlock label="input" value={asJsonObject(action.input)} />
-              <JsonBlock label="output" value={asJsonObject(action.output)} />
+              <JsonBlock label="input" value={asJsonObject(node.input)} />
+              <JsonBlock label="output" value={asJsonObject(node.output)} />
             </div>
           </TableCell>
         </TableRow>

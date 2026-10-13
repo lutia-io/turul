@@ -8,6 +8,7 @@ export const nodeTypes = [
   "FILE",
   "RECORD",
   "BULK",
+  "TRIGGER_WORKFLOW",
 ] as const
 
 export type NodeType = (typeof nodeTypes)[number]
@@ -20,6 +21,7 @@ export const nodeTypeLabels: Record<NodeType, string> = {
   FILE: "File",
   RECORD: "Record API",
   BULK: "Bulk records",
+  TRIGGER_WORKFLOW: "Run a workflow",
 }
 
 export const executableNodeTypes = new Set<NodeType>(nodeTypes)
@@ -272,6 +274,8 @@ export function defaultDefinition(type: NodeType): JsonObject {
           },
         ],
       }
+    case "TRIGGER_WORKFLOW":
+      return { workflow: "", input: {} }
   }
 }
 
@@ -363,6 +367,11 @@ export function nodeConfigSummary(type: string, definition: JsonObject) {
       : 0
     const types = records === 1 ? "1 record type" : `${records} record types`
     return `${operation} · ${types}`
+  }
+  if (type === "TRIGGER_WORKFLOW") {
+    const workflow =
+      typeof definition.workflow === "string" ? definition.workflow.trim() : ""
+    return workflow ? `Workflow ${workflow}` : "Run a workflow"
   }
   return nodeTypeLabel(type)
 }

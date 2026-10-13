@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { RotateCcwIcon, ViewIcon, WorkflowIcon } from "lucide-react"
+import { RotateCcwIcon, ViewIcon } from "lucide-react"
 import { useTable } from "@tanstack/react-table"
 
 import {
@@ -87,7 +87,7 @@ const sortFields: WorkflowListSort[] = [
   "status",
   "network",
   "organization",
-  "currentAction",
+  "currentLevel",
   "createdAt",
   "duration",
 ]
@@ -325,7 +325,7 @@ export default function WorkflowList() {
             ]
           : []),
         helper.accessor("currentLabel", {
-          id: "currentAction",
+          id: "currentLevel",
           header: ({ column }) => (
             <DataTableColumnHeader
               title="Step"
@@ -558,11 +558,11 @@ export default function WorkflowList() {
 
   return (
     <DataTablePage
-      title={network ? `${network.name} workflows` : "Workflows"}
+      title="Runs"
       description={
         network
-          ? `Live workflow executions in ${network.name}${organizationId ? " for this organization" : ""}.`
-          : "Active workflow executions across your networks. Open a run to inspect the current step."
+          ? `Each run is one execution of a workflow in ${network.name}${organizationId ? " for this organization" : ""}. Open a run to inspect steps and retry failures.`
+          : "Each run is one execution of a workflow. Open a run to inspect steps and retry failures."
       }
       action={
         canNetwork("workflow_definition", "read") ? (
@@ -570,8 +570,8 @@ export default function WorkflowList() {
             variant="outline"
             render={<Link to={href("workflow-definitions")} />}
           >
-            <WorkflowIcon />
-            Workflow Definitions
+            <ViewIcon />
+            View definitions
           </Button>
         ) : null
       }
@@ -579,24 +579,24 @@ export default function WorkflowList() {
       <DataTableToolbar
         query={query}
         onQueryChange={setQuery}
-        searchPlaceholder="Search workflows..."
+        searchPlaceholder="Search runs..."
         searchClassName="sm:max-w-3xl"
         chips={<DataTableActiveFilters filters={activeFilters} />}
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading workflows...",
+          loadingLabel: "Loading runs...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
-          singular: "workflow",
+          singular: "run",
         })}
         onRefresh={refetch}
         isRefreshing={isFetching}
       />
       {isError ? (
         <p className="text-sm text-destructive">
-          {getHumaErrorMessage(error, "Failed to load workflows")}
+          {getHumaErrorMessage(error, "Failed to load runs")}
         </p>
       ) : (
         <>
@@ -604,7 +604,7 @@ export default function WorkflowList() {
             <p className="text-sm text-destructive">
               {getHumaErrorMessage(
                 retryState.error,
-                "Failed to retry workflow"
+                "Failed to retry run"
               )}
             </p>
           ) : null}
@@ -613,10 +613,10 @@ export default function WorkflowList() {
             isRefreshing={isFetching}
             empty={
               isLoading
-                ? "Loading workflows..."
+                ? "Loading runs..."
                 : filtersActive
-                  ? "No workflows match this view."
-                  : "No workflow executions yet."
+                  ? "No runs match this view."
+                  : "No runs yet. Runs appear when a workflow is triggered or enqueued."
             }
           />
           <DataTablePagination table={table} />

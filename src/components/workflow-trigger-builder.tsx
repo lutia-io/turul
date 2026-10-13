@@ -1,4 +1,5 @@
 import { ClockIcon, WorkflowIcon } from "lucide-react"
+import type { ReactNode } from "react"
 
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -52,10 +53,12 @@ function hourLabel(hour: string) {
 export function WorkflowTriggerBuilder({
   value,
   fields,
+  schemaField,
   onChange,
 }: {
   value: TriggerDraft
   fields: JsonSchemaProperty[]
+  schemaField?: ReactNode
   onChange: (next: TriggerDraft) => void
 }) {
   const includesUpdate =
@@ -76,6 +79,9 @@ export function WorkflowTriggerBuilder({
         description={triggerSummary(triggerToApi(value), fields)}
       />
       <div className="mt-6 flex flex-col gap-4">
+        {schemaField ? (
+          <div className="max-w-sm">{schemaField}</div>
+        ) : null}
         <div className="flex flex-wrap gap-1.5">
           {kindItems.map((item) => {
             const selected = value.kind === item.value

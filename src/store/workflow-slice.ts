@@ -11,7 +11,7 @@ export type ApiWorkflowDefinition = {
   active: boolean
   internal: boolean
   definition: WorkflowDefinitionBody
-  schemaId: string
+  schemaId?: string
   networkId: string
   organizationId?: string | null
   userId: string
@@ -26,7 +26,7 @@ export type CreateWorkflowDefinitionRequest = {
   description: string
   active: boolean
   definition: WorkflowDefinitionBody
-  schemaId: string
+  schemaId?: string
   networkId: string
   organizationId?: string
 }
@@ -41,11 +41,22 @@ export type UpdateWorkflowDefinitionRequest = {
   description: string
   active: boolean
   definition: WorkflowDefinitionBody
-  schemaId: string
+  schemaId?: string
 }
 
 export type UpdateWorkflowDefinitionResponse = {
   id: string
+}
+
+export type TestWorkflowDefinitionRequest = {
+  definition: WorkflowDefinitionBody
+  input?: JsonObject
+}
+
+export type TestWorkflowDefinitionResponse = {
+  status: string
+  nodes?: ApiWorkflowNode[]
+  error?: string
 }
 
 export type StringFilterOp = "contains" | "eq" | "startsWith" | "empty"
@@ -58,6 +69,7 @@ export type WorkflowDefinitionListSort =
   | "network"
   | "scope"
   | "actions"
+  | "stages"
   | "createdAt"
   | "updatedAt"
 
@@ -84,6 +96,8 @@ export type ListWorkflowDefinitionsParams = {
   networkOp?: StringFilterOp
   actions?: number
   actionsOp?: NumberFilterOp
+  stages?: number
+  stagesOp?: NumberFilterOp
 }
 
 export type ApiWorkflowDefinitionList = {
@@ -142,23 +156,38 @@ function listWorkflowDefinitionQueryParams(
   }
   setStringFilterParam(query, "network", params.network, params.networkOp)
   setNumberFilterParam(query, "actions", params.actions, params.actionsOp)
+  setNumberFilterParam(query, "stages", params.stages, params.stagesOp)
 
   return query
 }
 
 export type ApiWorkflowStatus = "pending" | "running" | "completed" | "failed"
 
+export type ApiSnapshotNode = {
+  name: string
+  slug: string
+  type: string
+  definition: JsonObject
+}
+
+export type ApiWorkflowRunDefinition = {
+  trigger: WorkflowDefinitionBody["trigger"]
+  criteria: WorkflowDefinitionBody["criteria"]
+  nodes: ApiSnapshotNode[][]
+}
+
 export type ApiWorkflow = {
   id: string
   workflowDefinitionId: string
   networkId: string
-  recordId: string
-  data: JsonObject
+  recordId?: string
+  data?: JsonObject
+  input: JsonObject
   organizationId: string
   organizationUserId: string
-  definition: WorkflowDefinitionBody
+  definition: ApiWorkflowRunDefinition
   status: ApiWorkflowStatus
-  currentAction: number
+  currentLevel: number
   attempts: number
   maxAttempts: number
   error?: string
@@ -171,6 +200,7 @@ export type WorkflowListSort =
   | "status"
   | "network"
   | "organization"
+  | "currentLevel"
   | "currentAction"
   | "createdAt"
   | "completedAt"
@@ -242,20 +272,40 @@ function listWorkflowQueryParams(params?: ListWorkflowsParams) {
   return query
 }
 
-export type ApiWorkflowActionStatus = "completed" | "failed"
+export type ApiWorkflowNodeStatus = "completed" | "failed"
 
-export type ApiWorkflowAction = {
+export type ApiNodeFileRef = {
+  fileId: string
+  filename?: string
+  contentType?: string
+  sizeBytes?: number
+}
+
+export type ApiNodePayload = {
+  files?: ApiNodeFileRef[]
+}
+
+export type ApiWorkflowNode = {
   id: string
   workflowId: string
-  actionIndex: number
+  levelIndex: number
+  nodeIndex: number
   attempt: number
-  actionType: string
-  status: ApiWorkflowActionStatus
+  nodeSlug: string
+  nodeType: string
+  status: ApiWorkflowNodeStatus | string
   input?: JsonObject
   output?: JsonObject
+  payload?: ApiNodePayload
   error?: string
   startedAt: string
   completedAt: string
+}
+
+export type CreateWorkflowRequest = {
+  workflowDefinitionId: string
+  input: JsonObject
+  dedupeKey?: string
 }
 
 const workflowApi = api.injectEndpoints({
@@ -330,6 +380,16 @@ const workflowApi = api.injectEndpoints({
               { type: "WorkflowDefinition", id: "LIST" },
             ],
     }),
+    testWorkflowDefinition: build.mutation<
+      TestWorkflowDefinitionResponse,
+      TestWorkflowDefinitionRequest
+    >({
+      query: (body) => ({
+        url: "/workflow-definition/test",
+        method: "POST",
+        body,
+      }),
+    }),
     listWorkflows: build.query<ApiWorkflowList, ListWorkflowsParams | void>({
       query: (params) => ({
         url: "/workflow",
@@ -366,6 +426,15 @@ const workflowApi = api.injectEndpoints({
       query: (id) => `/workflow/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Workflow", id }],
     }),
+    createWorkflow: build.mutation<{ id: string }, CreateWorkflowRequest>({
+      query: (body) => ({
+        url: "/workflow",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (_result, error) =>
+        error ? [] : [{ type: "Workflow", id: "LIST" }],
+    }),
     retryWorkflow: build.mutation<{ id: string }, string>({
       query: (id) => ({
         url: `/workflow/${id}/retry`,
@@ -377,41 +446,41 @@ const workflowApi = api.injectEndpoints({
           : [
               { type: "Workflow", id },
               { type: "Workflow", id: "LIST" },
-              { type: "WorkflowAction", id: `LIST-${id}` },
+              { type: "WorkflowNode", id: `LIST-${id}` },
             ],
     }),
-    listWorkflowActions: build.query<ApiWorkflowAction[], string>({
-      query: (workflowId) => `/workflow/${workflowId}/action`,
+    listWorkflowNodes: build.query<ApiWorkflowNode[], string>({
+      query: (workflowId) => `/workflow/${workflowId}/node`,
       providesTags: (result, _error, workflowId) =>
         result
           ? [
               ...result.map(({ id }) => ({
-                type: "WorkflowAction" as const,
+                type: "WorkflowNode" as const,
                 id,
               })),
-              { type: "WorkflowAction", id: `LIST-${workflowId}` },
+              { type: "WorkflowNode", id: `LIST-${workflowId}` },
             ]
-          : [{ type: "WorkflowAction", id: `LIST-${workflowId}` }],
+          : [{ type: "WorkflowNode", id: `LIST-${workflowId}` }],
       async onQueryStarted(_workflowId, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled
-          for (const action of data) {
+          for (const node of data) {
             dispatch(
               workflowApi.util.upsertQueryData(
-                "getWorkflowAction",
-                action.id,
-                action
+                "getWorkflowNode",
+                node.id,
+                node
               )
             )
           }
         } catch {
-          // List failed; getWorkflowAction cache stays unchanged.
+          // List failed; getWorkflowNode cache stays unchanged.
         }
       },
     }),
-    getWorkflowAction: build.query<ApiWorkflowAction, string>({
-      query: (id) => `/workflow-action/${id}`,
-      providesTags: (_result, _error, id) => [{ type: "WorkflowAction", id }],
+    getWorkflowNode: build.query<ApiWorkflowNode, string>({
+      query: (id) => `/workflow-node/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "WorkflowNode", id }],
     }),
   }),
 })
@@ -421,11 +490,13 @@ export const {
   useGetWorkflowDefinitionQuery,
   useCreateWorkflowDefinitionMutation,
   useUpdateWorkflowDefinitionMutation,
+  useTestWorkflowDefinitionMutation,
   useListWorkflowsQuery,
   useGetWorkflowQuery,
+  useCreateWorkflowMutation,
   useRetryWorkflowMutation,
-  useListWorkflowActionsQuery,
-  useGetWorkflowActionQuery,
+  useListWorkflowNodesQuery,
+  useGetWorkflowNodeQuery,
 } = workflowApi
 
 export function workflowDefinitionAsJson(

@@ -11,9 +11,14 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { getHumaErrorMessage, useLoginUserMutation } from "@/store/api"
+import { setCredentials } from "@/store/auth-slice"
+import { useAppDispatch } from "@/store/hooks"
 import { Loader } from "lucide-react"
 
+const APP_HOME = "/app/networks"
+
 export function LoginForm() {
+  const dispatch = useAppDispatch()
   const [loginUser, { isLoading, error }] = useLoginUserMutation()
   const navigate = useNavigate()
   const location = useLocation() as { state?: { from?: { pathname: string } } }
@@ -25,9 +30,12 @@ export function LoginForm() {
     const password = String(form.get("password") ?? "")
 
     try {
-      await loginUser({ email, password }).unwrap()
+      const tokens = await loginUser({ email, password }).unwrap()
+      dispatch(setCredentials({ ...tokens, email }))
       const from = location.state?.from?.pathname
-      navigate(from && from.startsWith("/app") ? from : "/app/networks", { replace: true })
+      navigate(from && from.startsWith("/app") ? from : APP_HOME, {
+        replace: true,
+      })
     } catch {
       // Error is rendered from the mutation state.
     }

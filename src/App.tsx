@@ -19,10 +19,6 @@ import {
   WorkflowDefinitionDetail,
   WorkflowList,
   WorkflowRunDetail,
-  PipelineDefinitionList,
-  PipelineDefinitionDetail,
-  PipelineList,
-  PipelineRunDetail,
   RecordsPage,
   RecordDetail,
   FilesPage,
@@ -56,15 +52,8 @@ function networkWorkspaceRoutes() {
         path="workflow-definitions/:workflowDefinitionId"
         element={<WorkflowDefinitionDetail />}
       />
-      <Route path="pipeline-definitions" element={<PipelineDefinitionList />} />
-      <Route
-        path="pipeline-definitions/:pipelineDefinitionId"
-        element={<PipelineDefinitionDetail />}
-      />
       <Route path="workflows" element={<WorkflowList />} />
       <Route path="workflows/:workflowRunId" element={<WorkflowRunDetail />} />
-      <Route path="pipelines" element={<PipelineList />} />
-      <Route path="pipelines/:pipelineRunId" element={<PipelineRunDetail />} />
       <Route path="organizations" element={<OrganizationList />} />
       <Route path="organization/:orgId" element={<OrganizationDetail />} />
       <Route path="organization-users" element={<OrganizationUserList />} />

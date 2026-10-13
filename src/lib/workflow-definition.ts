@@ -5,6 +5,19 @@ import {
   type JsonSchemaProperty,
   type JsonValue,
 } from "@/lib/json-definition"
+import {
+  levelsFromApi,
+  levelsToApi,
+  parsePipelineDefinition,
+  pipelineDraftSentence,
+  pipelineNodeCount,
+  pipelineSummary,
+  type PipelineLevelDraft,
+  type PipelineNodeConfig,
+} from "@/lib/pipeline-definition"
+
+export type { PipelineLevelDraft, PipelineNodeConfig }
+export { levelsFromApi, levelsToApi }
 
 export const compareOperators = [
   "eq",
@@ -30,24 +43,10 @@ export type WorkflowCriteria = {
   value?: JsonValue
 }
 
-export const workflowActionTypes = [
-  "CREATE_RECORD",
-  "UPDATE_RECORD",
-  "UPSERT_RECORD",
-  "TRIGGER_PIPELINE",
-] as const
-
-export type WorkflowActionType = (typeof workflowActionTypes)[number]
-
-export type WorkflowAction = {
-  type: WorkflowActionType
-  context: JsonObject
-}
-
 export type WorkflowDefinitionBody = {
   trigger: WorkflowTrigger
   criteria: WorkflowCriteria
-  actions: WorkflowAction[]
+  nodes: PipelineNodeConfig[][]
 }
 
 export const triggerOnValues = ["created", "updated", "schedule"] as const
@@ -108,12 +107,6 @@ export const commonTimezones = [
   "Pacific/Auckland",
 ] as const
 
-export type DataEntryDraft = {
-  key: string
-  name: string
-  value: string
-}
-
 export type CriteriaLeafDraft = {
   kind: "leaf"
   key: string
@@ -131,15 +124,6 @@ export type CriteriaGroupDraft = {
 }
 
 export type CriteriaNodeDraft = CriteriaLeafDraft | CriteriaGroupDraft
-
-export type ActionDraft = {
-  key: string
-  type: WorkflowActionType
-  schemaId: string
-  recordId: string
-  pipeline: string
-  data: DataEntryDraft[]
-}
 
 let draftSeq = 0
 
@@ -165,27 +149,6 @@ export function emptyGroup(logic: CriteriaLogic = "AND"): CriteriaGroupDraft {
     key: newDraftKey("group"),
     logic,
     conditions: [],
-  }
-}
-
-export function emptyDataEntry(name = ""): DataEntryDraft {
-  return {
-    key: newDraftKey("data"),
-    name,
-    value: "",
-  }
-}
-
-export function emptyAction(
-  type: WorkflowActionType = "CREATE_RECORD"
-): ActionDraft {
-  return {
-    key: newDraftKey("action"),
-    type,
-    schemaId: "",
-    recordId: "",
-    pipeline: "",
-    data: [emptyDataEntry()],
   }
 }
 
@@ -424,31 +387,11 @@ export const logicLabels: Record<CriteriaLogic, string> = {
   NOT: "None of these match",
 }
 
-export const actionTypeLabels: Record<WorkflowActionType, string> = {
-  CREATE_RECORD: "Create a record",
-  UPDATE_RECORD: "Update a record",
-  UPSERT_RECORD: "Create or update a record",
-  TRIGGER_PIPELINE: "Run a pipeline",
-}
-
-export const actionTypeDescriptions: Record<WorkflowActionType, string> = {
-  CREATE_RECORD: "Make a new record when this workflow runs.",
-  UPDATE_RECORD:
-    "Change fields on an existing record. You can read that record's current values while updating it.",
-  UPSERT_RECORD:
-    "Update the record if it exists, otherwise create it. Updates can read the existing record's current values.",
-  TRIGGER_PIPELINE: "Send data into a pipeline.",
-}
-
 function asObject(value: unknown): JsonObject | undefined {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value as JsonObject
   }
   return undefined
-}
-
-function asString(value: unknown) {
-  return typeof value === "string" ? value : undefined
 }
 
 function asCompareOperator(value: unknown): CompareOperator {
@@ -461,12 +404,6 @@ function asLogic(value: unknown): CriteriaLogic {
   return criteriaLogics.includes(value as CriteriaLogic)
     ? (value as CriteriaLogic)
     : "AND"
-}
-
-function asActionType(value: unknown): WorkflowActionType {
-  return workflowActionTypes.includes(value as WorkflowActionType)
-    ? (value as WorkflowActionType)
-    : "CREATE_RECORD"
 }
 
 function stringifyValue(value: unknown) {
@@ -548,17 +485,6 @@ export function stringifyWorkflowValue(value: unknown) {
     return value ? "true" : "false"
   }
   return String(value)
-}
-
-export function actionDataEntries(action: WorkflowAction): [string, unknown][] {
-  const source =
-    action.type === "TRIGGER_PIPELINE"
-      ? action.context.input
-      : action.context.data
-  if (source && typeof source === "object" && !Array.isArray(source)) {
-    return Object.entries(source as Record<string, unknown>)
-  }
-  return []
 }
 
 export function criteriaFromApi(
@@ -660,109 +586,16 @@ function criteriaNodeToApi(
   }
 }
 
-function entriesFromRecord(record: unknown): DataEntryDraft[] {
-  const object = asObject(record)
-  if (!object) {
-    return [emptyDataEntry()]
-  }
-  const entries = Object.entries(object).map(([name, value]) => ({
-    key: newDraftKey("data"),
-    name,
-    value: stringifyValue(value),
-  }))
-  return entries.length > 0 ? entries : [emptyDataEntry()]
+export function workflowNodesToApi(
+  levels: PipelineLevelDraft[]
+): PipelineNodeConfig[][] | undefined {
+  return levelsToApi(levels)?.nodes
 }
 
-function recordFromEntries(entries: DataEntryDraft[]): JsonObject {
-  const data: JsonObject = {}
-  for (const entry of entries) {
-    const name = entry.name.trim()
-    if (!name) {
-      continue
-    }
-    data[name] = entry.value
-  }
-  return data
-}
-
-export function actionsFromApi(
-  actions: WorkflowAction[] | undefined
-): ActionDraft[] {
-  if (!actions || actions.length === 0) {
-    return []
-  }
-
-  return actions.map((action) => {
-    const context = asObject(action.context) ?? {}
-    return {
-      key: newDraftKey("action"),
-      type: asActionType(action.type),
-      schemaId: asString(context.schemaId) ?? "",
-      recordId: asString(context.recordId) ?? "",
-      pipeline: asString(context.pipeline) ?? "",
-      data: entriesFromRecord(
-        action.type === "TRIGGER_PIPELINE" ? context.input : context.data
-      ),
-    }
-  })
-}
-
-export function actionsToApi(actions: ActionDraft[]): WorkflowAction[] {
-  return actions.flatMap((action): WorkflowAction[] => {
-    const data = recordFromEntries(action.data)
-    switch (action.type) {
-      case "CREATE_RECORD":
-        if (!action.schemaId) {
-          return []
-        }
-        return [
-          {
-            type: action.type,
-            context: { schemaId: action.schemaId, data },
-          },
-        ]
-      case "UPDATE_RECORD":
-        if (!action.recordId.trim()) {
-          return []
-        }
-        return [
-          {
-            type: action.type,
-            context: {
-              ...(action.schemaId ? { schemaId: action.schemaId } : {}),
-              recordId: action.recordId.trim(),
-              data,
-            },
-          },
-        ]
-      case "UPSERT_RECORD":
-        if (!action.schemaId) {
-          return []
-        }
-        return [
-          {
-            type: action.type,
-            context: {
-              schemaId: action.schemaId,
-              ...(action.recordId.trim()
-                ? { recordId: action.recordId.trim() }
-                : {}),
-              data,
-            },
-          },
-        ]
-      case "TRIGGER_PIPELINE":
-        if (!action.pipeline.trim()) {
-          return []
-        }
-        return [
-          {
-            type: action.type,
-            context: { pipeline: action.pipeline.trim(), input: data },
-          },
-        ]
-    }
-  })
+export function workflowNodesFromApi(
+  nodes: PipelineNodeConfig[][] | undefined
+): PipelineLevelDraft[] {
+  return levelsFromApi(nodes ? { nodes } : undefined)
 }
 
 function parseTrigger(value: unknown): WorkflowTrigger {
@@ -804,43 +637,36 @@ export function parseWorkflowDefinition(
     return undefined
   }
   const criteria = asObject(object.criteria) as WorkflowCriteria | undefined
-  const actions = Array.isArray(object.actions)
-    ? object.actions.flatMap((item) => {
-        const action = asObject(item)
-        const type = asActionType(action?.type)
-        if (!action || !workflowActionTypes.includes(type)) {
-          return []
-        }
-        return [
-          {
-            type,
-            context: asObject(action.context) ?? {},
-          },
-        ]
-      })
-    : []
-  if (!criteria && actions.length === 0) {
+  const nodes = parsePipelineDefinition({ nodes: object.nodes })?.nodes
+  if (!nodes?.length) {
     return undefined
   }
   return {
     trigger: parseTrigger(object.trigger),
     criteria: (criteria ?? {}) as WorkflowCriteria,
-    actions,
+    nodes,
   }
+}
+
+export function workflowNodeCount(body?: WorkflowDefinitionBody) {
+  if (!body?.nodes) {
+    return 0
+  }
+  return pipelineNodeCount({ nodes: body.nodes })
 }
 
 export function workflowRuleSentence(
   trigger: WorkflowTrigger | undefined,
   criteria: WorkflowCriteria | undefined,
-  actionCount: number,
+  nodeCount: number,
   fields?: JsonSchemaProperty[]
 ) {
   const conditionCount = countCriteriaLeaves(criteria)
   return `${triggerSummary(trigger, fields)}${
     conditionCount > 0 ? ` · ${criteriaSummary(criteria, fields)}.` : "."
   }${
-    actionCount > 0
-      ? ` Then ${actionCount} ${actionCount === 1 ? "action" : "actions"} run in order.`
+    nodeCount > 0
+      ? ` Then ${nodeCount} ${nodeCount === 1 ? "node" : "nodes"} run level by level.`
       : ""
   }`
 }
@@ -848,15 +674,18 @@ export function workflowRuleSentence(
 export function workflowDraftSentence(
   trigger: TriggerDraft,
   criteria: CriteriaGroupDraft,
-  actions: ActionDraft[],
+  levels: PipelineLevelDraft[],
   fields: JsonSchemaProperty[]
 ) {
-  return workflowRuleSentence(
+  const nodeCount = levels.reduce((count, level) => count + level.nodes.length, 0)
+  const flow =
+    nodeCount > 0 ? ` ${pipelineDraftSentence(levels)}` : ""
+  return `${workflowRuleSentence(
     triggerToApi(trigger),
     criteriaToApi(criteria, fields),
-    actions.length,
+    nodeCount,
     fields
-  )
+  )}${flow}`
 }
 
 export function workflowColumnNames(
@@ -901,9 +730,10 @@ export function workflowSummary(
 ): string {
   const parsed = parseWorkflowDefinition(definition)
   if (parsed) {
-    const actionCount = parsed.actions.length
+    const nodeCount = workflowNodeCount(parsed)
     const conditions = criteriaSummary(parsed.criteria, fields)
-    return `${triggerSummary(parsed.trigger, fields)} · ${conditions} · ${actionCount} ${actionCount === 1 ? "action" : "actions"}`
+    const nodes = pipelineSummary({ nodes: parsed.nodes })
+    return `${triggerSummary(parsed.trigger, fields)} · ${conditions} · ${nodeCount} ${nodeCount === 1 ? "node" : "nodes"} · ${nodes}`
   }
   return "Workflow"
 }
@@ -933,10 +763,6 @@ export function criteriaSummary(
     return `${fieldSummaryLabel(criteria.field, fields)} ${operatorLabels[asCompareOperator(criteria.operator)]} ${stringifyValue(criteria.value)}`
   }
   return "No conditions"
-}
-
-export function actionSummary(action: WorkflowAction): string {
-  return actionTypeLabels[asActionType(action.type)]
 }
 
 export function recordFieldTemplate(field: string) {

@@ -1,7 +1,7 @@
 import type { BadgeColor } from "@/lib/badge"
 import type { JsonObject, JsonValue } from "@/lib/json-definition"
+import type { PipelineNodeConfig } from "@/lib/pipeline-definition"
 import type {
-  WorkflowAction,
   WorkflowCriteria,
   WorkflowTrigger,
 } from "@/lib/workflow-definition"
@@ -70,7 +70,7 @@ export function defineWorkflow({
   trigger,
   steps,
   criteria,
-  actions,
+  nodes,
   active = true,
   internal = false,
   organizationId,
@@ -83,16 +83,16 @@ export function defineWorkflow({
   trigger?: WorkflowTrigger | { type: string; event: string }
   steps?: { id: string; type: string; name: string }[]
   criteria?: WorkflowCriteria
-  actions?: WorkflowAction[]
+  nodes?: PipelineNodeConfig[][]
   active?: boolean
   internal?: boolean
   organizationId?: string
 }) {
   const nextTrigger = normalizeMockTrigger(trigger)
-  const nextActions =
-    actions && actions.length > 0
-      ? actions
-      : mockActionsFromSteps(schemaId, steps)
+  const nextNodes =
+    nodes && nodes.length > 0
+      ? nodes
+      : mockNodesFromSteps(schemaId, steps)
 
   return {
     id,
@@ -106,7 +106,7 @@ export function defineWorkflow({
     definition: {
       trigger: nextTrigger,
       criteria: criteria ?? {},
-      actions: nextActions,
+      nodes: nextNodes,
     } satisfies JsonObject,
   }
 }
@@ -130,22 +130,32 @@ function normalizeMockTrigger(
   return { on: ["created"] }
 }
 
-function mockActionsFromSteps(
+function mockNodesFromSteps(
   schemaId: string,
   steps?: { id: string; type: string; name: string }[]
-): WorkflowAction[] {
+): PipelineNodeConfig[][] {
   if (!steps || steps.length === 0) {
     return [
-      {
-        type: "CREATE_RECORD",
-        context: { schemaId, data: {} },
-      },
+      [
+        {
+          name: "Create record",
+          type: "RECORD",
+          definition: {
+            operation: "CREATE",
+            schemaId,
+            data: {},
+          },
+        },
+      ],
     ]
   }
-  return steps.map((step) => ({
-    type: "CREATE_RECORD" as const,
-    context: { schemaId, data: { step: step.name } },
-  }))
+  return [
+    steps.map((step) => ({
+      name: step.name,
+      type: "NOOP" as const,
+      definition: { message: step.name },
+    })),
+  ]
 }
 
 export function definePipeline({

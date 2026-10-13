@@ -88,6 +88,11 @@ import type { PipelineNodeConfig } from "@/lib/pipeline-definition"
 
 const CHOOSE_SCHEMA = "__choose_schema__"
 
+type TriggerWorkflowDefinitionDraft = {
+  workflow: string
+  input: MappingEntry[]
+}
+
 type NodeDrafts = {
   http: HttpDefinitionDraft
   message: string
@@ -96,6 +101,7 @@ type NodeDrafts = {
   file: FileDefinitionDraft
   record: RecordDefinitionDraft
   bulk: BulkDefinitionDraft
+  triggerWorkflow: TriggerWorkflowDefinitionDraft
 }
 
 function draftsFromDefinition(
@@ -117,6 +123,17 @@ function draftsFromDefinition(
     file: fileDraftFromDefinition(definition),
     record: recordDraftFromDefinition(definition),
     bulk: bulkDraftFromDefinition(definition),
+    triggerWorkflow: {
+      workflow:
+        typeof definition.workflow === "string" ? definition.workflow : "",
+      input: mappingEntriesFromObject(
+        definition.input &&
+          typeof definition.input === "object" &&
+          !Array.isArray(definition.input)
+          ? (definition.input as JsonObject)
+          : undefined
+      ),
+    },
   }
 }
 
@@ -141,6 +158,18 @@ function definitionFromDrafts(
       return { definition: recordDefinitionFromDraft(drafts.record) }
     case "BULK":
       return bulkDefinitionFromDraft(drafts.bulk)
+    case "TRIGGER_WORKFLOW": {
+      const workflow = drafts.triggerWorkflow.workflow.trim()
+      if (!workflow) {
+        return { error: "Workflow slug or ID is required" }
+      }
+      return {
+        definition: {
+          workflow,
+          input: mappingObjectFromEntries(drafts.triggerWorkflow.input),
+        },
+      }
+    }
   }
 }
 
@@ -1450,6 +1479,48 @@ export function NodeDefinitionEditor({
                     Add record type
                   </button>
                 </div>
+              </Field>
+            </>
+          ) : null}
+          {type === "TRIGGER_WORKFLOW" ? (
+            <>
+              <Field>
+                <FieldLabel htmlFor={`${formId}-trigger-workflow`}>
+                  Workflow
+                </FieldLabel>
+                <Input
+                  id={`${formId}-trigger-workflow`}
+                  value={drafts.triggerWorkflow.workflow}
+                  onChange={(event) =>
+                    setDrafts((current) => ({
+                      ...current,
+                      triggerWorkflow: {
+                        ...current.triggerWorkflow,
+                        workflow: event.target.value,
+                      },
+                    }))
+                  }
+                  placeholder="workflow slug or ID"
+                  disabled={isLoading}
+                  required
+                />
+                <FieldDescription>
+                  Runs another workflow definition in this network.
+                </FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel>Input</FieldLabel>
+                <MappingFields
+                  entries={drafts.triggerWorkflow.input}
+                  onChange={(input) =>
+                    setDrafts((current) => ({
+                      ...current,
+                      triggerWorkflow: { ...current.triggerWorkflow, input },
+                    }))
+                  }
+                  groups={templateGroups}
+                  disabled={isLoading}
+                />
               </Field>
             </>
           ) : null}

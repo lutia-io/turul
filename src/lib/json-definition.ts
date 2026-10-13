@@ -200,24 +200,20 @@ export function getWorkflowSteps(definition: JsonObject) {
   if (named.length > 0) {
     return named
   }
-  if (!Array.isArray(definition.actions)) {
-    return []
+  const levels = getPipelineLevels(definition)
+  if (levels.length > 0) {
+    return levels.map((level, levelIndex) => ({
+      id: `level-${levelIndex}`,
+      type: "level",
+      name:
+        level
+          .map((node) => node.name.trim())
+          .filter(Boolean)
+          .join(", ") || `Level ${levelIndex + 1}`,
+      order: levelIndex + 1,
+    }))
   }
-  return definition.actions.flatMap((item, index) => {
-    const action = asObject(item)
-    const type = asString(action?.type)
-    if (!type) {
-      return []
-    }
-    return [
-      {
-        id: `${type}-${index}`,
-        type,
-        name: type.replaceAll("_", " ").toLowerCase(),
-        order: index + 1,
-      },
-    ]
-  })
+  return []
 }
 
 export type PipelineLevelNode = {

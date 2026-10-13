@@ -1,26 +1,20 @@
 import { type ReactNode } from "react"
-import { Link } from "react-router"
-import {
-  TableIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { type LucideIcon } from "lucide-react"
 
 import { columnLabel, propertyLabel } from "@/components/schema-records-table"
-import type { PipelineDefinition, Schema } from "@/data/networks"
+import { PipelineLevelsView } from "@/components/pipeline-levels-editor"
 import type { JsonSchemaProperty } from "@/lib/json-definition"
+import { getPipelineLevels, type JsonObject } from "@/lib/json-definition"
 import { cn } from "@/lib/utils"
 import {
-  actionDataEntries,
-  actionTypeDescriptions,
-  actionTypeLabels,
   hasCriteria,
   logicLabels,
   operatorLabels,
   stringifyWorkflowValue,
   type CompareOperator,
   type CriteriaLogic,
-  type WorkflowAction,
   type WorkflowCriteria,
+  type WorkflowDefinitionBody,
 } from "@/lib/workflow-definition"
 
 export const workflowLogicExplanations: Record<CriteriaLogic, string> = {
@@ -246,148 +240,24 @@ function CriteriaLeafView({
   )
 }
 
-export function WorkflowActionView({
-  action,
-  index,
-  last,
-  schemas,
-  pipelines,
-  href,
+export function WorkflowNodesView({
+  definition,
 }: {
-  action: WorkflowAction
-  index: number
-  last: boolean
-  schemas: Schema[]
-  pipelines: PipelineDefinition[]
-  href: (rest?: string) => string
+  definition?: WorkflowDefinitionBody
 }) {
-  const label = actionTypeLabels[action.type] ?? action.type
-  const description = actionTypeDescriptions[action.type]
-  const schemaId =
-    typeof action.context.schemaId === "string"
-      ? action.context.schemaId
-      : undefined
-  const recordId =
-    typeof action.context.recordId === "string"
-      ? action.context.recordId
-      : undefined
-  const pipelineRef =
-    typeof action.context.pipeline === "string"
-      ? action.context.pipeline
-      : undefined
-  const schema = schemaId
-    ? schemas.find((item) => item.id === schemaId)
-    : undefined
-  const pipeline = pipelineRef
-    ? pipelines.find(
-        (item) => item.id === pipelineRef || item.slug === pipelineRef
-      )
-    : undefined
-  const data = actionDataEntries(action)
-  const hasMeta = Boolean(schemaId || recordId || pipelineRef || data.length)
-
-  return (
-    <li className="relative flex gap-3.5">
-      {last ? null : (
-        <span className="absolute top-8 bottom-0 left-[15px] w-px bg-border" />
-      )}
-      <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-xs font-medium">
-        {index + 1}
-      </span>
-      <div className={cn("min-w-0 flex-1", last ? "pb-0" : "pb-6")}>
-        <div className="rounded-xl border bg-background p-4 shadow-xs">
-          <p className="text-sm font-medium">{label}</p>
-          {description ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {description}
-            </p>
-          ) : null}
-          {hasMeta ? (
-            <dl className="mt-4 space-y-3">
-              {schemaId ? (
-                <ActionMeta label="Table">
-                  {schema ? (
-                    <Link
-                      to={`${href("records")}?schema=${schema.id}`}
-                      className="inline-flex max-w-full items-center gap-1.5 hover:underline"
-                    >
-                      <TableIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate">{schema.name}</span>
-                    </Link>
-                  ) : (
-                    <span className="font-mono text-xs font-normal">
-                      {schemaId}
-                    </span>
-                  )}
-                </ActionMeta>
-              ) : null}
-              {recordId ? (
-                <ActionMeta label="Record">
-                  <span className="font-mono text-xs font-normal">
-                    {recordId}
-                  </span>
-                </ActionMeta>
-              ) : null}
-              {pipelineRef ? (
-                <ActionMeta label="Pipeline">
-                  {pipeline ? (
-                    <Link
-                      to={href(`pipeline-definitions/${pipeline.id}`)}
-                      className="hover:underline"
-                    >
-                      {pipeline.name}
-                    </Link>
-                  ) : (
-                    <span className="font-mono text-xs font-normal">
-                      {pipelineRef}
-                    </span>
-                  )}
-                </ActionMeta>
-              ) : null}
-              {data.length > 0 ? (
-                <ActionMeta
-                  label={
-                    action.type === "TRIGGER_PIPELINE" ? "Input" : "Fields"
-                  }
-                >
-                  <ul className="space-y-1.5">
-                    {data.map(([name, value]) => (
-                      <li
-                        key={name}
-                        className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-baseline gap-3"
-                      >
-                        <span className="truncate font-mono text-xs text-muted-foreground">
-                          {name}
-                        </span>
-                        <span className="truncate text-sm">
-                          {stringifyWorkflowValue(value)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </ActionMeta>
-              ) : null}
-            </dl>
-          ) : null}
-        </div>
-      </div>
-    </li>
+  const levels = getPipelineLevels(
+    definition?.nodes ? ({ nodes: definition.nodes } as JsonObject) : {}
   )
-}
-
-function ActionMeta({
-  label,
-  children,
-}: {
-  label: string
-  children: ReactNode
-}) {
+  if (levels.length === 0) {
+    return (
+      <p className="mt-6 text-sm text-muted-foreground">
+        This workflow does not declare any nodes.
+      </p>
+    )
+  }
   return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm font-medium">{children}</dd>
+    <div className="mt-6 [&>div:first-child]:hidden">
+      <PipelineLevelsView levels={levels} />
     </div>
   )
 }

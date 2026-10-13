@@ -44,7 +44,7 @@ export type WorkflowDefinition = {
   description: string
   active: boolean
   internal: boolean
-  schemaId: string
+  schemaId?: string
   definition: JsonObject
   networkId?: string
   organizationId?: string

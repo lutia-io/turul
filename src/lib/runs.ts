@@ -20,10 +20,10 @@ import {
   getWorkflowSteps,
   type DefinitionStep,
 } from "@/lib/json-definition"
+import { getPipelineLevels, type JsonObject } from "@/lib/json-definition"
+import { nodeTypeLabel } from "@/lib/node-definition"
 import {
-  actionTypeLabels,
   parseWorkflowDefinition,
-  type WorkflowActionType,
   type WorkflowDefinitionBody,
 } from "@/lib/workflow-definition"
 import type { ApiWorkflow } from "@/store/workflow-slice"
@@ -268,17 +268,25 @@ export function countWorkflowRunStatuses(runs: { status: string }[]) {
 export function apiWorkflowSteps(
   definition: WorkflowDefinitionBody | undefined
 ): DefinitionStep[] {
-  return (definition?.actions ?? []).map((action, index) => ({
-    id: String(index),
-    type: action.type,
-    name: actionTypeLabels[action.type as WorkflowActionType] ?? action.type,
-    order: index + 1,
+  const levels = getPipelineLevels(
+    definition ? ({ nodes: definition.nodes } as JsonObject) : {}
+  )
+  return levels.map((level, levelIndex) => ({
+    id: `level-${levelIndex}`,
+    type: "level",
+    name:
+      level
+        .map((node) => node.name.trim() || nodeTypeLabel(node.type))
+        .filter(Boolean)
+        .join(", ") || `Level ${levelIndex + 1}`,
+    order: levelIndex + 1,
   }))
 }
 
 export function apiWorkflowCurrentStep(workflow: ApiWorkflow) {
   const total =
-    parseWorkflowDefinition(workflow.definition)?.actions.length ?? 0
+    parseWorkflowDefinition(workflow.definition)?.nodes.length ?? 0
+  const currentLevel = workflow.currentLevel ?? 0
   if (workflow.status === "pending") {
     return 0
   }
@@ -286,9 +294,9 @@ export function apiWorkflowCurrentStep(workflow: ApiWorkflow) {
     return total
   }
   if (workflow.status === "failed") {
-    return Math.min(Math.max(workflow.currentAction, 1), Math.max(total, 1))
+    return Math.min(Math.max(currentLevel + 1, 1), Math.max(total, 1))
   }
-  return Math.min(workflow.currentAction + 1, Math.max(total, 1))
+  return Math.min(currentLevel + 1, Math.max(total, 1))
 }
 
 export function matchesWorkflowScope(

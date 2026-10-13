@@ -97,19 +97,8 @@ export function networkSectionRest(rest: string) {
     return "workflow-definitions"
   }
 
-  if (
-    rest === "pipeline-definitions" ||
-    rest.startsWith("pipeline-definitions/")
-  ) {
-    return "pipeline-definitions"
-  }
-
   if (rest === "workflows" || rest.startsWith("workflows/")) {
     return "workflows"
-  }
-
-  if (rest === "pipelines" || rest.startsWith("pipelines/")) {
-    return "pipelines"
   }
 
   if (
@@ -250,7 +239,7 @@ export function workspaceWorkflowFromApi(
     description: workflow.description ?? "",
     active: workflow.active,
     internal: workflow.internal,
-    schemaId: workflow.schemaId,
+    schemaId: workflow.schemaId ?? undefined,
     definition: workflowDefinitionAsJson(workflow.definition),
     networkId: workflow.networkId,
     organizationId: workflow.organizationId ?? undefined,
@@ -313,10 +302,10 @@ export function withNetworkWorkflows(
   return {
     ...network,
     workflowDefinitions: workflows.filter((workflow) => {
-      if (
-        workflow.networkId !== network.id ||
-        !schemaIds.has(workflow.schemaId)
-      ) {
+      if (workflow.networkId !== network.id) {
+        return false
+      }
+      if (workflow.schemaId && !schemaIds.has(workflow.schemaId)) {
         return false
       }
       if (!organizationId) {
