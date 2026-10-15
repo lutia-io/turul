@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  BellIcon,
   CreditCardIcon,
   LogOutIcon,
   SparklesIcon,
@@ -90,10 +89,6 @@ export function NavUser({
           <DropdownMenuItem render={<Link to="/app/billing" />}>
             <CreditCardIcon />
             Billing
-          </DropdownMenuItem>
-          <DropdownMenuItem render={<Link to="/app/notifications" />}>
-            <BellIcon />
-            Notifications
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

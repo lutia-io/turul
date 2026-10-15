@@ -27,7 +27,6 @@ import {
   Login,
   Account,
   Billing,
-  Notifications,
 } from "./pages"
 
 function RedirectSchemaToRecords() {
@@ -86,7 +85,6 @@ export function App() {
             <Route path="/app/networks" element={<NetworkList />} />
             <Route path="/app/account" element={<Account />} />
             <Route path="/app/billing" element={<Billing />} />
-            <Route path="/app/notifications" element={<Notifications />} />
           </Route>
           <Route path="/app/networks/:networkId" element={<NetworkLayout />}>
             {networkWorkspaceRoutes()}

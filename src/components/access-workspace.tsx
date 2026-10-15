@@ -321,30 +321,35 @@ export function AccessWorkspace({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">Access</p>
-            <div className="flex min-w-0 flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-              {headerActions}
-            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
             <p className="max-w-2xl text-sm text-muted-foreground">
               {description}
             </p>
           </div>
-          {canManage ? (
-            <div className="flex flex-wrap gap-2">
-              {onInvite ? (
-                <Button variant="outline" onClick={() => setInviteOpen(true)}>
-                  <UserPlusIcon />
-                  Invite
-                </Button>
+          {headerActions || canManage ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {headerActions}
+              {canManage ? (
+                <>
+                  {onInvite ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setInviteOpen(true)}
+                    >
+                      <UserPlusIcon />
+                      Invite
+                    </Button>
+                  ) : null}
+                  <Button variant="outline" onClick={openNewGroup}>
+                    <PlusIcon />
+                    Add group
+                  </Button>
+                  <Button onClick={openNewOutline}>
+                    <PlusIcon />
+                    Add permission
+                  </Button>
+                </>
               ) : null}
-              <Button variant="outline" onClick={openNewGroup}>
-                <PlusIcon />
-                Add group
-              </Button>
-              <Button onClick={openNewOutline}>
-                <PlusIcon />
-                Add permission
-              </Button>
             </div>
           ) : null}
         </div>

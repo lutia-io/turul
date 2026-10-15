@@ -2,7 +2,7 @@ import { Navigate, useSearchParams } from "react-router"
 import { PlusIcon, ShieldIcon } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { NetworkPicker } from "@/components/network-picker"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -92,24 +92,13 @@ export default function PlatformAccess() {
       description="Groups and permissions for this network apply across all organizations."
       headerActions={
         networks.length > 1 ? (
-          <NativeSelect
-            className="w-56"
-            size="sm"
-            aria-label="Network"
+          <NetworkPicker
+            networks={networks}
             value={network.id}
-            onChange={(event) => {
-              setSearchParams(
-                { network: event.target.value },
-                { replace: true }
-              )
+            onValueChange={(networkId) => {
+              setSearchParams({ network: networkId }, { replace: true })
             }}
-          >
-            {networks.map((item) => (
-              <NativeSelectOption key={item.id} value={item.id}>
-                {item.name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          />
         ) : undefined
       }
     />

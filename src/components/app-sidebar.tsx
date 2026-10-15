@@ -1,6 +1,5 @@
 import * as React from "react"
 import {
-  BellIcon,
   CreditCardIcon,
   ListIcon,
   ShieldIcon,
@@ -23,11 +22,6 @@ const navAccount = [
     title: "Billing",
     url: "/app/billing",
     icon: <CreditCardIcon />,
-  },
-  {
-    title: "Notifications",
-    url: "/app/notifications",
-    icon: <BellIcon />,
   },
 ]
 
