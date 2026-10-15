@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react"
+import { useEffect, useId, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
@@ -47,7 +47,6 @@ export function CreateOrganizationUserDialog({
   const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
-  const { organizations } = useWorkspaceOrganizations({ skip: !open })
   const editing = Boolean(organizationUserId)
   const lockNetwork = Boolean(networkId) || editing
   const lockOrganization = Boolean(organizationId) || editing
@@ -70,14 +69,11 @@ export function CreateOrganizationUserDialog({
   const existingQuery = useGetOrganizationUserQuery(organizationUserId ?? "", {
     skip: !open || !organizationUserId,
   })
+  const { organizations: networkOrganizations } = useWorkspaceOrganizations({
+    skip: !open || !selectedNetworkId,
+    networkId: selectedNetworkId,
+  })
   const firstNetworkId = networks[0]?.id ?? ""
-  const networkOrganizations = useMemo(
-    () =>
-      organizations.filter(
-        (organization) => organization.networkId === selectedNetworkId
-      ),
-    [organizations, selectedNetworkId]
-  )
   const firstOrganizationId = networkOrganizations[0]?.id ?? ""
 
   useEffect(() => {

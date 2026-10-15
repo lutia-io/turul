@@ -107,8 +107,6 @@ export function WorkflowDefinitionDialog({
   const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
-  const { organizations } = useWorkspaceOrganizations({ skip: !open })
-  const { schemas } = useWorkspaceSchemas({ skip: !open })
   const [createWorkflow, createState] = useCreateWorkflowDefinitionMutation()
   const isLoading = createState.isLoading
   const error = createState.error
@@ -132,27 +130,18 @@ export function WorkflowDefinitionDialog({
   const [jsonError, setJsonError] = useState<string | null>(null)
   const jsonSourceRef = useRef<"builder" | "json">("builder")
 
+  const { organizations: networkOrganizations } = useWorkspaceOrganizations({
+    skip: !open || !selectedNetworkId,
+    networkId: selectedNetworkId,
+  })
+  const { schemas: networkSchemas } = useWorkspaceSchemas({
+    skip: !open || !selectedNetworkId,
+    networkId: selectedNetworkId,
+    organizationId: selectedOrganizationId || undefined,
+    networkScopeOnly: !selectedOrganizationId,
+  })
   const firstNetworkId = networks[0]?.id ?? ""
-  const networkOrganizations = organizations.filter(
-    (organization) => organization.networkId === selectedNetworkId
-  )
-  const networkSchemas = useMemo(
-    () =>
-      schemas.filter((schema) => {
-        if (schema.networkId !== selectedNetworkId) {
-          return false
-        }
-        if (!selectedOrganizationId) {
-          return !schema.organizationId
-        }
-        return (
-          !schema.organizationId ||
-          schema.organizationId === selectedOrganizationId
-        )
-      }),
-    [schemas, selectedNetworkId, selectedOrganizationId]
-  )
-  const triggerSchema = schemas.find((schema) => schema.id === schemaId)
+  const triggerSchema = networkSchemas.find((schema) => schema.id === schemaId)
   const triggerFields = schemaFieldOptions(triggerSchema?.definition)
 
   useEffect(() => {

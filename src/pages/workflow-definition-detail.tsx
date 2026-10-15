@@ -65,7 +65,6 @@ import {
   useNetworkWorkspace,
   useWorkspaceOrganizations,
   useWorkspaceSchemas,
-  useWorkspaceWorkflowRuns,
   workspaceWorkflowFromApi,
 } from "@/lib/network-workspace"
 import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
@@ -101,6 +100,7 @@ import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
   useGetWorkflowDefinitionQuery,
   useCreateWorkflowMutation,
+  useListWorkflowsQuery,
   useUpdateWorkflowDefinitionMutation,
 } from "@/store/workflow-slice"
 
@@ -132,7 +132,6 @@ export default function WorkflowDefinitionDetail() {
   } = useNetworkWorkspace()
   const { schemas } = useWorkspaceSchemas()
   const { organizations } = useWorkspaceOrganizations()
-  const { runs } = useWorkspaceWorkflowRuns()
   const { openEditWorkflow } = useCreateEntity()
   const navigate = useNavigate()
   const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
@@ -190,17 +189,19 @@ export default function WorkflowDefinitionDetail() {
     }),
     [fields, parsed?.criteria, parsed?.trigger]
   )
-  const relatedRuns = visibleWorkflow
-    ? runs
-        .filter(
-          (run) =>
-            run.workflowDefinitionId === visibleWorkflow.id &&
-            (!organizationId || run.organizationId === organizationId)
-        )
-        .slice()
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-        .slice(0, 5)
-    : []
+  const relatedRunsQuery = useListWorkflowsQuery(
+    {
+      workflowDefinitionId: visibleWorkflow?.id,
+      networkId: network?.id,
+      organizationId,
+      sort: "createdAt",
+      order: "desc",
+      page: 1,
+      pageSize: 5,
+    },
+    { skip: !isAuthenticated || !visibleWorkflow?.id }
+  )
+  const relatedRuns = relatedRunsQuery.data?.items ?? []
   const createdAt = workflowQuery.data?.createdAt
   const updatedAt = workflowQuery.data?.updatedAt
   const createdBy = workflowQuery.data?.createdBy

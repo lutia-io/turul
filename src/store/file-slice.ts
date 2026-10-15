@@ -51,6 +51,7 @@ export type ListFilesParams = {
   order?: "asc" | "desc"
   networkId?: string
   organizationId?: string
+  organizationUserId?: string
   filename?: string
   filenameOp?: StringFilterOp
   contentType?: FileContentTypeFilter
@@ -93,6 +94,9 @@ function listFileQueryParams(params?: ListFilesParams) {
   }
   if (params.organizationId) {
     query.organizationId = params.organizationId
+  }
+  if (params.organizationUserId) {
+    query.organizationUserId = params.organizationUserId
   }
   setStringFilterParam(query, "filename", params.filename, params.filenameOp)
   if (params.contentType) {

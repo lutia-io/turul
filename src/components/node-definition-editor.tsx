@@ -245,25 +245,12 @@ export function NodeDefinitionEditor({
 }) {
   const formId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
-  const { schemas } = useWorkspaceSchemas({
+  const { schemas: availableSchemas } = useWorkspaceSchemas({
     networkId,
+    organizationId: organizationId || undefined,
+    networkScopeOnly: !organizationId,
     skip: !networkId,
   })
-  const availableSchemas = useMemo(
-    () =>
-      schemas.filter((schema) => {
-        if (schema.networkId !== networkId) {
-          return false
-        }
-        if (!organizationId) {
-          return !schema.organizationId
-        }
-        return (
-          !schema.organizationId || schema.organizationId === organizationId
-        )
-      }),
-    [schemas, networkId, organizationId]
-  )
   const editing = Boolean(node)
   const startingType: NodeType | null =
     node && isNodeType(node.type) ? node.type : (initialType ?? null)

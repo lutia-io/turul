@@ -201,6 +201,7 @@ export type ListWorkflowsParams = {
   order?: "asc" | "desc"
   networkId?: string
   organizationId?: string
+  workflowDefinitionId?: string
   name?: string
   nameOp?: StringFilterOp
   status?: ApiWorkflowStatus
@@ -243,6 +244,9 @@ function listWorkflowQueryParams(params?: ListWorkflowsParams) {
   }
   if (params.organizationId) {
     query.organizationId = params.organizationId
+  }
+  if (params.workflowDefinitionId) {
+    query.workflowDefinitionId = params.workflowDefinitionId
   }
   setStringFilterParam(query, "name", params.name, params.nameOp)
   if (params.status) {

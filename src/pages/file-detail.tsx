@@ -14,15 +14,15 @@ import { buttonVariants } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getBadgeColor } from "@/lib/badge"
 import { fileKindLabel } from "@/lib/file-preview"
-import { formatFileSize, recordsReferencingFile } from "@/lib/records"
+import { formatFileSize } from "@/lib/records"
 import {
   organizationUserName,
   useNetworkWorkspace,
-  useWorkspaceOrganizationUsers,
-  useWorkspaceOrganizations,
-  useWorkspaceRecords,
-  useWorkspaceSchemas,
   workspaceFileFromApi,
+  workspaceOrganizationFromApi,
+  workspaceOrganizationUserFromApi,
+  workspaceRecordFromApi,
+  workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
@@ -30,6 +30,10 @@ import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetFileContentQuery, useGetFileQuery } from "@/store/file-slice"
+import { useGetOrganizationQuery } from "@/store/organization-slice"
+import { useGetOrganizationUserQuery } from "@/store/organization-user-slice"
+import { useListRecordsQuery } from "@/store/record-slice"
+import { useListSchemasQuery } from "@/store/schema-slice"
 
 export default function FileDetail() {
   const { fileId } = useParams()
@@ -39,10 +43,6 @@ export default function FileDetail() {
     organizationId,
     href,
   } = useNetworkWorkspace()
-  const { organizations } = useWorkspaceOrganizations()
-  const { organizationUsers } = useWorkspaceOrganizationUsers()
-  const { records } = useWorkspaceRecords()
-  const { schemas } = useWorkspaceSchemas()
   const fileQuery = useGetFileQuery(fileId ?? "", {
     skip: !isAuthenticated || !fileId,
   })
@@ -54,15 +54,42 @@ export default function FileDetail() {
     (stored?.networkId === workspaceNetwork.id &&
       (!organizationId || stored.organizationId === organizationId))
   const file = belongsToWorkspace ? stored : undefined
-  const organization = file
-    ? organizations.find((item) => item.id === file.organizationId)
+  const organizationQuery = useGetOrganizationQuery(file?.organizationId ?? "", {
+    skip: !isAuthenticated || !file?.organizationId,
+  })
+  const organization = organizationQuery.data
+    ? workspaceOrganizationFromApi(organizationQuery.data)
     : undefined
-  const user = file
-    ? organizationUsers.find((item) => item.id === file.organizationUserId)
+  const userQuery = useGetOrganizationUserQuery(
+    file?.organizationUserId ?? "",
+    { skip: !isAuthenticated || !file?.organizationUserId }
+  )
+  const user = userQuery.data
+    ? workspaceOrganizationUserFromApi(userQuery.data)
     : undefined
-  const linkedRecords = file
-    ? recordsReferencingFile(file.id, records, schemas)
-    : []
+  const linkedRecordsQuery = useListRecordsQuery(
+    {
+      fileId: file?.id,
+      networkId: file?.networkId ?? workspaceNetwork?.id,
+      organizationId: file?.organizationId ?? organizationId,
+      sort: "createdAt",
+      order: "desc",
+      page: 1,
+      pageSize: 20,
+    },
+    { skip: !isAuthenticated || !file?.id }
+  )
+  const schemasQuery = useListSchemasQuery(
+    {
+      networkId: file?.networkId ?? workspaceNetwork?.id,
+      organizationId: file?.organizationId ?? organizationId,
+    },
+    { skip: !isAuthenticated || !file?.id }
+  )
+  const linkedRecords =
+    linkedRecordsQuery.data?.items.map(workspaceRecordFromApi) ?? []
+  const schemas =
+    schemasQuery.data?.items.map(workspaceSchemaFromApi) ?? []
   const contentQuery = useGetFileContentQuery(file?.id ?? "", {
     skip: !isAuthenticated || !file?.id,
   })

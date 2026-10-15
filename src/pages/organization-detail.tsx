@@ -16,8 +16,8 @@ import {
   networkWorkspacePath,
   organizationUserName,
   useNetworkWorkspace,
-  useWorkspaceOrganizationUsers,
   workspaceOrganizationFromApi,
+  workspaceOrganizationUserFromApi,
 } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
@@ -25,12 +25,12 @@ import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetOrganizationQuery } from "@/store/organization-slice"
+import { useListOrganizationUsersQuery } from "@/store/organization-user-slice"
 
 export default function OrganizationDetail() {
   const { orgId } = useParams()
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const { network: workspaceNetwork, href } = useNetworkWorkspace()
-  const { organizationUsers } = useWorkspaceOrganizationUsers()
   const { openEditOrganization } = useCreateEntity()
   const organizationQuery = useGetOrganizationQuery(orgId ?? "", {
     skip: !isAuthenticated || !orgId,
@@ -42,11 +42,19 @@ export default function OrganizationDetail() {
     !workspaceNetwork || organization?.networkId === workspaceNetwork.id
   const visibleOrganization = belongsToWorkspace ? organization : undefined
   const network = belongsToWorkspace ? workspaceNetwork : undefined
-  const members = visibleOrganization
-    ? organizationUsers.filter(
-        (user) => user.organizationId === visibleOrganization.id
-      )
-    : []
+  const membersQuery = useListOrganizationUsersQuery(
+    {
+      organizationId: visibleOrganization?.id,
+      networkId: network?.id,
+      sort: "name",
+      order: "asc",
+      page: 1,
+      pageSize: 100,
+    },
+    { skip: !isAuthenticated || !visibleOrganization?.id }
+  )
+  const members =
+    membersQuery.data?.items.map(workspaceOrganizationUserFromApi) ?? []
 
   if (organizationQuery.isLoading) {
     return <OrganizationSkeleton />

@@ -12,7 +12,6 @@ import { CreateNetworkDialog } from "@/components/create-network-dialog"
 import { CreateOrganizationDialog } from "@/components/create-organization-dialog"
 import { CreateOrganizationUserDialog } from "@/components/create-organization-user-dialog"
 import { CreateRecordDialog } from "@/components/create-record-dialog"
-import { PipelineDefinitionDialog } from "@/components/pipeline-definition-dialog"
 import { WorkflowDefinitionDialog } from "@/components/workflow-definition-dialog"
 import { networkWorkspacePath, parseNetworkPath } from "@/lib/network-workspace"
 
@@ -32,7 +31,6 @@ type CreateState =
       schemaId?: string
       field?: string
     }
-  | { kind: "pipeline"; networkId?: string; organizationId?: string }
   | {
       kind: "record"
       networkId?: string
@@ -50,7 +48,6 @@ const initialDialogKeys: Record<DialogKind, number> = {
   organization: 0,
   organizationUser: 0,
   workflow: 0,
-  pipeline: 0,
   record: 0,
   file: 0,
 }
@@ -72,11 +69,6 @@ type CreateEntityContextValue = {
     field?: string
   }) => void
   openEditWorkflow: (workflowDefinitionId: string) => void
-  openCreatePipeline: (scope?: {
-    networkId?: string
-    organizationId?: string
-  }) => void
-  openEditPipeline: (pipelineDefinitionId: string) => void
   openCreateRecord: (scope?: {
     networkId?: string
     organizationId?: string
@@ -138,22 +130,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
             networkId: parsed.networkId,
             organizationId: parsed.organizationId,
             rest: `workflow-definitions/${workflowDefinitionId}`,
-          })}?edit=1`
-        )
-      },
-      openCreatePipeline(scope) {
-        open({ kind: "pipeline", ...scope })
-      },
-      openEditPipeline(pipelineDefinitionId) {
-        const parsed = parseNetworkPath(location.pathname)
-        if (!parsed) {
-          return
-        }
-        navigate(
-          `${networkWorkspacePath({
-            networkId: parsed.networkId,
-            organizationId: parsed.organizationId,
-            rest: `pipeline-definitions/${pipelineDefinitionId}`,
           })}?edit=1`
         )
       },
@@ -234,19 +210,6 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
         schemaId={state?.kind === "workflow" ? state.schemaId : undefined}
         field={state?.kind === "workflow" ? state.field : undefined}
       />
-      <PipelineDefinitionDialog
-        key={`pipeline-${dialogKeys.pipeline}`}
-        open={state?.kind === "pipeline"}
-        onOpenChange={(open) => {
-          if (!open) {
-            close()
-          }
-        }}
-        networkId={state?.kind === "pipeline" ? state.networkId : undefined}
-        organizationId={
-          state?.kind === "pipeline" ? state.organizationId : undefined
-        }
-      />
       <CreateRecordDialog
         key={`record-${dialogKeys.record}`}
         open={state?.kind === "record"}
@@ -280,9 +243,9 @@ export function CreateEntityProvider({ children }: { children: ReactNode }) {
 }
 
 export function useCreateEntity() {
-  const context = useContext(CreateEntityContext)
-  if (!context) {
+  const value = useContext(CreateEntityContext)
+  if (!value) {
     throw new Error("useCreateEntity must be used within CreateEntityProvider")
   }
-  return context
+  return value
 }

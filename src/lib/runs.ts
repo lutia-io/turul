@@ -1,26 +1,21 @@
 import {
   getOrganization,
-  getPipelineDefinition,
   getWorkflowDefinition,
   networks,
   type Network,
   type Organization,
-  type PipelineDefinition,
   type WorkflowDefinition,
 } from "@/data/networks"
 import {
-  pipelineRuns,
-  workflowRuns,
-  type PipelineRun,
   type RunStatus,
   type WorkflowRun,
 } from "@/data/runs"
 import {
-  getPipelineStages,
+  getPipelineLevels,
   getWorkflowSteps,
   type DefinitionStep,
+  type JsonObject,
 } from "@/lib/json-definition"
-import { getPipelineLevels, type JsonObject } from "@/lib/json-definition"
 import { nodeTypeLabel } from "@/lib/node-definition"
 import {
   parseWorkflowDefinition,
@@ -39,47 +34,6 @@ export type WorkflowRunView = {
   organization?: Organization
   steps: DefinitionStep[]
   current?: DefinitionStep
-}
-
-export type PipelineRunView = {
-  run: PipelineRun
-  definition: PipelineDefinition
-  network: Network
-  organization?: Organization
-  stages: DefinitionStep[]
-  current?: DefinitionStep
-}
-
-function matchesScope(
-  run: { networkId: string; organizationId?: string },
-  networkId?: string,
-  organizationId?: string
-) {
-  if (networkId && run.networkId !== networkId) {
-    return false
-  }
-
-  if (organizationId && run.organizationId !== organizationId) {
-    return false
-  }
-
-  return true
-}
-
-function matchesFilter(status: RunStatus, filter: RunFilter) {
-  if (filter === "all") {
-    return true
-  }
-
-  if (filter === "active") {
-    return activeRunStatuses.includes(status)
-  }
-
-  if (filter === "succeeded") {
-    return status === "Succeeded"
-  }
-
-  return status === "Failed"
 }
 
 export function isActiveRun(status: RunStatus) {
@@ -170,63 +124,6 @@ export function getWorkflowRunView(
   }
 }
 
-export function getPipelineRunView(
-  run: PipelineRun
-): PipelineRunView | undefined {
-  const result = getPipelineDefinition(run.pipelineDefinitionId)
-  const network = networks[run.networkId]
-
-  if (!result || !network) {
-    return undefined
-  }
-
-  const stages = getPipelineStages(result.pipelineDefinition.definition)
-  const current = stages.find((stage) => stage.order === run.currentStage)
-
-  return {
-    run,
-    definition: result.pipelineDefinition,
-    network,
-    organization: run.organizationId
-      ? getOrganization(run.organizationId)?.organization
-      : undefined,
-    stages,
-    current,
-  }
-}
-
-export function listWorkflowRunViews({
-  networkId,
-  organizationId,
-  filter = "all",
-}: {
-  networkId?: string
-  organizationId?: string
-  filter?: RunFilter
-} = {}) {
-  return workflowRuns
-    .filter((run) => matchesScope(run, networkId, organizationId))
-    .filter((run) => matchesFilter(run.status, filter))
-    .map(getWorkflowRunView)
-    .filter((view): view is WorkflowRunView => view !== undefined)
-}
-
-export function listPipelineRunViews({
-  networkId,
-  organizationId,
-  filter = "all",
-}: {
-  networkId?: string
-  organizationId?: string
-  filter?: RunFilter
-} = {}) {
-  return pipelineRuns
-    .filter((run) => matchesScope(run, networkId, organizationId))
-    .filter((run) => matchesFilter(run.status, filter))
-    .map(getPipelineRunView)
-    .filter((view): view is PipelineRunView => view !== undefined)
-}
-
 export function apiWorkflowStatus(status: string): RunStatus {
   switch (status.toLowerCase()) {
     case "running":
@@ -308,69 +205,6 @@ export function matchesWorkflowScope(
     return false
   }
   if (organizationId && workflow.organizationId !== organizationId) {
-    return false
-  }
-  return true
-}
-
-export function apiPipelineStatus(status: string): RunStatus {
-  switch (status) {
-    case "running":
-      return "Running"
-    case "completed":
-      return "Succeeded"
-    case "failed":
-      return "Failed"
-    default:
-      return "Queued"
-  }
-}
-
-export function apiPipelineLevelSteps(
-  definition: { nodes?: { type?: string }[][] } | undefined
-): DefinitionStep[] {
-  return (definition?.nodes ?? []).map((level, index) => ({
-    id: `level-${index}`,
-    type: "level",
-    name:
-      level
-        .map((node) => (node.type ? nodeTypeLabel(node.type) : ""))
-        .filter(Boolean)
-        .join(", ") || `Level ${index}`,
-    order: index + 1,
-  }))
-}
-
-export function apiPipelineCurrentLevel(pipeline: {
-  status: string
-  currentLevel: number
-  definition: { nodes?: unknown[] }
-}) {
-  const total = pipeline.definition.nodes?.length ?? 0
-  if (pipeline.status === "pending") {
-    return 0
-  }
-  if (pipeline.status === "completed") {
-    return total
-  }
-  if (pipeline.status === "failed") {
-    return Math.min(Math.max(pipeline.currentLevel + 1, 1), Math.max(total, 1))
-  }
-  return Math.min(pipeline.currentLevel + 1, Math.max(total, 1))
-}
-
-export function matchesPipelineScope(
-  pipeline: Pick<
-    { networkId: string; organizationId: string },
-    "networkId" | "organizationId"
-  >,
-  networkId?: string,
-  organizationId?: string
-) {
-  if (networkId && pipeline.networkId !== networkId) {
-    return false
-  }
-  if (organizationId && pipeline.organizationId !== organizationId) {
     return false
   }
   return true

@@ -18,7 +18,7 @@ data:
             return 200 "ok\n";
         }
 
-        location ~ ^/(auth|user|network-group|network-permission|network-member|network|organization-user|organization-group|organization-permission|organization|authorization|schema|workflow-definition|workflow-action|workflow|pipeline-definition|pipeline-node|pipeline|record|file)(/|$) {
+        location ~ ^/(auth|user|network-group|network-permission|network-member|network|organization-user|organization-group|organization-permission|organization|authorization|schema|workflow-definition|workflow-action|workflow|record|file)(/|$) {
             proxy_pass {{ .Values.api.upstream }};
             proxy_http_version 1.1;
             proxy_set_header Host $host;

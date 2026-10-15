@@ -93,8 +93,6 @@ export function CreateRecordDialog({
   const navigate = useNavigate()
   const formId = useId()
   const { networks } = useWorkspaceNetworkList()
-  const { organizations } = useWorkspaceOrganizations({ skip: !open })
-  const { schemas } = useWorkspaceSchemas({ skip: !open })
   const editing = Boolean(recordId)
   const existingQuery = useGetRecordQuery(recordId ?? "", {
     skip: !open || !recordId,
@@ -124,31 +122,18 @@ export function CreateRecordDialog({
     (editing && existingQuery.isFetching && !existing)
   const mutationError =
     createState.error ?? updateState.error ?? createFileState.error
+  const { organizations: networkOrganizations } = useWorkspaceOrganizations({
+    skip: !open || !selectedNetworkId,
+    networkId: selectedNetworkId,
+  })
+  const { schemas: availableSchemas } = useWorkspaceSchemas({
+    skip: !open || !selectedNetworkId,
+    networkId: selectedNetworkId,
+    organizationId: selectedOrganizationId || undefined,
+    networkScopeOnly: !selectedOrganizationId,
+  })
   const firstNetworkId = networks[0]?.id ?? ""
-  const networkOrganizations = useMemo(
-    () =>
-      organizations.filter(
-        (organization) => organization.networkId === selectedNetworkId
-      ),
-    [organizations, selectedNetworkId]
-  )
   const firstOrganizationId = networkOrganizations[0]?.id ?? ""
-  const availableSchemas = useMemo(
-    () =>
-      schemas.filter((schema) => {
-        if (schema.networkId !== selectedNetworkId) {
-          return false
-        }
-        if (!selectedOrganizationId) {
-          return !schema.organizationId
-        }
-        return (
-          !schema.organizationId ||
-          schema.organizationId === selectedOrganizationId
-        )
-      }),
-    [schemas, selectedNetworkId, selectedOrganizationId]
-  )
   const selectedSchema = availableSchemas.find(
     (schema) => schema.id === selectedSchemaId
   )
@@ -214,7 +199,7 @@ export function CreateRecordDialog({
       if (organizationId) {
         return organizationId
       }
-      const schemaOrgId = schemas.find(
+      const schemaOrgId = availableSchemas.find(
         (schema) => schema.id === (schemaId || selectedSchemaId)
       )?.organizationId
       if (
@@ -229,6 +214,7 @@ export function CreateRecordDialog({
       return firstOrganizationId
     })
   }, [
+    availableSchemas,
     existing?.organizationId,
     firstOrganizationId,
     networkOrganizations,
@@ -236,7 +222,6 @@ export function CreateRecordDialog({
     organizationId,
     recordId,
     schemaId,
-    schemas,
     selectedSchemaId,
   ])
 
@@ -494,7 +479,7 @@ export function CreateRecordDialog({
                 key={property.name}
                 formId={formId}
                 property={property}
-                schemas={schemas}
+                schemas={availableSchemas}
                 networkId={selectedNetworkId}
                 organizationId={selectedOrganizationId}
                 organizationUsers={organizationUsers}

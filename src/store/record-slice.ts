@@ -59,6 +59,8 @@ export type ListRecordsParams = {
   schemaId?: string
   networkId?: string
   organizationId?: string
+  organizationUserId?: string
+  fileId?: string
   organization?: string
   organizationOp?: StringFilterOp
   fields?: RecordFieldFilter[]
@@ -101,6 +103,12 @@ function listRecordQueryParams(params?: ListRecordsParams) {
   }
   if (params.organizationId) {
     query.organizationId = params.organizationId
+  }
+  if (params.organizationUserId) {
+    query.organizationUserId = params.organizationUserId
+  }
+  if (params.fileId) {
+    query.fileId = params.fileId
   }
   setStringFilterParam(
     query,

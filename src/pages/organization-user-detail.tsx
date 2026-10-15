@@ -26,11 +26,11 @@ import {
   networkWorkspacePath,
   organizationUserName,
   useNetworkWorkspace,
-  useWorkspaceFiles,
-  useWorkspaceOrganizations,
-  useWorkspaceRecords,
-  useWorkspaceSchemas,
+  workspaceFileFromApi,
+  workspaceOrganizationFromApi,
   workspaceOrganizationUserFromApi,
+  workspaceRecordFromApi,
+  workspaceSchemaFromApi,
 } from "@/lib/network-workspace"
 import { formatFileSize } from "@/lib/records"
 import { formatRelativeTime } from "@/lib/runs"
@@ -38,7 +38,11 @@ import { cn } from "@/lib/utils"
 import { getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
+import { useListFilesQuery } from "@/store/file-slice"
+import { useGetOrganizationQuery } from "@/store/organization-slice"
 import { useGetOrganizationUserQuery } from "@/store/organization-user-slice"
+import { useListRecordsQuery } from "@/store/record-slice"
+import { useListSchemasQuery } from "@/store/schema-slice"
 
 export default function OrganizationUserDetail() {
   const { organizationUserId } = useParams()
@@ -48,10 +52,6 @@ export default function OrganizationUserDetail() {
     organizationId,
     href,
   } = useNetworkWorkspace()
-  const { organizations } = useWorkspaceOrganizations()
-  const { records } = useWorkspaceRecords()
-  const { files } = useWorkspaceFiles()
-  const { schemas } = useWorkspaceSchemas()
   const { openEditOrganizationUser } = useCreateEntity()
   const organizationUserQuery = useGetOrganizationUserQuery(
     organizationUserId ?? "",
@@ -66,15 +66,49 @@ export default function OrganizationUserDetail() {
       (!organizationId || organizationUser.organizationId === organizationId))
   const visibleUser = belongsToWorkspace ? organizationUser : undefined
   const network = belongsToWorkspace ? workspaceNetwork : undefined
-  const organization = visibleUser
-    ? organizations.find((item) => item.id === visibleUser.organizationId)
+  const organizationQuery = useGetOrganizationQuery(
+    visibleUser?.organizationId ?? "",
+    { skip: !isAuthenticated || !visibleUser?.organizationId }
+  )
+  const organization = organizationQuery.data
+    ? workspaceOrganizationFromApi(organizationQuery.data)
     : undefined
-  const userRecords = visibleUser
-    ? records.filter((record) => record.organizationUserId === visibleUser.id)
-    : []
-  const userFiles = visibleUser
-    ? files.filter((file) => file.organizationUserId === visibleUser.id)
-    : []
+  const recordsQuery = useListRecordsQuery(
+    {
+      organizationUserId: visibleUser?.id,
+      networkId: network?.id,
+      organizationId: visibleUser?.organizationId ?? organizationId,
+      sort: "createdAt",
+      order: "desc",
+      page: 1,
+      pageSize: 20,
+    },
+    { skip: !isAuthenticated || !visibleUser?.id }
+  )
+  const filesQuery = useListFilesQuery(
+    {
+      organizationUserId: visibleUser?.id,
+      networkId: network?.id,
+      organizationId: visibleUser?.organizationId ?? organizationId,
+      sort: "createdAt",
+      order: "desc",
+      page: 1,
+      pageSize: 20,
+    },
+    { skip: !isAuthenticated || !visibleUser?.id }
+  )
+  const schemasQuery = useListSchemasQuery(
+    {
+      networkId: network?.id,
+      organizationId: visibleUser?.organizationId ?? organizationId,
+    },
+    { skip: !isAuthenticated || !network?.id }
+  )
+  const userRecords =
+    recordsQuery.data?.items.map(workspaceRecordFromApi) ?? []
+  const userFiles = filesQuery.data?.items.map(workspaceFileFromApi) ?? []
+  const schemas =
+    schemasQuery.data?.items.map(workspaceSchemaFromApi) ?? []
 
   if (organizationUserQuery.isLoading) {
     return <OrganizationUserSkeleton />

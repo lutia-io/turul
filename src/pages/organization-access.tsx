@@ -4,11 +4,7 @@ import { Navigate } from "react-router"
 import { AccessWorkspace } from "@/components/access-workspace"
 import { useAuthorization } from "@/lib/authorization"
 import { getJsonSchemaProperties } from "@/lib/json-definition"
-import {
-  useNetworkWorkspace,
-  useWorkspaceOrganizationUsers,
-  useWorkspaceSchemas,
-} from "@/lib/network-workspace"
+import { useNetworkWorkspace } from "@/lib/network-workspace"
 import { getHumaErrorMessage } from "@/store/api"
 import {
   useAddOrganizationGroupMemberMutation,
@@ -24,12 +20,12 @@ import {
   useUnassignOrganizationPermissionMutation,
   useUpdateOrganizationPermissionMutation,
 } from "@/store/access-slice"
+import { useListOrganizationUsersQuery } from "@/store/organization-user-slice"
+import { useListSchemasQuery } from "@/store/schema-slice"
 
 export default function OrganizationAccess() {
   const { network, organization, organizationId, href } = useNetworkWorkspace()
   const { manageAccess } = useAuthorization()
-  const { organizationUsers } = useWorkspaceOrganizationUsers()
-  const { schemas } = useWorkspaceSchemas()
   const [error, setError] = useState("")
 
   const groupsQuery = useListOrganizationGroupsQuery(
@@ -38,6 +34,22 @@ export default function OrganizationAccess() {
   )
   const permissionsQuery = useListOrganizationPermissionsQuery(
     { networkId: network?.id ?? "", organizationId: organizationId ?? "" },
+    { skip: !network?.id || !organizationId }
+  )
+  const membersQuery = useListOrganizationUsersQuery(
+    {
+      networkId: network?.id,
+      organizationId: organizationId,
+      sort: "name",
+      order: "asc",
+    },
+    { skip: !network?.id || !organizationId }
+  )
+  const schemasQuery = useListSchemasQuery(
+    {
+      networkId: network?.id,
+      organizationId: organizationId,
+    },
     { skip: !network?.id || !organizationId }
   )
   const [createGroup] = useCreateOrganizationGroupMutation()
@@ -51,34 +63,26 @@ export default function OrganizationAccess() {
   const [updatePermission] = useUpdateOrganizationPermissionMutation()
   const [deletePermission] = useDeleteOrganizationPermissionMutation()
 
-  const members = organizationUsers.filter(
-    (user) => user.organizationId === organizationId
-  )
   const candidates = useMemo(
     () =>
-      members.map((user) => ({
+      (membersQuery.data?.items ?? []).map((user) => ({
         id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
       })),
-    [members]
+    [membersQuery.data?.items]
   )
   const schemaOptions = useMemo(
     () =>
-      schemas
-        .filter(
-          (schema) =>
-            !schema.organizationId || schema.organizationId === organizationId
-        )
-        .map((schema) => ({
-          id: schema.id,
-          name: schema.name,
-          properties: getJsonSchemaProperties(schema.definition).map(
-            (property) => property.name
-          ),
-        })),
-    [organizationId, schemas]
+      (schemasQuery.data?.items ?? []).map((schema) => ({
+        id: schema.id,
+        name: schema.name,
+        properties: getJsonSchemaProperties(schema.definition).map(
+          (property) => property.name
+        ),
+      })),
+    [schemasQuery.data?.items]
   )
 
   if (!manageAccess) {
@@ -101,7 +105,12 @@ export default function OrganizationAccess() {
       candidates={candidates}
       implicitMembers={candidates}
       addMemberMode="select"
-      isLoading={groupsQuery.isLoading || permissionsQuery.isLoading}
+      isLoading={
+        groupsQuery.isLoading ||
+        permissionsQuery.isLoading ||
+        membersQuery.isLoading ||
+        schemasQuery.isLoading
+      }
       error={error}
       onError={setError}
       formatError={getHumaErrorMessage}

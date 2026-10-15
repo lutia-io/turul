@@ -71,16 +71,6 @@ export const NETWORK_ACCESS_CATALOG: AccessResource[] = [
       ACCESS_ACTIONS.delete,
     ],
   },
-  {
-    id: "pipeline_definition",
-    label: "Pipeline definitions",
-    actions: [
-      ACCESS_ACTIONS.create,
-      ACCESS_ACTIONS.read,
-      ACCESS_ACTIONS.update,
-      ACCESS_ACTIONS.delete,
-    ],
-  },
 ]
 
 export const ORGANIZATION_ACCESS_CATALOG: AccessResource[] = [

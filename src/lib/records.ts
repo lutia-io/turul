@@ -1,10 +1,6 @@
-import type { StoredRecord } from "@/data/files"
-import type { Schema } from "@/data/networks"
 import { formatAddressLine, isEmptyAddress, parseAddress } from "@/lib/address"
 import { formatTimeValue } from "@/lib/time"
 import {
-  getJsonSchemaProperties,
-  getRecordFileIds,
   isAddressProperty,
   isCurrencyProperty,
   isFileProperty,
@@ -127,22 +123,4 @@ export function recordDisplayTitle(
   }
 
   return fallback
-}
-
-export function recordsReferencingFile(
-  fileId: string,
-  records: StoredRecord[],
-  schemas: Schema[]
-) {
-  return records.filter((item) => {
-    const schema = schemas.find((schema) => schema.id === item.schemaId)
-    if (!schema) {
-      return false
-    }
-
-    return getRecordFileIds(
-      item.data,
-      getJsonSchemaProperties(schema.definition)
-    ).includes(fileId)
-  })
 }
