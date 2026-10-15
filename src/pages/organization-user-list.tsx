@@ -435,7 +435,6 @@ export default function OrganizationUserList() {
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading organization users...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
@@ -452,13 +451,12 @@ export default function OrganizationUserList() {
         <>
           <DataTableView
             table={table}
+            isLoading={isLoading}
             isRefreshing={isFetching}
             empty={
-              isLoading
-                ? "Loading organization users..."
-                : filtersActive
-                  ? "No organization users match this view."
-                  : "No organization users yet. Create one so people can sign in."
+              filtersActive
+                ? "No organization users match this view."
+                : "No organization users yet. Create one so people can sign in."
             }
           />
           <DataTablePagination table={table} />

@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Popover,
   PopoverContent,
@@ -682,18 +683,21 @@ function pinnedEdgeClass<TData extends Record<string, unknown>>(
 export function DataTableView<TData extends Record<string, unknown>>({
   table,
   empty,
+  isLoading,
   isRefreshing,
 }: {
   table: ManagedTable<TData>
   empty: string
+  isLoading?: boolean
   isRefreshing?: boolean
 }) {
   const rows = table.getRowModel().rows
   const visibleColumns = table.getVisibleLeafColumns()
+  const showSkeleton = isLoading && rows.length === 0
 
   return (
     <LoadingFrame
-      isLoading={isRefreshing}
+      isLoading={isRefreshing && !showSkeleton}
       className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border bg-background shadow-xs"
     >
       <div className="h-full min-h-0 overflow-auto">
@@ -762,6 +766,16 @@ export function DataTableView<TData extends Record<string, unknown>>({
                   })}
                 </TableRow>
               ))
+            ) : showSkeleton ? (
+              Array.from({ length: 5 }).map((_, rowIndex) => (
+                <TableRow key={rowIndex} className="hover:bg-transparent">
+                  {visibleColumns.map((column) => (
+                    <TableCell key={column.id}>
+                      <Skeleton className="h-4 w-full max-w-32" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : (
               <TableRow className="hover:bg-transparent">
                 <TableCell
@@ -786,7 +800,7 @@ export function DataTablePagination<TData extends Record<string, unknown>>({
 }: {
   table: ManagedTable<TData>
   pageSizeOptions?: number[]
-  summary?: string
+  summary?: ReactNode
 }) {
   const pageCount = Math.max(table.getPageCount(), 1)
   const pageIndex = table.state.pagination.pageIndex
@@ -814,7 +828,9 @@ export function DataTablePagination<TData extends Record<string, unknown>>({
       </div>
       <div className="flex items-center gap-3">
         {summary ? (
-          <p className="text-sm text-muted-foreground tabular-nums">{summary}</p>
+          <div className="text-sm text-muted-foreground tabular-nums">
+            {summary}
+          </div>
         ) : null}
         <p className="text-sm text-muted-foreground tabular-nums">
           Page {pageIndex + 1} of {pageCount}

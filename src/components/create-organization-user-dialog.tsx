@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogClose,
@@ -339,11 +340,9 @@ export function CreateOrganizationUserDialog({
               !selectedOrganizationId
             }
           >
-            {isLoading
-              ? editing
-                ? "Saving..."
-                : "Creating..."
-              : editing
+            {isLoading ? (
+              <Spinner label={editing ? "Saving" : "Creating"} />
+            ) : editing
                 ? "Save organization user"
                 : "Create organization user"}
           </Button>

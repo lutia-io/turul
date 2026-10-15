@@ -405,7 +405,6 @@ export default function OrganizationList() {
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading organizations...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
@@ -422,13 +421,12 @@ export default function OrganizationList() {
         <>
           <DataTableView
             table={table}
+            isLoading={isLoading}
             isRefreshing={isFetching}
             empty={
-              isLoading
-                ? "Loading organizations..."
-                : filtersActive
-                  ? "No organizations match this view."
-                  : "No organizations yet. Create one to start collaborating in this network."
+              filtersActive
+                ? "No organizations match this view."
+                : "No organizations yet. Create one to start collaborating in this network."
             }
           />
           <DataTablePagination table={table} />

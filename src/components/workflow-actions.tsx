@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { ChevronDownIcon } from "lucide-react"
 
 import { RunStatusPill } from "@/components/run-card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -70,11 +71,13 @@ export function WorkflowNodesJournal({
             Append-only journal of node attempts. Failed attempts are kept.
           </p>
         </div>
-        <p className="text-sm text-muted-foreground tabular-nums">
-          {query.isLoading
-            ? "Loading..."
-            : `${nodes.length} attempt${nodes.length === 1 ? "" : "s"}`}
-        </p>
+        {query.isLoading ? (
+          <Skeleton className="h-4 w-20" />
+        ) : (
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {`${nodes.length} attempt${nodes.length === 1 ? "" : "s"}`}
+          </p>
+        )}
       </div>
 
       {query.isError ? (
@@ -82,9 +85,11 @@ export function WorkflowNodesJournal({
           {getHumaErrorMessage(query.error, "Failed to load workflow nodes")}
         </p>
       ) : query.isLoading ? (
-        <p className="text-sm text-muted-foreground">
-          Loading node attempts...
-        </p>
+        <div className="flex flex-col gap-2" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-9 w-full rounded-lg" />
+          ))}
+        </div>
       ) : nodes.length > 0 ? (
         <div className="overflow-auto rounded-xl border bg-background">
           <Table>

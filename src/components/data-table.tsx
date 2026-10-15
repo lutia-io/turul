@@ -5,11 +5,11 @@ import { SearchIcon, XIcon } from "lucide-react"
 import { RefreshButton } from "@/components/refresh-button"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 export function dataTablePageSummary({
   isLoading,
-  loadingLabel,
   pageIndex,
   pageSize,
   total,
@@ -17,15 +17,14 @@ export function dataTablePageSummary({
   plural,
 }: {
   isLoading?: boolean
-  loadingLabel: string
   pageIndex: number
   pageSize: number
   total: number
   singular: string
   plural?: string
-}) {
+}): ReactNode {
   if (isLoading) {
-    return loadingLabel
+    return <Skeleton className="h-4 w-28" />
   }
 
   const word = plural ?? `${singular}s`
@@ -84,7 +83,7 @@ export function DataTableToolbar({
   filters?: ReactNode
   chips?: ReactNode
   trailing?: ReactNode
-  count?: string
+  count?: ReactNode
   onRefresh?: () => void
   isRefreshing?: boolean
 }) {
@@ -131,9 +130,9 @@ export function DataTableToolbar({
             />
           ) : null}
           {count ? (
-            <p className="text-sm text-muted-foreground tabular-nums">
+            <div className="text-sm text-muted-foreground tabular-nums">
               {count}
-            </p>
+            </div>
           ) : null}
         </div>
       </div>

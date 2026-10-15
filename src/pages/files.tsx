@@ -515,7 +515,6 @@ export default function FilesPage() {
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading files...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
@@ -532,14 +531,9 @@ export default function FilesPage() {
         <>
           <DataTableView
             table={table}
+            isLoading={isLoading}
             isRefreshing={isFetching}
-            empty={
-              isLoading
-                ? "Loading files..."
-                : filtersActive
-                  ? "No files match this view."
-                  : "No files yet."
-            }
+            empty={filtersActive ? "No files match this view." : "No files yet."}
           />
           <DataTablePagination table={table} />
         </>

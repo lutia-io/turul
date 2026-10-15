@@ -47,6 +47,7 @@ import {
 } from "@/components/table-column-editor"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import type { StoredFile, StoredRecord } from "@/data/files"
 import type { Network, Schema } from "@/data/networks"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -353,9 +354,7 @@ export default function RecordsPage() {
       ) : null}
 
       {schemaListSettling ? (
-        <div className="flex flex-1 items-center justify-center rounded-xl border bg-background text-sm text-muted-foreground">
-          Loading table...
-        </div>
+        <Skeleton className="flex-1 rounded-xl" aria-busy="true" />
       ) : activeSchema && activeNetwork ? (
         <SchemaRecordsDataTable
           key={activeSchema.id}
@@ -772,20 +771,16 @@ function SchemaRecordsDataTable({
         <>
           <DataTableView
             table={table}
+            isLoading={isLoading}
             isRefreshing={isFetching}
             empty={
-              isLoading
-                ? "Loading records..."
-                : filtersActive
-                  ? "No records match this view."
-                  : "No records yet."
+              filtersActive ? "No records match this view." : "No records yet."
             }
           />
           <DataTablePagination
             table={table}
             summary={dataTablePageSummary({
               isLoading,
-              loadingLabel: "Loading records...",
               pageIndex: pagination.pageIndex,
               pageSize: pagination.pageSize,
               total,

@@ -11,6 +11,7 @@ import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { useCreateEntity } from "@/components/create-entity"
 import { WorkflowsSubmenu } from "@/components/table-workflows-menu"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogContent,
@@ -197,7 +198,7 @@ function EditTableForm({
           form={formId}
           disabled={isLoading || !name.trim()}
         >
-          {isLoading ? "Saving..." : "Save"}
+          {isLoading ? <Spinner label="Saving" /> : "Save"}
         </Button>
       </DialogFooter>
     </>
@@ -314,7 +315,7 @@ function SchemaJsonForm({
             form={formId}
             disabled={isLoading || Boolean(jsonError)}
           >
-            {isLoading ? "Saving..." : "Save"}
+            {isLoading ? <Spinner label="Saving" /> : "Save"}
           </Button>
         ) : null}
       </DialogFooter>
@@ -380,7 +381,7 @@ function DeleteTableDialog({
             disabled={isLoading}
             onClick={() => void handleDelete()}
           >
-            {isLoading ? "Deleting..." : "Delete table"}
+            {isLoading ? <Spinner label="Deleting" /> : "Delete table"}
           </Button>
         </DialogFooter>
       </DialogContent>

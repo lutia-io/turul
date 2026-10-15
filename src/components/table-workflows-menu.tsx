@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -88,7 +89,11 @@ export function WorkflowsSubmenu({
         ) : null}
         {showList ? (
           list.isLoading ? (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</p>
+            <div className="flex flex-col gap-1 p-1" aria-busy="true">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton key={index} className="h-7 w-full" />
+              ))}
+            </div>
           ) : workflows.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-muted-foreground">
               {debouncedQuery ? "No matches" : "No workflows"}

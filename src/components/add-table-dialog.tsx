@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from "react"
 
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogContent,
@@ -119,7 +120,7 @@ function AddTableForm({
           Cancel
         </Button>
         <Button type="submit" form={formId} disabled={isLoading || !name.trim()}>
-          {isLoading ? "Adding..." : "Add table"}
+          {isLoading ? <Spinner label="Adding" /> : "Add table"}
         </Button>
       </DialogFooter>
     </>

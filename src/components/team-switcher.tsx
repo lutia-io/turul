@@ -17,11 +17,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getBadgeColor, type BadgeColor } from "@/lib/badge"
 import { cn } from "@/lib/utils"
 import {
   ChevronsUpDownIcon,
-  LoaderCircleIcon,
   PlusIcon,
   SearchIcon,
 } from "lucide-react"
@@ -228,10 +228,14 @@ export function TeamSwitcher({
             </div>
             <DropdownMenuGroup className="max-h-72 min-h-0 overflow-y-auto p-1">
               {pending ? (
-                <p className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-                  <LoaderCircleIcon className="size-3 animate-spin" />
-                  Searching...
-                </p>
+                <div aria-busy="true">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2">
+                      <Skeleton className="size-6 rounded-md" />
+                      <Skeleton className="h-4 flex-1" />
+                    </div>
+                  ))}
+                </div>
               ) : searchError ? (
                 <p className="px-2 py-1.5 text-xs text-destructive">
                   {searchError}

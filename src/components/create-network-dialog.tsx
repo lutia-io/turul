@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogClose,
@@ -126,11 +127,9 @@ export function CreateNetworkDialog({
             form={formId}
             disabled={isLoading || !name.trim()}
           >
-            {isLoading
-              ? editing
-                ? "Saving..."
-                : "Creating..."
-              : editing
+            {isLoading ? (
+              <Spinner label={editing ? "Saving" : "Creating"} />
+            ) : editing
                 ? "Save network"
                 : "Create network"}
           </Button>

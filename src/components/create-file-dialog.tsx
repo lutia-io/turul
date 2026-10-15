@@ -3,6 +3,7 @@ import { useNavigate } from "react-router"
 
 import { CreateActorFields } from "@/components/create-actor-fields"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogClose,
@@ -233,7 +234,11 @@ export function CreateFileDialog({
               !selectedOrganizationUserId
             }
           >
-            {createState.isLoading ? "Uploading..." : "Upload file"}
+            {createState.isLoading ? (
+              <Spinner label="Uploading" />
+            ) : (
+              "Upload file"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

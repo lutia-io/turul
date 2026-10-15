@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router"
 
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogClose,
@@ -101,7 +102,11 @@ export function DeleteOrganizationDialog({
             onClick={() => void handleDelete()}
             disabled={deleteState.isLoading || !organization}
           >
-            {deleteState.isLoading ? "Deleting..." : "Delete organization"}
+            {deleteState.isLoading ? (
+              <Spinner label="Deleting" />
+            ) : (
+              "Delete organization"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

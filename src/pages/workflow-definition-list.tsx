@@ -696,7 +696,6 @@ export default function WorkflowDefinitionList() {
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading definitions...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
@@ -713,13 +712,12 @@ export default function WorkflowDefinitionList() {
         <>
           <DataTableView
             table={table}
+            isLoading={isLoading}
             isRefreshing={isFetching}
             empty={
-              isLoading
-                ? "Loading definitions..."
-                : filtersActive
-                  ? "No definitions match this view."
-                  : "No workflow definitions yet. Create one to automate what happens when records are created, updated, or on a schedule."
+              filtersActive
+                ? "No definitions match this view."
+                : "No workflow definitions yet. Create one to automate what happens when records are created, updated, or on a schedule."
             }
           />
           <DataTablePagination table={table} />

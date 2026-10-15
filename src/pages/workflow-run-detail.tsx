@@ -11,6 +11,7 @@ import {
 
 import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { WorkflowNodesJournal } from "@/components/workflow-actions"
 import type { RunStatus } from "@/data/runs"
@@ -150,10 +151,14 @@ export default function WorkflowRunDetail() {
             disabled={retryState.isLoading}
             aria-busy={retryState.isLoading}
           >
-            <RotateCcwIcon
-              className={retryState.isLoading ? "animate-spin" : undefined}
-            />
-            {retryState.isLoading ? "Retrying..." : "Retry"}
+            {retryState.isLoading ? (
+              <Spinner label="Retrying" />
+            ) : (
+              <>
+                <RotateCcwIcon />
+                Retry
+              </>
+            )}
           </Button>
         ) : null}
       </div>

@@ -5,6 +5,7 @@ import { PlusIcon, XIcon } from "lucide-react"
 import { CreateActorFields } from "@/components/create-actor-fields"
 import { columnLabel } from "@/components/schema-records-table"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogClose,
@@ -518,11 +519,9 @@ export function CreateRecordDialog({
             form={formId}
             disabled={isLoading || !canSubmit}
           >
-            {isLoading
-              ? editing
-                ? "Saving..."
-                : "Creating..."
-              : editing
+            {isLoading ? (
+              <Spinner label={editing ? "Saving" : "Creating"} />
+            ) : editing
                 ? "Save"
                 : "Create record"}
           </Button>

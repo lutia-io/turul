@@ -38,6 +38,7 @@ import {
   type ColumnPinPosition,
 } from "@/components/data-table-view"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Dialog,
   DialogContent,
@@ -277,7 +278,7 @@ function DeleteColumnDialog({
             disabled={isLoading}
             onClick={() => void handleDelete()}
           >
-            {isLoading ? "Deleting..." : "Delete column"}
+            {isLoading ? <Spinner label="Deleting" /> : "Delete column"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -453,7 +454,7 @@ function ColumnFormBody({
         size={wrapped ? "default" : "sm"}
         disabled={isLoading}
       >
-        {saveLabel(mode, confirming, isLoading)}
+        {isLoading ? <Spinner label="Saving" /> : saveLabel(mode, confirming)}
       </Button>
     </>
   )
@@ -863,14 +864,7 @@ function ColumnFields({
   )
 }
 
-function saveLabel(
-  mode: "add" | "edit",
-  confirming: boolean,
-  isLoading: boolean
-) {
-  if (isLoading) {
-    return "Saving..."
-  }
+function saveLabel(mode: "add" | "edit", confirming: boolean) {
   if (confirming) {
     return "Save column"
   }

@@ -17,6 +17,7 @@ import {
 } from "@/components/data-table"
 import { LoadingFrame, RefreshButton } from "@/components/refresh-button"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
   Card,
@@ -162,7 +163,11 @@ function DeleteNetworkDialog({
             onClick={() => void handleDelete()}
             disabled={deleteState.isLoading}
           >
-            {deleteState.isLoading ? "Deleting..." : "Delete network"}
+            {deleteState.isLoading ? (
+              <Spinner label="Deleting" />
+            ) : (
+              "Delete network"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -454,8 +459,9 @@ export default function NetworkList() {
   const searchActive = query.trim().length > 0
   const showInitialSkeleton = !list && (isLoading || isFetching) && !isError
   const showEmpty =
-    data != null && data.total === 0 && !searchActive && !isError
-  const showHeaderCreate = !showEmpty
+    list != null && list.total === 0 && !searchActive && !isError
+  const showControls = !showInitialSkeleton && !showEmpty
+  const showHeaderCreate = showControls
   const isRefreshing = isFetching || scopeFetching
 
   const title =
@@ -503,7 +509,7 @@ export default function NetworkList() {
         ) : null}
       </div>
 
-      {showEmpty ? null : (
+      {showControls ? (
         <DataTableToolbar
           query={query}
           onQueryChange={setQuery}
@@ -544,14 +550,13 @@ export default function NetworkList() {
           }
           count={dataTablePageSummary({
             isLoading: isLoading || isRefreshing,
-            loadingLabel: "Loading networks...",
             pageIndex,
             pageSize,
             total,
             singular: "network",
           })}
         />
-      )}
+      ) : null}
 
       {showInitialSkeleton ? (
         <NetworkListSkeleton />

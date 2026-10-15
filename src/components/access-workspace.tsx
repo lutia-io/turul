@@ -28,6 +28,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import {
@@ -481,11 +482,7 @@ export function AccessWorkspace({
               searchPlaceholder="Search groups…"
               searchLabel="Search groups"
             >
-              {isLoading && groups.length === 0 ? (
-                <p className="px-2 py-1.5 text-sm text-muted-foreground">
-                  Loading groups…
-                </p>
-              ) : null}
+              {isLoading && groups.length === 0 ? <RailItemsSkeleton /> : null}
               {!isLoading && groups.length === 0 ? (
                 <p className="px-2 py-1.5 text-sm text-muted-foreground">
                   {debouncedGroupQuery.trim()
@@ -556,6 +553,9 @@ export function AccessWorkspace({
                   }
                 />
               ))}
+              {permissions.length === 0 && permissionsQuery.isLoading ? (
+                <RailItemsSkeleton />
+              ) : null}
               {permissions.length === 0 && !permissionsQuery.isLoading ? (
                 <p className="px-2 py-1.5 text-sm text-muted-foreground">
                   {debouncedPermissionQuery.trim()
@@ -569,7 +569,10 @@ export function AccessWorkspace({
 
         <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {detailLoading && !selectedGroup && !selectedPermission ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <div className="mx-auto flex max-w-3xl flex-col gap-6" aria-busy="true">
+              <Skeleton className="h-28 w-full rounded-2xl" />
+              <Skeleton className="h-48 w-full rounded-2xl" />
+            </div>
           ) : null}
 
           {selectedGroup ? (
@@ -1121,7 +1124,11 @@ function PermissionAttachPicker({
         />
       </div>
       {list.isFetching && items.length === 0 ? (
-        <p className="px-1 text-xs text-muted-foreground">Searching…</p>
+        <div className="flex flex-col gap-1.5" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-9 w-full rounded-lg" />
+          ))}
+        </div>
       ) : null}
       {items.length === 0 && !list.isFetching ? (
         <p className="px-1 text-xs text-muted-foreground">
@@ -1230,6 +1237,19 @@ function RailItem({
         </span>
       </button>
       {action ? <div className="shrink-0 pr-1 pt-1">{action}</div> : null}
+    </div>
+  )
+}
+
+function RailItemsSkeleton() {
+  return (
+    <div aria-busy="true">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="space-y-1.5 px-2 py-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      ))}
     </div>
   )
 }

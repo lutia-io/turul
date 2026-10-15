@@ -1,6 +1,7 @@
 import { Link, Navigate, useLocation } from "react-router"
 
 import { NetworkSidebar } from "@/components/network-sidebar"
+import { Skeleton } from "@/components/ui/skeleton"
 import { AppShell, appSidebarStyle } from "@/pages/app-layout"
 import {
   networkWorkspacePath,
@@ -22,27 +23,18 @@ export default function NetworkLayout() {
   } = useNetworkWorkspace()
   const parsed = parseNetworkPath(pathname)
 
-  if (isNetworkLoading) {
+  if (isNetworkLoading || (requestedOrganizationId && isOrganizationLoading)) {
     return (
       <AppShell sidebar={<NetworkSidebar style={appSidebarStyle} />}>
-        <div className="flex flex-1 flex-col gap-2 p-4">
-          <h1 className="text-lg font-semibold">Loading network</h1>
-          <p className="text-sm text-muted-foreground">
-            Fetching this network from the server.
-          </p>
-        </div>
-      </AppShell>
-    )
-  }
-
-  if (requestedOrganizationId && isOrganizationLoading) {
-    return (
-      <AppShell sidebar={<NetworkSidebar style={appSidebarStyle} />}>
-        <div className="flex flex-1 flex-col gap-2 p-4">
-          <h1 className="text-lg font-semibold">Loading organization</h1>
-          <p className="text-sm text-muted-foreground">
-            Fetching this organization from the server.
-          </p>
+        <div
+          className="flex flex-1 flex-col gap-4 p-4 sm:p-6"
+          aria-busy="true"
+        >
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-full max-w-md" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
       </AppShell>
     )

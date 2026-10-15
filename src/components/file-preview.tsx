@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
   DialogContent,
@@ -116,7 +117,9 @@ export function FileViewer({
       )}
     >
       {isLoading ? (
-        <p className="p-4 text-sm text-muted-foreground">Loading preview...</p>
+        <div className="flex min-h-48 flex-1 p-4" aria-busy="true">
+          <Skeleton className="flex-1 rounded-lg" />
+        </div>
       ) : isError || !data ? (
         <p className="p-4 text-sm text-muted-foreground">
           Preview is not available for this file.
@@ -455,6 +458,16 @@ function ZoomableImage({
   )
 }
 
+function PreviewLinesSkeleton() {
+  return (
+    <div className="flex flex-col gap-2" aria-busy="true">
+      {["w-full", "w-11/12", "w-4/5", "w-full", "w-2/3"].map((width, index) => (
+        <Skeleton key={index} className={cn("h-4", width)} />
+      ))}
+    </div>
+  )
+}
+
 function TextPreview({
   blob,
   filename,
@@ -499,7 +512,7 @@ function TextPreview({
   }, [blob, filename])
 
   if (text == null) {
-    return <p className="text-sm text-muted-foreground">Loading preview...</p>
+    return <PreviewLinesSkeleton />
   }
 
   if (text.length === 0) {
@@ -541,7 +554,7 @@ function CsvPreview({ blob, filename }: { blob: Blob; filename: string }) {
   }, [blob])
 
   if (!table) {
-    return <p className="text-sm text-muted-foreground">Loading preview...</p>
+    return <PreviewLinesSkeleton />
   }
 
   if (table.headers.length === 0) {
@@ -658,8 +671,9 @@ export function FilePreviewDialog({
             ) : null}
           </>
         ) : open ? (
-          <div className="p-4 text-sm text-muted-foreground">
-            Loading file...
+          <div className="flex flex-col gap-3 p-4" aria-busy="true">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-64 w-full rounded-lg" />
           </div>
         ) : null}
       </DialogContent>

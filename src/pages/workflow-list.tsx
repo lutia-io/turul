@@ -585,7 +585,6 @@ export default function WorkflowList() {
         trailing={<DataTableViewOptions table={table} />}
         count={dataTablePageSummary({
           isLoading,
-          loadingLabel: "Loading runs...",
           pageIndex: pagination.pageIndex,
           pageSize: pagination.pageSize,
           total,
@@ -610,13 +609,12 @@ export default function WorkflowList() {
           ) : null}
           <DataTableView
             table={table}
+            isLoading={isLoading}
             isRefreshing={isFetching}
             empty={
-              isLoading
-                ? "Loading runs..."
-                : filtersActive
-                  ? "No runs match this view."
-                  : "No runs yet. Runs appear when a workflow is triggered or enqueued."
+              filtersActive
+                ? "No runs match this view."
+                : "No runs yet. Runs appear when a workflow is triggered or enqueued."
             }
           />
           <DataTablePagination table={table} />
