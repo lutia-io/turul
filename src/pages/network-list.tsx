@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
 import {
+  CrownIcon,
   GalleryVerticalEndIcon,
   MoreHorizontalIcon,
   NetworkIcon,
@@ -39,6 +40,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { networkWorkspacePath } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
@@ -203,7 +209,13 @@ function NetworkOwnershipFilter({
   )
 }
 
-function NetworkCard({ network }: { network: NetworkDetails }) {
+function NetworkCard({
+  network,
+  isOwner,
+}: {
+  network: NetworkDetails
+  isOwner: boolean
+}) {
   const { openEditNetwork } = useCreateEntity()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const networkPath = networkWorkspacePath({ networkId: network.id })
@@ -220,8 +232,21 @@ function NetworkCard({ network }: { network: NetworkDetails }) {
         to={networkPath}
         className="flex min-w-0 flex-1 items-start gap-3 rounded-lg px-1 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <div className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <GalleryVerticalEndIcon className="size-4" />
+          {isOwner ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="absolute -right-1.5 -bottom-1.5 flex size-4.5 items-center justify-center rounded-full bg-teal-500 text-white ring-2 ring-card" />
+                }
+              >
+                <CrownIcon className="size-2.5" strokeWidth={2.5} />
+                <span className="sr-only">You own this network</span>
+              </TooltipTrigger>
+              <TooltipContent>You own this network</TooltipContent>
+            </Tooltip>
+          ) : null}
         </div>
         <div className="min-w-0 flex-1 py-0.5">
           <p className="truncate font-medium leading-snug">{network.name}</p>
@@ -571,7 +596,11 @@ export default function NetworkList() {
             ) : (
               <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
                 {networks.map((network) => (
-                  <NetworkCard key={network.id} network={network} />
+                  <NetworkCard
+                    key={network.id}
+                    network={network}
+                    isOwner={isOwnedNetwork(network, currentUserId)}
+                  />
                 ))}
               </div>
             )}
