@@ -43,7 +43,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { networkWorkspacePath } from "@/lib/network-workspace"
 import { formatRelativeTime } from "@/lib/runs"
 import { userDisplayName } from "@/lib/user"
-import { getHumaErrorMessage, type ApiUserRef } from "@/store/api"
+import { getHumaErrorMessage, useMeQuery, type ApiUserRef } from "@/store/api"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useAppSelector } from "@/store/hooks"
 import {
@@ -55,9 +55,18 @@ import {
 } from "@/store/network-slice"
 
 type NetworkDetails = ApiNetwork
+type NetworkOwnershipScope = "owned" | "shared" | "all"
 
 const PAGE_SIZES = [12, 24, 48]
+const SCOPE_FETCH_SIZE = 100
 const sortFields: NetworkListSort[] = ["name", "slug", "createdAt", "updatedAt"]
+
+function isOwnedNetwork(network: ApiNetwork, userId?: string) {
+  if (!userId) {
+    return false
+  }
+  return network.userId === userId || network.createdBy?.id === userId
+}
 
 const sortOptions: { value: string; label: string }[] = [
   { value: "name:asc", label: "Name (A–Z)" },
@@ -152,6 +161,45 @@ function DeleteNetworkDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function NetworkOwnershipFilter({
+  value,
+  onChange,
+  counts,
+}: {
+  value: NetworkOwnershipScope
+  onChange: (value: NetworkOwnershipScope) => void
+  counts: { owned: number; shared: number; all: number }
+}) {
+  const filters: {
+    id: NetworkOwnershipScope
+    label: string
+    count: number
+  }[] = [
+    { id: "owned", label: "Yours", count: counts.owned },
+    { id: "shared", label: "Shared with me", count: counts.shared },
+    { id: "all", label: "All", count: counts.all },
+  ]
+
+  return (
+    <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Network ownership">
+      {filters.map((filter) => (
+        <Button
+          key={filter.id}
+          type="button"
+          size="sm"
+          role="tab"
+          aria-selected={value === filter.id}
+          variant={value === filter.id ? "default" : "outline"}
+          onClick={() => onChange(filter.id)}
+        >
+          {filter.label}
+          <span className="tabular-nums opacity-70">{filter.count}</span>
+        </Button>
+      ))}
+    </div>
   )
 }
 
@@ -299,61 +347,126 @@ function NetworkListPagination({
 
 export default function NetworkList() {
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
+  const { data: me } = useMeQuery(undefined, { skip: !isAuthenticated })
   const { openCreateNetwork } = useCreateEntity()
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query)
   const [sort, setSort] = useState<NetworkListSort>("updatedAt")
   const [order, setOrder] = useState<"asc" | "desc">("desc")
+  const [ownership, setOwnership] = useState<NetworkOwnershipScope>("owned")
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(12)
 
   useEffect(() => {
     setPageIndex(0)
-  }, [debouncedQuery, sort, order])
+  }, [debouncedQuery, sort, order, ownership])
+
+  const searchQuery = debouncedQuery.trim() || undefined
+  const useScopedList = ownership !== "all"
 
   const listParams = useMemo<ListNetworksParams>(
     () => ({
-      page: pageIndex + 1,
-      pageSize,
-      q: debouncedQuery.trim() || undefined,
+      page: useScopedList ? 1 : pageIndex + 1,
+      pageSize: useScopedList ? SCOPE_FETCH_SIZE : pageSize,
+      q: searchQuery,
       sort,
       order,
     }),
-    [debouncedQuery, order, pageIndex, pageSize, sort]
+    [order, pageIndex, pageSize, searchQuery, sort, useScopedList]
+  )
+
+  const scopeParams = useMemo<ListNetworksParams>(
+    () => ({
+      page: 1,
+      pageSize: SCOPE_FETCH_SIZE,
+      q: searchQuery,
+      sort,
+      order,
+    }),
+    [order, searchQuery, sort]
   )
 
   const { data, isLoading, isFetching, isError, error, refetch } =
     useListNetworksQuery(listParams, { skip: !isAuthenticated })
+  const { data: scopeData, isFetching: scopeFetching } = useListNetworksQuery(
+    scopeParams,
+    { skip: !isAuthenticated }
+  )
+
   const dataRef = useRef(data)
   if (data) {
     dataRef.current = data
   }
   const list = data ?? dataRef.current
-  const networks = list?.items ?? []
-  const total = list?.total ?? 0
-  const filtersActive = query.trim().length > 0
+  const scopeItems = scopeData?.items ?? list?.items ?? []
+  const currentUserId = me?.id
+
+  const ownedCount = scopeItems.filter((network) =>
+    isOwnedNetwork(network, currentUserId)
+  ).length
+  const sharedCount = currentUserId
+    ? scopeItems.filter((network) => !isOwnedNetwork(network, currentUserId))
+        .length
+    : 0
+  const allCount = scopeData?.total ?? list?.total ?? scopeItems.length
+
+  const scopedItems = useMemo(() => {
+    const items = list?.items ?? []
+    if (!useScopedList || !currentUserId) {
+      return items
+    }
+    return items.filter((network) => {
+      const owned = isOwnedNetwork(network, currentUserId)
+      return ownership === "owned" ? owned : !owned
+    })
+  }, [currentUserId, list?.items, ownership, useScopedList])
+
+  const networks = useScopedList
+    ? scopedItems.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize)
+    : (list?.items ?? [])
+  const total = useScopedList ? scopedItems.length : (list?.total ?? 0)
+
+  const searchActive = query.trim().length > 0
   const showInitialSkeleton = !list && (isLoading || isFetching) && !isError
   const showEmpty =
-    data != null && data.total === 0 && !filtersActive && !isError
+    data != null && data.total === 0 && !searchActive && !isError
   const showHeaderCreate = !showEmpty
+  const isRefreshing = isFetching || scopeFetching
+
+  const title =
+    ownership === "shared"
+      ? "Shared with me"
+      : ownership === "owned"
+        ? "Your networks"
+        : "All Networks"
+  const description =
+    ownership === "shared"
+      ? "Networks others invited you to collaborate on."
+      : ownership === "owned"
+        ? "Networks you created and own."
+        : "Open a network workspace to collaborate."
+  const emptyMatchLabel =
+    ownership === "shared"
+      ? "No networks have been shared with you."
+      : ownership === "owned"
+        ? "You have not created any networks yet."
+        : "No networks match this view."
 
   return (
     <div className="@container flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            All Networks
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Open a network workspace to collaborate.
+            {description}
           </p>
         </div>
         {showHeaderCreate ? (
           <div className="flex items-center gap-2">
-            {networks.length > 0 || filtersActive ? (
+            {networks.length > 0 || searchActive || ownership !== "all" ? (
               <RefreshButton
                 onRefresh={refetch}
-                isRefreshing={isFetching}
+                isRefreshing={isRefreshing}
                 size="icon"
               />
             ) : null}
@@ -370,31 +483,42 @@ export default function NetworkList() {
           query={query}
           onQueryChange={setQuery}
           searchPlaceholder="Search name..."
-          searchClassName="sm:max-w-3xl"
+          searchClassName="sm:max-w-sm"
           filters={
-            <NativeSelect
-              aria-label="Sort networks"
-              value={`${sort}:${order}`}
-              className="w-48"
-              onChange={(event) => {
-                const [nextSort, nextOrder] = event.target.value.split(":")
-                if (nextSort && isNetworkSort(nextSort)) {
-                  setSort(nextSort)
-                }
-                if (nextOrder === "asc" || nextOrder === "desc") {
-                  setOrder(nextOrder)
-                }
-              }}
-            >
-              {sortOptions.map((option) => (
-                <NativeSelectOption key={option.value} value={option.value}>
-                  {option.label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <>
+              <NetworkOwnershipFilter
+                value={ownership}
+                onChange={setOwnership}
+                counts={{
+                  owned: ownedCount,
+                  shared: sharedCount,
+                  all: allCount,
+                }}
+              />
+              <NativeSelect
+                aria-label="Sort networks"
+                value={`${sort}:${order}`}
+                className="w-48"
+                onChange={(event) => {
+                  const [nextSort, nextOrder] = event.target.value.split(":")
+                  if (nextSort && isNetworkSort(nextSort)) {
+                    setSort(nextSort)
+                  }
+                  if (nextOrder === "asc" || nextOrder === "desc") {
+                    setOrder(nextOrder)
+                  }
+                }}
+              >
+                {sortOptions.map((option) => (
+                  <NativeSelectOption key={option.value} value={option.value}>
+                    {option.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </>
           }
           count={dataTablePageSummary({
-            isLoading: isLoading || isFetching,
+            isLoading: isLoading || isRefreshing,
             loadingLabel: "Loading networks...",
             pageIndex,
             pageSize,
@@ -429,11 +553,21 @@ export default function NetworkList() {
         </Card>
       ) : (
         <>
-          <LoadingFrame isLoading={isFetching} label="Loading networks">
+          <LoadingFrame isLoading={isRefreshing} label="Loading networks">
             {networks.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No networks match this view.
-              </p>
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <p className="text-sm text-muted-foreground">{emptyMatchLabel}</p>
+                {ownership !== "all" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOwnership("all")}
+                  >
+                    View all networks
+                  </Button>
+                ) : null}
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-2 @5xl:grid-cols-3">
                 {networks.map((network) => (

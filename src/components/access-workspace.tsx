@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import {
   PencilIcon,
   PlusIcon,
+  SearchIcon,
   ShieldIcon,
   Trash2Icon,
   UserPlusIcon,
@@ -28,6 +29,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import {
   grantsFromPermissions,
   outlineRows,
@@ -41,6 +43,17 @@ import type {
   ApiAccessMember,
   ApiAccessPermission,
   ApiGrant,
+  ListAccessParams,
+} from "@/store/access-slice"
+import {
+  useGetNetworkGroupQuery,
+  useGetNetworkPermissionQuery,
+  useGetOrganizationGroupQuery,
+  useGetOrganizationPermissionQuery,
+  useListNetworkGroupsQuery,
+  useListNetworkPermissionsQuery,
+  useListOrganizationGroupsQuery,
+  useListOrganizationPermissionsQuery,
 } from "@/store/access-slice"
 
 export type AccessCandidate = {
@@ -54,12 +67,15 @@ type Selection =
   | { type: "group"; id: string }
   | { type: "permission"; id: string }
 
+const RAIL_PAGE_SIZE = 50
+const ATTACH_PAGE_SIZE = 20
+
 export function AccessWorkspace({
   kind,
+  networkId,
+  organizationId,
   title,
   description,
-  groups,
-  permissions,
   canManage,
   canRemoveMembers,
   creatorId,
@@ -81,17 +97,16 @@ export function AccessWorkspace({
   onUpdatePermission,
   onDeletePermission,
   headerActions,
-  isLoading,
   error,
   onError,
   formatError,
 }: {
   kind: "network" | "organization"
+  networkId: string
+  organizationId?: string
   title: string
   description: string
   headerActions?: ReactNode
-  groups: ApiAccessGroup[]
-  permissions: ApiAccessPermission[]
   canManage: boolean
   canRemoveMembers: boolean
   creatorId?: string
@@ -121,12 +136,15 @@ export function AccessWorkspace({
     grants: ApiGrant[]
   ) => Promise<void>
   onDeletePermission: (id: string) => Promise<void>
-  isLoading?: boolean
   error?: string
   onError: (message: string) => void
   formatError: (err: unknown, fallback: string) => string
 }) {
   const [selection, setSelection] = useState<Selection | null>(null)
+  const [groupQuery, setGroupQuery] = useState("")
+  const [permissionQuery, setPermissionQuery] = useState("")
+  const debouncedGroupQuery = useDebouncedValue(groupQuery)
+  const debouncedPermissionQuery = useDebouncedValue(permissionQuery)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [groupOpen, setGroupOpen] = useState(false)
   const [outlineOpen, setOutlineOpen] = useState(false)
@@ -143,17 +161,95 @@ export function AccessWorkspace({
   const [memberValue, setMemberValue] = useState("")
   const [busy, setBusy] = useState(false)
 
-  const selectedGroup =
-    selection?.type === "group"
-      ? groups.find((group) => group.id === selection.id)
-      : undefined
-  const selectedPermission =
-    selection?.type === "permission"
-      ? permissions.find((permission) => permission.id === selection.id)
-      : undefined
+  const scopeReady =
+    Boolean(networkId) && (kind === "network" || Boolean(organizationId))
+
+  const groupListParams = useMemo<ListAccessParams>(
+    () => ({
+      networkId,
+      organizationId,
+      q: debouncedGroupQuery.trim() || undefined,
+      page: 1,
+      pageSize: RAIL_PAGE_SIZE,
+    }),
+    [debouncedGroupQuery, networkId, organizationId]
+  )
+
+  const permissionListParams = useMemo<ListAccessParams>(
+    () => ({
+      networkId,
+      organizationId,
+      q: debouncedPermissionQuery.trim() || undefined,
+      page: 1,
+      pageSize: RAIL_PAGE_SIZE,
+    }),
+    [debouncedPermissionQuery, networkId, organizationId]
+  )
+
+  const networkGroupsQuery = useListNetworkGroupsQuery(groupListParams, {
+    skip: !scopeReady || kind !== "network",
+  })
+  const orgGroupsQuery = useListOrganizationGroupsQuery(groupListParams, {
+    skip: !scopeReady || kind !== "organization",
+  })
+  const networkPermissionsQuery = useListNetworkPermissionsQuery(
+    permissionListParams,
+    { skip: !scopeReady || kind !== "network" }
+  )
+  const orgPermissionsQuery = useListOrganizationPermissionsQuery(
+    permissionListParams,
+    { skip: !scopeReady || kind !== "organization" }
+  )
+
+  const groupsQuery =
+    kind === "network" ? networkGroupsQuery : orgGroupsQuery
+  const permissionsQuery =
+    kind === "network" ? networkPermissionsQuery : orgPermissionsQuery
+
+  const groups = groupsQuery.data?.items ?? []
+  const permissions = permissionsQuery.data?.items ?? []
+  const isLoading =
+    (groupsQuery.isLoading && groups.length === 0) ||
+    (permissionsQuery.isLoading && permissions.length === 0)
+
+  const selectedGroupId =
+    selection?.type === "group" ? selection.id : undefined
+  const selectedPermissionId =
+    selection?.type === "permission" ? selection.id : undefined
+
+  const networkGroupDetail = useGetNetworkGroupQuery(selectedGroupId ?? "", {
+    skip: kind !== "network" || !selectedGroupId,
+  })
+  const orgGroupDetail = useGetOrganizationGroupQuery(selectedGroupId ?? "", {
+    skip: kind !== "organization" || !selectedGroupId,
+  })
+  const networkPermissionDetail = useGetNetworkPermissionQuery(
+    selectedPermissionId ?? "",
+    { skip: kind !== "network" || !selectedPermissionId }
+  )
+  const orgPermissionDetail = useGetOrganizationPermissionQuery(
+    selectedPermissionId ?? "",
+    { skip: kind !== "organization" || !selectedPermissionId }
+  )
+
+  const selectedGroup: ApiAccessGroup | undefined =
+    kind === "network" ? networkGroupDetail.data : orgGroupDetail.data
+  const selectedPermission: ApiAccessPermission | undefined =
+    kind === "network"
+      ? networkPermissionDetail.data
+      : orgPermissionDetail.data
 
   useEffect(() => {
-    if (selectedGroup || selectedPermission) {
+    setSelection(null)
+    setGroupQuery("")
+    setPermissionQuery("")
+  }, [networkId, organizationId, kind])
+
+  useEffect(() => {
+    if (selection) {
+      return
+    }
+    if (groupsQuery.isLoading || groups.length === 0) {
       return
     }
     const preferred =
@@ -163,7 +259,7 @@ export function AccessWorkspace({
     if (preferred) {
       setSelection({ type: "group", id: preferred.id })
     }
-  }, [groups, selectedGroup, selectedPermission])
+  }, [groups, groupsQuery.isLoading, selection])
 
   const groupPeople = useMemo(() => {
     if (!selectedGroup) {
@@ -175,19 +271,22 @@ export function AccessWorkspace({
     return selectedGroup.members
   }, [implicitMembers, selectedGroup])
 
+  const attachedPermissions = selectedGroup?.permissions ?? []
+
   const mergedRows = useMemo(() => {
     if (!selectedGroup) {
       return []
     }
     return outlineRows(
-      grantsFromPermissions(permissions, selectedGroup.permissionIds),
+      grantsFromPermissions(
+        attachedPermissions,
+        selectedGroup.permissionIds
+      ),
       kind
     )
-  }, [kind, permissions, selectedGroup])
+  }, [attachedPermissions, kind, selectedGroup])
 
-  const attachedPermissions = permissions.filter((permission) =>
-    selectedGroup?.permissionIds.includes(permission.id)
-  )
+  const attachedGroups = selectedPermission?.groups ?? []
 
   function openNewGroup() {
     setEditingGroupId(null)
@@ -314,6 +413,15 @@ export function AccessWorkspace({
   }
 
   const implicit = selectedGroup?.slug === "everyone"
+  const detailLoading =
+    (selection?.type === "group" &&
+      (kind === "network"
+        ? networkGroupDetail.isLoading
+        : orgGroupDetail.isLoading)) ||
+    (selection?.type === "permission" &&
+      (kind === "network"
+        ? networkPermissionDetail.isLoading
+        : orgPermissionDetail.isLoading))
 
   return (
     <div className="flex min-h-[calc(100svh-var(--app-header-height))] min-w-0 flex-1 flex-col overflow-hidden bg-muted/40">
@@ -362,22 +470,33 @@ export function AccessWorkspace({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <aside className="w-full shrink-0 border-b bg-background lg:flex lg:h-full lg:w-72 lg:flex-col lg:overflow-hidden lg:border-r lg:border-b-0">
-          <div className="space-y-6 overflow-y-auto p-4 lg:min-h-0 lg:flex-1">
+        <aside className="flex max-h-[50vh] w-full shrink-0 flex-col overflow-hidden border-b bg-background lg:h-full lg:max-h-none lg:w-72 lg:border-r lg:border-b-0">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
             <RailSection
               icon={<UsersIcon className="size-3.5" />}
               label="Groups"
               hint="Who"
+              query={groupQuery}
+              onQueryChange={setGroupQuery}
+              searchPlaceholder="Search groups…"
+              searchLabel="Search groups"
             >
               {isLoading && groups.length === 0 ? (
                 <p className="px-2 py-1.5 text-sm text-muted-foreground">
                   Loading groups…
                 </p>
               ) : null}
+              {!isLoading && groups.length === 0 ? (
+                <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                  {debouncedGroupQuery.trim()
+                    ? "No matching groups"
+                    : "No groups yet"}
+                </p>
+              ) : null}
               {groups.map((group) => (
                 <RailItem
                   key={group.id}
-                  active={selectedGroup?.id === group.id}
+                  active={selectedGroupId === group.id}
                   onClick={() => setSelection({ type: "group", id: group.id })}
                   title={group.name}
                   subtitle={
@@ -406,11 +525,15 @@ export function AccessWorkspace({
               icon={<ShieldIcon className="size-3.5" />}
               label="Permissions"
               hint="What"
+              query={permissionQuery}
+              onQueryChange={setPermissionQuery}
+              searchPlaceholder="Search permissions…"
+              searchLabel="Search permissions"
             >
               {permissions.map((permission) => (
                 <RailItem
                   key={permission.id}
-                  active={selectedPermission?.id === permission.id}
+                  active={selectedPermissionId === permission.id}
                   onClick={() =>
                     setSelection({ type: "permission", id: permission.id })
                   }
@@ -433,9 +556,11 @@ export function AccessWorkspace({
                   }
                 />
               ))}
-              {permissions.length === 0 ? (
+              {permissions.length === 0 && !permissionsQuery.isLoading ? (
                 <p className="px-2 py-1.5 text-sm text-muted-foreground">
-                  Create a permission, then attach it.
+                  {debouncedPermissionQuery.trim()
+                    ? "No matching permissions"
+                    : "Create a permission, then attach it."}
                 </p>
               ) : null}
             </RailSection>
@@ -443,6 +568,10 @@ export function AccessWorkspace({
         </aside>
 
         <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {detailLoading && !selectedGroup && !selectedPermission ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : null}
+
           {selectedGroup ? (
             <div className="mx-auto flex max-w-3xl flex-col gap-6">
               <section className="rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10">
@@ -474,10 +603,10 @@ export function AccessWorkspace({
                           variant="ghost"
                           size="icon-sm"
                           onClick={() =>
-                            void run(
-                              () => onDeleteGroup(selectedGroup.id),
-                              "Could not delete group."
-                            )
+                            void run(async () => {
+                              await onDeleteGroup(selectedGroup.id)
+                              setSelection(null)
+                            }, "Could not delete group.")
                           }
                         >
                           <Trash2Icon />
@@ -566,43 +695,21 @@ export function AccessWorkspace({
                     ))}
                   </ul>
                 )}
-                {canManage &&
-                permissions.some(
-                  (permission) =>
-                    !selectedGroup.permissionIds.includes(permission.id)
-                ) ? (
-                  <form className="mt-4">
-                    <NativeSelect
-                      value=""
-                      onChange={(event) => {
-                        const permissionId = event.target.value
-                        if (!permissionId) {
-                          return
-                        }
+                {canManage ? (
+                  <div className="mt-4">
+                    <PermissionAttachPicker
+                      kind={kind}
+                      networkId={networkId}
+                      organizationId={organizationId}
+                      groupId={selectedGroup.id}
+                      onSelect={(permissionId) =>
                         void run(
                           () => onAssign(selectedGroup.id, permissionId),
                           "Could not attach that permission."
                         )
-                      }}
-                    >
-                      <NativeSelectOption value="">
-                        Attach a permission…
-                      </NativeSelectOption>
-                      {permissions
-                        .filter(
-                          (permission) =>
-                            !selectedGroup.permissionIds.includes(permission.id)
-                        )
-                        .map((permission) => (
-                          <NativeSelectOption
-                            key={permission.id}
-                            value={permission.id}
-                          >
-                            {permission.name}
-                          </NativeSelectOption>
-                        ))}
-                    </NativeSelect>
-                  </form>
+                      }
+                    />
+                  </div>
                 ) : null}
               </section>
 
@@ -763,10 +870,10 @@ export function AccessWorkspace({
                           variant="ghost"
                           size="icon-sm"
                           onClick={() =>
-                            void run(
-                              () => onDeletePermission(selectedPermission.id),
-                              "Could not delete that permission."
-                            )
+                            void run(async () => {
+                              await onDeletePermission(selectedPermission.id)
+                              setSelection(null)
+                            }, "Could not delete that permission.")
                           }
                         >
                           <Trash2Icon />
@@ -780,36 +887,32 @@ export function AccessWorkspace({
                 <p className="text-xs font-medium text-muted-foreground">
                   Attached to
                 </p>
-                {groups.filter((group) =>
-                  group.permissionIds.includes(selectedPermission.id)
-                ).length === 0 ? (
+                {attachedGroups.length === 0 ? (
                   <p className="mt-3 text-sm text-muted-foreground">
                     Not attached to any group yet.
                   </p>
                 ) : (
                   <ul className="mt-3 divide-y overflow-hidden rounded-xl ring-1 ring-foreground/10">
-                    {groups
-                      .filter((group) =>
-                        group.permissionIds.includes(selectedPermission.id)
-                      )
-                      .map((group) => (
-                        <li key={group.id}>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-muted/50"
-                            onClick={() =>
-                              setSelection({ type: "group", id: group.id })
-                            }
-                          >
-                            <span className="text-sm font-medium">{group.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {group.slug === "everyone"
-                                ? "Everyone"
-                                : `${group.members.length} people`}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
+                    {attachedGroups.map((group) => (
+                      <li key={group.id}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-muted/50"
+                          onClick={() =>
+                            setSelection({ type: "group", id: group.id })
+                          }
+                        >
+                          <span className="text-sm font-medium">{group.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {group.slug === "everyone"
+                              ? "Everyone"
+                              : `${group.memberCount} ${
+                                  group.memberCount === 1 ? "person" : "people"
+                                }`}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
                   </ul>
                 )}
               </section>
@@ -827,7 +930,7 @@ export function AccessWorkspace({
             </div>
           ) : null}
 
-          {!selectedGroup && !selectedPermission && !isLoading ? (
+          {!selectedGroup && !selectedPermission && !isLoading && !detailLoading ? (
             <div className="mx-auto max-w-lg rounded-2xl bg-card p-8 text-center shadow-xs ring-1 ring-foreground/10">
               <p className="text-sm font-medium">Start with a group</p>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -970,27 +1073,128 @@ export function AccessWorkspace({
   )
 }
 
+function PermissionAttachPicker({
+  kind,
+  networkId,
+  organizationId,
+  groupId,
+  onSelect,
+}: {
+  kind: "network" | "organization"
+  networkId: string
+  organizationId?: string
+  groupId: string
+  onSelect: (permissionId: string) => void
+}) {
+  const [query, setQuery] = useState("")
+  const debouncedQuery = useDebouncedValue(query)
+  const params = useMemo<ListAccessParams>(
+    () => ({
+      networkId,
+      organizationId,
+      q: debouncedQuery.trim() || undefined,
+      page: 1,
+      pageSize: ATTACH_PAGE_SIZE,
+      excludeAssignedToGroupId: groupId,
+    }),
+    [debouncedQuery, groupId, networkId, organizationId]
+  )
+  const networkQuery = useListNetworkPermissionsQuery(params, {
+    skip: kind !== "network",
+  })
+  const orgQuery = useListOrganizationPermissionsQuery(params, {
+    skip: kind !== "organization",
+  })
+  const list = kind === "network" ? networkQuery : orgQuery
+  const items = list.data?.items ?? []
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Attach a permission…"
+          aria-label="Search permissions to attach"
+          className="h-9 pl-8"
+        />
+      </div>
+      {list.isFetching && items.length === 0 ? (
+        <p className="px-1 text-xs text-muted-foreground">Searching…</p>
+      ) : null}
+      {items.length === 0 && !list.isFetching ? (
+        <p className="px-1 text-xs text-muted-foreground">
+          {debouncedQuery.trim()
+            ? "No matching permissions to attach"
+            : "No unattached permissions"}
+        </p>
+      ) : (
+        <ul className="max-h-40 overflow-y-auto rounded-xl ring-1 ring-foreground/10">
+          {items.map((permission) => (
+            <li key={permission.id}>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
+                onClick={() => {
+                  onSelect(permission.id)
+                  setQuery("")
+                }}
+              >
+                <span className="truncate font-medium">{permission.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  Attach
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function RailSection({
   icon,
   label,
   hint,
+  query,
+  onQueryChange,
+  searchPlaceholder,
+  searchLabel,
   children,
 }: {
   icon: ReactNode
   label: string
   hint: string
+  query: string
+  onQueryChange: (value: string) => void
+  searchPlaceholder: string
+  searchLabel: string
   children: ReactNode
 }) {
   return (
-    <section>
-      <div className="mb-2 flex items-center justify-between gap-2 px-2">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-2">
         <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {icon}
           {label}
         </p>
         <span className="text-[11px] text-muted-foreground">{hint}</span>
       </div>
-      <div className="space-y-1">{children}</div>
+      <div className="relative mb-2 shrink-0 px-0.5">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder={searchPlaceholder}
+          aria-label={searchLabel}
+          className="h-8 border-transparent bg-muted/70 pl-8 text-sm shadow-none focus-visible:ring-1"
+        />
+      </div>
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
+        {children}
+      </div>
     </section>
   )
 }

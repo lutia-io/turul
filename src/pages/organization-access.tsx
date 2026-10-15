@@ -14,8 +14,6 @@ import {
   useCreateOrganizationPermissionMutation,
   useDeleteOrganizationGroupMutation,
   useDeleteOrganizationPermissionMutation,
-  useListOrganizationGroupsQuery,
-  useListOrganizationPermissionsQuery,
   useRemoveOrganizationGroupMemberMutation,
   useUnassignOrganizationPermissionMutation,
   useUpdateOrganizationPermissionMutation,
@@ -28,14 +26,6 @@ export default function OrganizationAccess() {
   const { manageAccess } = useAuthorization()
   const [error, setError] = useState("")
 
-  const groupsQuery = useListOrganizationGroupsQuery(
-    { networkId: network?.id ?? "", organizationId: organizationId ?? "" },
-    { skip: !network?.id || !organizationId }
-  )
-  const permissionsQuery = useListOrganizationPermissionsQuery(
-    { networkId: network?.id ?? "", organizationId: organizationId ?? "" },
-    { skip: !network?.id || !organizationId }
-  )
   const membersQuery = useListOrganizationUsersQuery(
     {
       networkId: network?.id,
@@ -95,22 +85,16 @@ export default function OrganizationAccess() {
   return (
     <AccessWorkspace
       kind="organization"
+      networkId={network.id}
+      organizationId={organizationId}
       title={organization.name}
       description="Everyone is already in this organization. Tighten records, files, and column access by attaching permissions to groups."
-      groups={groupsQuery.data ?? []}
-      permissions={permissionsQuery.data ?? []}
       canManage
       canRemoveMembers
       schemas={schemaOptions}
       candidates={candidates}
       implicitMembers={candidates}
       addMemberMode="select"
-      isLoading={
-        groupsQuery.isLoading ||
-        permissionsQuery.isLoading ||
-        membersQuery.isLoading ||
-        schemasQuery.isLoading
-      }
       error={error}
       onError={setError}
       formatError={getHumaErrorMessage}

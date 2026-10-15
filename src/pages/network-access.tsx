@@ -13,8 +13,6 @@ import {
   useDeleteNetworkGroupMutation,
   useDeleteNetworkPermissionMutation,
   useInviteNetworkMemberMutation,
-  useListNetworkGroupsQuery,
-  useListNetworkPermissionsQuery,
   useRemoveNetworkGroupMemberMutation,
   useUnassignNetworkPermissionMutation,
   useUpdateNetworkPermissionMutation,
@@ -35,12 +33,6 @@ export default function NetworkAccess({
   })
   const [error, setError] = useState("")
 
-  const groupsQuery = useListNetworkGroupsQuery(network?.id ?? "", {
-    skip: !network?.id,
-  })
-  const permissionsQuery = useListNetworkPermissionsQuery(network?.id ?? "", {
-    skip: !network?.id,
-  })
   const [inviteMember] = useInviteNetworkMemberMutation()
   const [createGroup] = useCreateNetworkGroupMutation()
   const [updateGroup] = useUpdateNetworkGroupMutation()
@@ -56,18 +48,16 @@ export default function NetworkAccess({
   return (
     <AccessWorkspace
       kind="network"
+      networkId={network.id}
       title={network.name}
       description={description}
       headerActions={headerActions}
-      groups={groupsQuery.data ?? []}
-      permissions={permissionsQuery.data ?? []}
       canManage={manageAccess}
       canRemoveMembers={creator}
       creatorId={network.createdBy?.id}
       addMemberMode="email"
       inviteLabel="Invite a platform user"
       inviteDescription="They must already have a Huma account. Invites join Members."
-      isLoading={groupsQuery.isLoading || permissionsQuery.isLoading}
       error={error}
       onError={setError}
       formatError={getHumaErrorMessage}
