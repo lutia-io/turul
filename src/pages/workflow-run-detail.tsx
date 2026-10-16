@@ -1,44 +1,76 @@
-import { useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Link, useParams } from "react-router"
 import {
+  ArrowLeftIcon,
   Building2Icon,
-  CheckIcon,
-  CopyIcon,
+  ChevronDownIcon,
+  CircleAlertIcon,
   GalleryVerticalEndIcon,
+  ListIcon,
   RotateCcwIcon,
+  Table2Icon,
   WorkflowIcon,
+  type LucideIcon,
 } from "lucide-react"
 
+import {
+  AsideRow,
+  CopyIdButton,
+  DefinitionAsideCard,
+  DefinitionPage,
+  DefinitionStatusPage,
+} from "@/components/definition-detail"
 import { RunStatusPill } from "@/components/run-card"
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { WorkflowNodesJournal } from "@/components/workflow-actions"
+import { RunFlowMap } from "@/components/workflow-run/run-flow-map"
+import { RunInspector } from "@/components/workflow-run/run-inspector"
+import {
+  allNodes,
+  buildLevels,
+  defaultSelection,
+  formatAbsoluteTime,
+  formatMs,
+  retryCount,
+  runElapsedMs,
+  runNarrative,
+  selectionOrder,
+  stepStateLabel,
+  stepStateTone,
+  type LevelView,
+} from "@/components/workflow-run/run-model"
+import { RunTiming } from "@/components/workflow-run/run-timing"
 import type { RunStatus } from "@/data/runs"
-import type { DefinitionStep } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
   useNetworkWorkspace,
   useWorkspaceOrganizations,
+  useWorkspaceSchemas,
   useWorkspaceWorkflows,
 } from "@/lib/network-workspace"
-import {
-  apiWorkflowCurrentStep,
-  apiWorkflowStatus,
-  apiWorkflowSteps,
-  formatRelativeTime,
-  formatRunDuration,
-  runProgress,
-} from "@/lib/runs"
+import { apiWorkflowStatus, formatRelativeTime } from "@/lib/runs"
 import { cn } from "@/lib/utils"
-import { parseWorkflowDefinition } from "@/lib/workflow-definition"
+import { schemaFieldOptions } from "@/lib/workflow-definition"
 import { getHumaErrorMessage, getHumaLoadErrorCopy } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
   useGetWorkflowQuery,
+  useListWorkflowNodesQuery,
   useRetryWorkflowMutation,
 } from "@/store/workflow-slice"
+
+const heroIconTone: Record<RunStatus, string> = {
+  Succeeded:
+    "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400",
+  Failed: "bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-400",
+  Running: "bg-cyan-500/10 text-cyan-700 ring-cyan-500/20 dark:text-cyan-400",
+  Queued:
+    "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-400",
+  Paused: "bg-muted text-muted-foreground ring-foreground/10",
+}
 
 export default function WorkflowRunDetail() {
   const { workflowRunId } = useParams()
@@ -50,6 +82,7 @@ export default function WorkflowRunDetail() {
   } = useNetworkWorkspace()
   const { organizations } = useWorkspaceOrganizations()
   const { workflows } = useWorkspaceWorkflows()
+  const { schemas } = useWorkspaceSchemas()
   const skipWorkflow = !isAuthenticated || !workflowRunId
   const workflowQuery = useGetWorkflowQuery(workflowRunId ?? "", {
     skip: skipWorkflow,
@@ -61,26 +94,26 @@ export default function WorkflowRunDetail() {
     skip: skipWorkflow || !live,
     pollingInterval: 2000,
   })
+  const nodesQuery = useListWorkflowNodesQuery(workflowRunId ?? "", {
+    skip: skipWorkflow,
+    pollingInterval: live ? 2000 : 0,
+  })
   const [retryWorkflow, retryState] = useRetryWorkflowMutation()
+  const [picked, setPicked] = useState<string>()
+  const [showLog, setShowLog] = useState(false)
+  const now = useNow(live)
+
   const workflow = workflowQuery.data
   const belongsToWorkspace =
     !workspaceNetwork ||
     (workflow?.networkId === workspaceNetwork.id &&
       (!organizationId || workflow.organizationId === organizationId))
   const resolved = belongsToWorkspace ? workflow : undefined
-  const definition = resolved
-    ? workflows.find((item) => item.id === resolved.workflowDefinitionId)
-    : undefined
-  const organization = resolved
-    ? organizations.find((item) => item.id === resolved.organizationId)
-    : undefined
-  const parsed = resolved
-    ? parseWorkflowDefinition(resolved.definition)
-    : undefined
-  const steps = apiWorkflowSteps(parsed)
-  const status = resolved ? apiWorkflowStatus(resolved.status) : "Queued"
-  const currentStep = resolved ? apiWorkflowCurrentStep(resolved) : 0
-  const progress = resolved ? runProgress(currentStep, steps.length, status) : 0
+  const attempts = nodesQuery.data
+  const levels = useMemo(
+    () => (resolved ? buildLevels(resolved, attempts ?? []) : []),
+    [resolved, attempts]
+  )
 
   if (workflowQuery.isLoading) {
     return <WorkflowRunSkeleton />
@@ -88,352 +121,426 @@ export default function WorkflowRunDetail() {
 
   if (workflowQuery.isError) {
     return (
-      <WorkflowRunStatusPage
+      <DefinitionStatusPage
         {...getHumaLoadErrorCopy(workflowQuery.error, {
           resource: "Workflow run",
           notFoundMessage:
             "This workflow execution does not exist or is no longer available.",
         })}
+        action={<BackToRunsButton to={href("workflows")} />}
       />
     )
   }
 
   if (!resolved || !workspaceNetwork) {
     return (
-      <WorkflowRunStatusPage
+      <DefinitionStatusPage
         title="Workflow run not found"
         message="This workflow execution does not exist or is no longer available."
+        action={<BackToRunsButton to={href("workflows")} />}
       />
     )
   }
 
-  const duration = formatRunDuration({
-    startedAt: resolved.createdAt,
-    finishedAt: resolved.completedAt ?? undefined,
-    status,
-  })
+  const definition = workflows.find(
+    (item) => item.id === resolved.workflowDefinitionId
+  )
+  const organization = organizations.find(
+    (item) => item.id === resolved.organizationId
+  )
+  const schema = definition?.schemaId
+    ? schemas.find((item) => item.id === definition.schemaId)
+    : undefined
+  const fields = schemaFieldOptions(schema?.definition)
+  const status = apiWorkflowStatus(resolved.status)
+  const order = selectionOrder(levels)
+  const selected =
+    picked && order.includes(picked) ? picked : defaultSelection(levels)
+  const nodes = allNodes(levels)
+  const doneCount = levels.filter((level) => level.state === "done").length
+  const retries = retryCount(levels)
+  const failedNode = nodes.find((node) => node.state === "failed")
+  const runError = resolved.error ?? failedNode?.attempts.at(-1)?.error
+  const elapsed = formatMs(runElapsedMs(resolved, now))
+  const recordHref = resolved.recordId
+    ? href(`records/${resolved.recordId}`)
+    : undefined
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-8 overflow-x-hidden bg-muted/40 p-4 sm:p-6 lg:p-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground">
-            Workflow run
-          </p>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-semibold tracking-tight text-pretty">
-              {definition?.name ?? "Workflow"}
-            </h1>
-            <RunStatusPill status={status} />
-          </div>
-          {resolved.error ? (
-            <p className="max-w-2xl text-sm text-red-700 dark:text-red-400">
-              {resolved.error}
-            </p>
-          ) : null}
-          {retryState.isError ? (
-            <p className="max-w-2xl text-sm text-destructive">
-              {getHumaErrorMessage(
-                retryState.error,
-                "Failed to retry workflow"
-              )}
-            </p>
-          ) : null}
-        </div>
-        {resolved.status === "failed" ? (
-          <Button
-            type="button"
-            size="sm"
-            className="shrink-0"
-            onClick={() => {
-              void retryWorkflow(resolved.id)
-            }}
-            disabled={retryState.isLoading}
-            aria-busy={retryState.isLoading}
-          >
-            {retryState.isLoading ? (
-              <Spinner label="Retrying" />
-            ) : (
-              <>
-                <RotateCcwIcon />
-                Retry
-              </>
-            )}
-          </Button>
-        ) : null}
-      </div>
+    <DefinitionPage>
+      <section className="rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10 sm:p-8">
+        <Link
+          to={href("workflows")}
+          className="inline-flex w-fit items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-3.5" />
+          All workflow runs
+        </Link>
 
-      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <section className="min-w-0 rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-medium">Steps</h2>
-                <p className="text-sm text-muted-foreground">
-                  {steps.length === 0
-                    ? "This workflow has no levels."
-                    : `${progress}% complete`}
-                </p>
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-4">
+            <span
+              className={cn(
+                "flex size-12 shrink-0 items-center justify-center rounded-xl ring-1",
+                heroIconTone[status]
+              )}
+            >
+              <WorkflowIcon className="size-5" />
+            </span>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="text-2xl font-semibold tracking-tight text-pretty">
+                  {definition?.name ?? "Workflow run"}
+                </h1>
+                <RunStatusPill status={status} />
               </div>
-              <p className="text-sm text-muted-foreground tabular-nums">
-                {Math.min(currentStep, steps.length)}/{steps.length}
+              <p className="max-w-3xl text-base text-pretty text-foreground/80">
+                {runNarrative(resolved, levels, now)}
               </p>
             </div>
-            <div className="mt-4 h-1 overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-[width]",
-                  status === "Failed" ? "bg-red-500" : "bg-emerald-500"
-                )}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            {steps.length > 0 ? (
-              <ol className="mt-8">
-                {steps.map((step, index) => (
-                  <StepRow
-                    key={step.id}
-                    step={step}
-                    status={status}
-                    currentStep={currentStep}
-                    last={index === steps.length - 1}
-                  />
-                ))}
-              </ol>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {definition ? (
+              <Button
+                variant="outline"
+                render={
+                  <Link to={href(`workflow-definitions/${definition.id}`)} />
+                }
+              >
+                <WorkflowIcon />
+                Open workflow
+              </Button>
             ) : null}
-          </section>
+            {resolved.status === "failed" ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  void retryWorkflow(resolved.id)
+                }}
+                disabled={retryState.isLoading}
+                aria-busy={retryState.isLoading}
+              >
+                {retryState.isLoading ? (
+                  <Spinner label="Retrying" />
+                ) : (
+                  <>
+                    <RotateCcwIcon />
+                    Retry run
+                  </>
+                )}
+              </Button>
+            ) : null}
+          </div>
+        </div>
 
+        {resolved.status === "failed" && (runError || retryState.isError) ? (
+          <div
+            role="alert"
+            className="mt-5 flex items-start gap-3 rounded-xl bg-red-500/5 p-4 ring-1 ring-red-500/20"
+          >
+            <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-400" />
+            <div className="min-w-0 space-y-1 text-sm">
+              {runError ? (
+                <p className="break-words text-red-700 dark:text-red-400">
+                  {runError}
+                </p>
+              ) : null}
+              {retryState.isError ? (
+                <p className="text-destructive">
+                  {getHumaErrorMessage(
+                    retryState.error,
+                    "Failed to retry workflow"
+                  )}
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  Fix the cause, then retry. Steps that already finished won't
+                  run again.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        <dl className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile
+            label={live ? "Running for" : "Duration"}
+            value={status === "Queued" ? "—" : elapsed}
+            hint={
+              <span title={formatAbsoluteTime(resolved.createdAt)}>
+                Started {formatRelativeTime(resolved.createdAt)}
+              </span>
+            }
+          />
+          <StatTile
+            label="Steps"
+            value={
+              <>
+                {doneCount}
+                <span className="text-muted-foreground">/{levels.length}</span>
+              </>
+            }
+            hint={<StepSegments levels={levels} />}
+          />
+          <StatTile
+            label="Actions"
+            value={nodes.length}
+            hint={`${nodes.filter((node) => node.state === "done").length} finished`}
+          />
+          <StatTile
+            label="Retries"
+            value={retries}
+            hint={
+              retries === 0
+                ? "None needed"
+                : `Across ${nodes.filter((node) => node.attempts.length > 1).length} actions`
+            }
+          />
+        </dl>
+      </section>
+
+      <RunFlowMap
+        run={resolved}
+        levels={levels}
+        fields={fields}
+        selected={selected}
+        order={order}
+        onSelect={setPicked}
+      />
+
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <RunInspector
+          run={resolved}
+          levels={levels}
+          fields={fields}
+          selected={selected}
+          order={order}
+          onSelect={setPicked}
+          recordHref={recordHref}
+          fileHref={(fileId) => href(`files/${fileId}`)}
+        />
+
+        <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-6">
+          <DefinitionAsideCard title="Details">
+            <dl className="mt-4 space-y-4">
+              <AsideRow label="Started">
+                <span title={formatAbsoluteTime(resolved.createdAt)}>
+                  {formatRelativeTime(resolved.createdAt)}
+                </span>
+              </AsideRow>
+              {resolved.completedAt ? (
+                <AsideRow label="Finished">
+                  <span title={formatAbsoluteTime(resolved.completedAt)}>
+                    {formatRelativeTime(resolved.completedAt)}
+                  </span>
+                </AsideRow>
+              ) : null}
+              {resolved.maxAttempts > 1 ? (
+                <AsideRow label="Run attempts">
+                  <span className="tabular-nums">
+                    {resolved.attempts} of {resolved.maxAttempts}
+                  </span>
+                </AsideRow>
+              ) : null}
+              <AsideRow label="Workflow">
+                {definition ? (
+                  <AsideLink
+                    to={href(`workflow-definitions/${definition.id}`)}
+                    icon={WorkflowIcon}
+                  >
+                    {definition.name}
+                  </AsideLink>
+                ) : (
+                  <span className="font-mono text-xs font-normal">
+                    {resolved.workflowDefinitionId}
+                  </span>
+                )}
+              </AsideRow>
+              {recordHref ? (
+                <AsideRow label="Record">
+                  <AsideLink to={recordHref} icon={Table2Icon}>
+                    {schema?.name ?? "View record"}
+                  </AsideLink>
+                </AsideRow>
+              ) : null}
+              {organization ? (
+                <AsideRow label="Organization">
+                  <AsideLink
+                    to={href(`organization/${organization.id}`)}
+                    icon={Building2Icon}
+                  >
+                    {organization.name}
+                  </AsideLink>
+                </AsideRow>
+              ) : (
+                <AsideRow label="Network">
+                  <AsideLink
+                    to={networkWorkspacePath({ networkId: resolved.networkId })}
+                    icon={GalleryVerticalEndIcon}
+                  >
+                    {workspaceNetwork.name}
+                  </AsideLink>
+                </AsideRow>
+              )}
+              <AsideRow label="Run ID">
+                <CopyIdButton value={resolved.id} />
+              </AsideRow>
+            </dl>
+          </DefinitionAsideCard>
+        </aside>
+      </div>
+
+      <RunTiming
+        run={resolved}
+        levels={levels}
+        now={now}
+        selected={selected}
+        onSelect={setPicked}
+      />
+
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => setShowLog((current) => !current)}
+          aria-expanded={showLog}
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ListIcon className="size-4" />
+          {showLog ? "Hide raw attempt log" : "Show raw attempt log"}
+          {attempts ? (
+            <span className="tabular-nums">({attempts.length})</span>
+          ) : null}
+          <ChevronDownIcon
+            className={cn(
+              "size-4 transition-transform",
+              showLog && "rotate-180"
+            )}
+          />
+        </button>
+        {showLog ? (
           <WorkflowNodesJournal
             workflowId={resolved.id}
             pollingInterval={live ? 2000 : 0}
           />
-        </div>
-
-        <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-6">
-          <section className="rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10">
-            <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Details
-            </h2>
-            <dl className="mt-4 space-y-4">
-              <AsideRow label="Progress">
-                <span className="tabular-nums">{progress}%</span>
-              </AsideRow>
-              <AsideRow label="Started">
-                {formatRelativeTime(resolved.createdAt)}
-              </AsideRow>
-              <AsideRow label="Duration">{duration}</AsideRow>
-              {definition ? (
-                <AsideRow label="Workflow">
-                  <Link
-                    to={href(`workflow-definitions/${definition.id}`)}
-                    className="inline-flex max-w-full items-center gap-1.5 hover:underline"
-                  >
-                    <WorkflowIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{definition.name}</span>
-                  </Link>
-                </AsideRow>
-              ) : (
-                <AsideRow label="Workflow">
-                  <span className="font-mono text-xs font-normal">
-                    {resolved.workflowDefinitionId}
-                  </span>
-                </AsideRow>
-              )}
-              {organization ? (
-                <AsideRow label="Organization">
-                  <Link
-                    to={href(`organization/${organization.id}`)}
-                    className="inline-flex max-w-full items-center gap-1.5 hover:underline"
-                  >
-                    <Building2Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{organization.name}</span>
-                  </Link>
-                </AsideRow>
-              ) : (
-                <AsideRow label="Network">
-                  <Link
-                    to={networkWorkspacePath({
-                      networkId: resolved.networkId,
-                    })}
-                    className="inline-flex max-w-full items-center gap-1.5 hover:underline"
-                  >
-                    <GalleryVerticalEndIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{workspaceNetwork.name}</span>
-                  </Link>
-                </AsideRow>
-              )}
-              <AsideRow label="ID">
-                <CopyIdButton value={resolved.id} />
-              </AsideRow>
-            </dl>
-            <Link
-              to={href("workflows")}
-              className="mt-5 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              View all workflow runs
-            </Link>
-          </section>
-        </aside>
+        ) : null}
       </div>
+    </DefinitionPage>
+  )
+}
+
+function useNow(live: boolean) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!live) {
+      return
+    }
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [live])
+  return now
+}
+
+function StatTile({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: ReactNode
+  hint?: ReactNode
+}) {
+  return (
+    <div className="min-w-0 rounded-xl bg-background px-4 py-3 ring-1 ring-foreground/10">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+        {value}
+      </dd>
+      {hint ? (
+        <dd className="mt-1 truncate text-xs text-muted-foreground">{hint}</dd>
+      ) : null}
     </div>
   )
 }
 
-function StepRow({
-  step,
-  status,
-  currentStep,
-  last,
-}: {
-  step: DefinitionStep
-  status: RunStatus
-  currentStep: number
-  last: boolean
-}) {
-  const isCurrent = step.order === currentStep
-  const isDone =
-    status === "Succeeded" || (currentStep > 0 && step.order < currentStep)
-  const isFailed = status === "Failed" && isCurrent
-  const label = isFailed
-    ? "Failed"
-    : isCurrent && status === "Running"
-      ? "In progress"
-      : isDone
-        ? "Complete"
-        : status === "Queued"
-          ? "Queued"
-          : "Pending"
-
+function StepSegments({ levels }: { levels: LevelView[] }) {
+  if (levels.length === 0) {
+    return "No steps"
+  }
   return (
-    <li className="relative flex gap-3.5">
-      {last ? null : (
+    <span className="flex h-4 items-center gap-1" aria-hidden>
+      {levels.map((level) => (
         <span
+          key={level.index}
+          title={`Step ${level.index + 1}: ${stepStateLabel[level.state]}`}
           className={cn(
-            "absolute top-8 bottom-0 left-[15px] w-px",
-            isDone && !isFailed ? "bg-emerald-500/40" : "bg-border"
+            "h-1.5 flex-1 rounded-full",
+            stepStateTone[level.state].bar
           )}
         />
-      )}
-      <span
-        className={cn(
-          "relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full font-mono text-xs font-medium",
-          isFailed && "bg-red-500 text-white",
-          isDone && !isFailed && "bg-emerald-500 text-white",
-          isCurrent &&
-            status === "Running" &&
-            "bg-emerald-500 text-white ring-2 ring-emerald-500/30 ring-offset-2 ring-offset-card",
-          !isDone && !isCurrent && "bg-muted text-muted-foreground"
-        )}
-      >
-        {step.order}
-      </span>
-      <div className={cn("min-w-0 flex-1", last ? "pb-0" : "pb-6")}>
-        <p className="truncate text-sm font-medium">{step.name}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {step.type}
-          {` · ${label}`}
-        </p>
-      </div>
-    </li>
+      ))}
+    </span>
+  )
+}
+
+function AsideLink({
+  to,
+  icon: Icon,
+  children,
+}: {
+  to: string
+  icon: LucideIcon
+  children: ReactNode
+}) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+    >
+      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="truncate">{children}</span>
+    </Link>
+  )
+}
+
+function BackToRunsButton({ to }: { to: string }) {
+  return (
+    <Button variant="outline" render={<Link to={to} />}>
+      <ArrowLeftIcon />
+      All workflow runs
+    </Button>
   )
 }
 
 function WorkflowRunSkeleton() {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-8 overflow-x-hidden bg-muted/40 p-4 sm:p-6 lg:p-8">
-      <div className="space-y-1.5">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-8 w-56" />
+    <DefinitionPage>
+      <div className="rounded-2xl bg-card p-5 ring-1 ring-foreground/10 sm:p-8">
+        <Skeleton className="h-3 w-28" />
+        <div className="mt-4 flex items-start gap-4">
+          <Skeleton className="size-12 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-7 w-56" />
+            <Skeleton className="h-4 w-full max-w-lg" />
+          </div>
+        </div>
+        <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-24 rounded-xl" />
+          ))}
+        </div>
+      </div>
+      <div className="rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+        <Skeleton className="h-5 w-16" />
+        <div className="mt-6 flex items-center gap-4 overflow-hidden">
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className="h-16 w-56 shrink-0 rounded-xl" />
+          ))}
+        </div>
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="rounded-2xl bg-card p-6 ring-1 ring-foreground/10 sm:p-8">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="mt-4 h-1 w-full rounded-full" />
-          <div className="mt-8 space-y-6">
-            {Array.from({ length: 4 }, (_, index) => (
-              <div key={index} className="flex gap-3.5">
-                <Skeleton className="size-8 shrink-0 rounded-full" />
-                <div className="flex-1 space-y-2 pt-1">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-2xl bg-card p-5 ring-1 ring-foreground/10">
-          <Skeleton className="h-3 w-16" />
-          <div className="mt-4 space-y-4">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-3/4" />
-          </div>
-        </div>
+        <Skeleton className="h-80 rounded-2xl" />
+        <Skeleton className="h-64 rounded-2xl" />
       </div>
-    </div>
-  )
-}
-
-function WorkflowRunStatusPage({
-  title,
-  message,
-  destructive,
-}: {
-  title: string
-  message: string
-  destructive?: boolean
-}) {
-  return (
-    <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-x-hidden bg-muted/40 p-4 sm:p-6">
-      <div className="min-w-0 space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p
-          className={cn(
-            "text-sm",
-            destructive ? "text-destructive" : "text-muted-foreground"
-          )}
-        >
-          {message}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function AsideRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 truncate text-sm font-medium">{children}</dd>
-    </div>
-  )
-}
-
-function CopyIdButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false)
-
-  async function copyId() {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={copyId}
-      className="inline-flex max-w-full items-center gap-1.5 font-mono text-xs font-normal text-muted-foreground transition-colors hover:text-foreground"
-    >
-      <span className="truncate">{value}</span>
-      {copied ? (
-        <CheckIcon className="size-3.5 shrink-0" />
-      ) : (
-        <CopyIcon className="size-3.5 shrink-0" />
-      )}
-    </button>
+    </DefinitionPage>
   )
 }
