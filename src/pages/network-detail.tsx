@@ -222,7 +222,7 @@ export default function NetworkDetail() {
             <CardTitle>Organizations</CardTitle>
             <CardDescription>
               {organizations.length === 0
-                ? "Add a team to start collecting records."
+                ? "Add an organization to start collecting records."
                 : `${organizations.length} in this network`}
             </CardDescription>
             <CardAction>

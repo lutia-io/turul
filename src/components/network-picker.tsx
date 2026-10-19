@@ -25,11 +25,13 @@ export function NetworkPicker({
   networks,
   value,
   onValueChange,
+  size = "default",
   className,
 }: {
   networks: Network[]
   value: string
   onValueChange: (networkId: string) => void
+  size?: "default" | "lg"
   className?: string
 }) {
   const [open, setOpen] = React.useState(false)
@@ -65,31 +67,55 @@ export function NetworkPicker({
     return null
   }
 
+  const large = size === "lg"
+
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger
         render={
           <Button
             variant="outline"
-            size="sm"
+            size={large ? "default" : "sm"}
             aria-label="Switch network"
-            className={cn("max-w-64 gap-2 font-normal", className)}
+            className={cn(
+              "gap-2 font-normal",
+              large ? "h-12 max-w-80 gap-2.5 px-3" : "max-w-64",
+              className
+            )}
           />
         }
       >
         <span
           className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded-md text-white [&_svg]:size-3 [&_svg]:stroke-white",
+            "flex shrink-0 items-center justify-center rounded-md text-white [&_svg]:stroke-white",
+            large
+              ? "size-8 rounded-lg [&_svg]:size-4"
+              : "size-5 [&_svg]:size-3",
             selectedTone.bg
           )}
         >
           <GalleryVerticalEndIcon />
         </span>
-        <span className="truncate">{selected.name}</span>
-        <ChevronsUpDownIcon className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate font-medium",
+            large ? "text-base" : "text-sm"
+          )}
+        >
+          {selected.name}
+        </span>
+        <ChevronsUpDownIcon
+          className={cn(
+            "ml-auto shrink-0 text-muted-foreground",
+            large ? "size-5" : "size-3.5"
+          )}
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="flex w-72 flex-col overflow-hidden p-0"
+        className={cn(
+          "flex flex-col overflow-hidden p-0",
+          large ? "w-80" : "w-72"
+        )}
         align="end"
         sideOffset={6}
       >

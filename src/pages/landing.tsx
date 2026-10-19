@@ -1,145 +1,66 @@
 import { Link } from "react-router"
-import {
-  ArrowRightIcon,
-  Building2Icon,
-  FileJsonIcon,
-  LayersIcon,
-  ListIcon,
-  TableIcon,
-  WorkflowIcon,
-  type LucideIcon,
-} from "lucide-react"
+import { ArrowRightIcon } from "lucide-react"
 
 import { LandingProductPreview } from "@/components/landing-product-preview"
 import { MarketingHeader } from "@/components/marketing-header"
 import { buttonVariants } from "@/components/ui/button"
-import { getBadgeColor, type BadgeColor } from "@/lib/badge"
-import { cn } from "@/lib/utils"
 
-const steps = [
+const ideas = [
   {
-    title: "Make a network",
-    body: "Invite the teams that share data — warehouses, shops, clinics, schools, funds.",
-  },
-  {
-    title: "Agree on a shape",
-    body: "A table is the shared form: columns, types, and what’s required.",
-  },
-  {
-    title: "Keep data in shape",
-    body: "Records are the rows and files, in one table instead of spreadsheets.",
-  },
-  {
-    title: "Run the next step",
-    body: "A workflow runs when a row matches. A pipeline brings data in.",
-  },
-]
-
-const capabilities: {
-  title: string
-  body: string
-  color: BadgeColor
-  icon: LucideIcon
-}[] = [
-  {
-    title: "Networks",
-    body: "The group that shares data.",
-    color: "purple",
-    icon: ListIcon,
-  },
-  {
-    title: "Organizations",
-    body: "Teams in the network, each with their own people and files.",
-    color: "orange",
-    icon: Building2Icon,
+    title: "Network",
+    body: "The shared workspace. Warehouses and carriers, cafes and a roastery, campuses in a district — whoever needs the same data.",
   },
   {
     title: "Tables",
-    body: "The shared form: columns, types, and what’s required.",
-    color: "blue",
-    icon: FileJsonIcon,
+    body: "The agreed shape: columns, types, and what’s required. Every team writes into the same form.",
   },
   {
     title: "Records & files",
-    body: "The rows and documents in that shape.",
-    color: "cyan",
-    icon: TableIcon,
+    body: "The rows and documents that fill that shape — instead of scattered spreadsheets.",
   },
   {
-    title: "Workflows",
-    body: "When a row matches, Lutia does the next steps.",
-    color: "teal",
-    icon: WorkflowIcon,
-  },
-  {
-    title: "Pipelines",
-    body: "How data gets in, then gets saved.",
-    color: "pink",
-    icon: LayersIcon,
+    title: "Pipelines & workflows",
+    body: "Pipelines bring data in. Workflows run the next step when a row matches.",
   },
 ]
-
-function CapabilityIcon({
-  color,
-  icon: Icon,
-}: {
-  color: BadgeColor
-  icon: LucideIcon
-}) {
-  const tone = getBadgeColor(color)
-
-  return (
-    <div
-      className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-lg",
-        tone.bg,
-        tone.text
-      )}
-    >
-      <Icon className="size-4" />
-    </div>
-  )
-}
 
 export default function Landing() {
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <MarketingHeader />
       <main className="flex flex-1 flex-col">
-        <section className="relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--primary)_14%,transparent),transparent_58%)]" />
-          <div className="relative mx-auto flex w-full max-w-6xl flex-col items-center px-6 pt-16 pb-10 text-center md:pt-24">
-            <p className="text-sm font-medium tracking-widest text-primary uppercase">
-              Launch your network in minutes
-            </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-balance md:text-5xl">
-              Keep every team on the same shape.
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg text-balance text-muted-foreground md:text-xl">
-              Structured data for any organization in one place
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                to="/app/signup"
-                className={buttonVariants({
-                  size: "lg",
-                  className: "h-11 px-6",
-                })}
-              >
-                Get started
-                <ArrowRightIcon />
-              </Link>
-              <a
-                href="#product"
-                className={buttonVariants({
-                  size: "lg",
-                  variant: "outline",
-                  className: "h-11 px-6",
-                })}
-              >
-                See the product
-              </a>
-            </div>
+        <section className="mx-auto flex w-full max-w-6xl flex-col items-center px-6 pt-16 pb-12 text-center md:pt-24 md:pb-16">
+          <p className="text-sm font-medium tracking-widest text-primary uppercase">
+            Structured data for partner teams
+          </p>
+          <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-balance md:text-5xl">
+            Keep every team on the same shape.
+          </h1>
+          <p className="mt-5 max-w-2xl text-lg text-balance text-muted-foreground md:text-xl">
+            Lutia is where partner organizations share tables, keep records in
+            that shape, and let automation handle what happens next.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              to="/app/signup"
+              className={buttonVariants({
+                size: "lg",
+                className: "h-11 px-6",
+              })}
+            >
+              Get started
+              <ArrowRightIcon />
+            </Link>
+            <a
+              href="#product"
+              className={buttonVariants({
+                size: "lg",
+                variant: "outline",
+                className: "h-11 px-6",
+              })}
+            >
+              See how it works
+            </a>
           </div>
         </section>
 
@@ -150,88 +71,49 @@ export default function Landing() {
           <LandingProductPreview />
         </section>
 
-        <section
-          id="how-it-works"
-          className="scroll-mt-20 border-y bg-muted/40"
-        >
+        <section className="border-y bg-muted/40">
           <div className="mx-auto w-full max-w-6xl px-6 py-20">
             <div className="max-w-2xl">
               <p className="text-sm font-medium tracking-widest text-primary uppercase">
-                How it works
+                The idea
               </p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight">
-                Group, shape, data, then the next step.
+                Four things. One loop.
               </h2>
               <p className="mt-3 text-muted-foreground">
-                Warehouses and carriers, cafes and roasteries, funds and
-                investors — they share one shape, then Lutia moves the work.
+                Group the teams, agree on a shape, put the data in, then run what
+                comes next. That is the whole product.
               </p>
             </div>
-            <ol className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {steps.map((step, index) => (
-                <li
-                  key={step.title}
-                  className="flex flex-col rounded-xl border bg-background p-5 shadow-xs"
-                >
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+            <ol className="mt-10 grid gap-6 sm:grid-cols-2">
+              {ideas.map((idea, index) => (
+                <li key={idea.title} className="flex gap-4">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
                     {index + 1}
                   </span>
-                  <h3 className="mt-4 text-base font-semibold tracking-tight">
-                    {step.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {step.body}
-                  </p>
+                  <div>
+                    <h3 className="text-base font-semibold tracking-tight">
+                      {idea.title}
+                    </h3>
+                    <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+                      {idea.body}
+                    </p>
+                  </div>
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-6xl px-6 py-20">
-          <div className="max-w-2xl">
-            <p className="text-sm font-medium tracking-widest text-primary uppercase">
-              The workspace
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight">
-              Everything in one place.
-            </h2>
-            <p className="mt-3 text-muted-foreground">
-              The group, the teams, the shape, the rows, and what happens next.
-            </p>
-          </div>
-          <div className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {capabilities.map((capability) => (
-              <article
-                key={capability.title}
-                className="flex flex-col gap-3 rounded-xl border bg-card p-5 shadow-xs"
-              >
-                <CapabilityIcon
-                  color={capability.color}
-                  icon={capability.icon}
-                />
-                <div>
-                  <h3 className="text-base font-semibold tracking-tight">
-                    {capability.title}
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-                    {capability.body}
-                  </p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="border-t bg-muted/40">
+        <section className="border-t">
           <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-6 px-6 py-16 md:flex-row md:items-center">
             <div className="max-w-xl">
               <h2 className="text-3xl font-bold tracking-tight">
                 Put your teams on one shared shape.
               </h2>
               <p className="mt-3 text-muted-foreground">
-                Create a network, invite teams, agree on tables. Lutia keeps the
-                rest in shape.
+                Create a network, invite organizations, agree on tables. Lutia
+                keeps the rest in shape.
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-3">

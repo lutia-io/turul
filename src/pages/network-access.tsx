@@ -12,7 +12,6 @@ import {
   useCreateNetworkPermissionMutation,
   useDeleteNetworkGroupMutation,
   useDeleteNetworkPermissionMutation,
-  useInviteNetworkMemberMutation,
   useRemoveNetworkGroupMemberMutation,
   useUnassignNetworkPermissionMutation,
   useUpdateNetworkPermissionMutation,
@@ -20,7 +19,7 @@ import {
 
 export default function NetworkAccess({
   network,
-  description = "Groups hold people. Permissions describe what those people can do. Attach a permission to a group to grant it.",
+  description = "Select a group to manage people and the permissions they receive.",
   headerActions,
 }: {
   network: Network
@@ -33,7 +32,6 @@ export default function NetworkAccess({
   })
   const [error, setError] = useState("")
 
-  const [inviteMember] = useInviteNetworkMemberMutation()
   const [createGroup] = useCreateNetworkGroupMutation()
   const [updateGroup] = useUpdateNetworkGroupMutation()
   const [deleteGroup] = useDeleteNetworkGroupMutation()
@@ -56,15 +54,9 @@ export default function NetworkAccess({
       canRemoveMembers={creator}
       creatorId={network.createdBy?.id}
       addMemberMode="email"
-      inviteLabel="Invite a platform user"
-      inviteDescription="They must already have a Huma account. Invites join Members."
       error={error}
       onError={setError}
       formatError={getHumaErrorMessage}
-      onInvite={async (email) => {
-        setError("")
-        await inviteMember({ networkId: network.id, email }).unwrap()
-      }}
       onCreateGroup={async (name, description) => {
         setError("")
         const created = await createGroup({

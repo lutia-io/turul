@@ -254,6 +254,7 @@ const accessApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: "NetworkPermission", id: "LIST" },
         { type: "NetworkPermission", id },
+        { type: "NetworkGroup" },
         { type: "Authorization" },
       ],
     }),
@@ -262,6 +263,7 @@ const accessApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, id) => [
         { type: "NetworkPermission", id: "LIST" },
         { type: "NetworkPermission", id },
+        { type: "NetworkGroup" },
         { type: "Authorization" },
       ],
     }),
@@ -429,6 +431,7 @@ const accessApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: "OrganizationPermission", id: "LIST" },
         { type: "OrganizationPermission", id },
+        { type: "OrganizationGroup" },
         { type: "Authorization" },
       ],
     }),
@@ -437,6 +440,7 @@ const accessApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, id) => [
         { type: "OrganizationPermission", id: "LIST" },
         { type: "OrganizationPermission", id },
+        { type: "OrganizationGroup" },
         { type: "Authorization" },
       ],
     }),

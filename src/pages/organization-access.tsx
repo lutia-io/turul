@@ -88,7 +88,7 @@ export default function OrganizationAccess() {
       networkId={network.id}
       organizationId={organizationId}
       title={organization.name}
-      description="Everyone is already in this organization. Tighten records, files, and column access by attaching permissions to groups."
+      description="Select a group to manage people and tighten records, files, and column access."
       canManage
       canRemoveMembers
       schemas={schemaOptions}

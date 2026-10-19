@@ -95,6 +95,7 @@ export default function PlatformAccess() {
           <NetworkPicker
             networks={networks}
             value={network.id}
+            size="lg"
             onValueChange={(networkId) => {
               setSearchParams({ network: networkId }, { replace: true })
             }}
