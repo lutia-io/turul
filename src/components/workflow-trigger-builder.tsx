@@ -1,4 +1,4 @@
-import { ClockIcon, WorkflowIcon } from "lucide-react"
+import { ClockIcon, TableIcon, WorkflowIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
@@ -58,12 +58,14 @@ function hourLabel(hour: string) {
 export function WorkflowTriggerBuilder({
   value,
   fields,
+  schemaName,
   schemaField,
   compact = false,
   onChange,
 }: {
   value: TriggerDraft
   fields: JsonSchemaProperty[]
+  schemaName?: string
   schemaField?: ReactNode
   compact?: boolean
   onChange: (next: TriggerDraft) => void
@@ -81,13 +83,19 @@ export function WorkflowTriggerBuilder({
     "rounded-full border transition-colors",
     compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"
   )
+  const summary = triggerSummary(triggerToApi(value), fields)
+  const description = schemaName
+    ? `${summary} on the ${schemaName} table.`
+    : schemaField
+      ? `${summary}. Choose the table this workflow is assigned to.`
+      : summary
 
   return (
     <>
       <WorkflowSectionHeading
         icon={value.kind === "schedule" ? ClockIcon : WorkflowIcon}
         title="When"
-        description={triggerSummary(triggerToApi(value), fields)}
+        description={description}
         compact={compact}
         iconClassName={workflowTriggerIconTone(value.kind)}
         action={<WorkflowTriggerBadges trigger={value} />}
@@ -99,7 +107,48 @@ export function WorkflowTriggerBuilder({
         )}
       >
         {schemaField ? (
-          <div className="max-w-sm">{schemaField}</div>
+          <div
+            className={cn(
+              "rounded-lg border border-foreground/10 bg-muted/40",
+              compact ? "px-3 py-2.5" : "px-3.5 py-3"
+            )}
+          >
+            <div className="flex items-start gap-2.5">
+              <span
+                className={cn(
+                  "mt-0.5 flex shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-foreground/10",
+                  compact ? "size-7" : "size-8"
+                )}
+              >
+                <TableIcon className={compact ? "size-3.5" : "size-4"} />
+              </span>
+              <div className="min-w-0 flex-1">{schemaField}</div>
+            </div>
+          </div>
+        ) : schemaName ? (
+          <div
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg border border-foreground/10 bg-muted/40",
+              compact ? "px-3 py-2.5" : "px-3.5 py-3"
+            )}
+          >
+            <span
+              className={cn(
+                "flex shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground ring-1 ring-foreground/10",
+                compact ? "size-7" : "size-8"
+              )}
+            >
+              <TableIcon className={compact ? "size-3.5" : "size-4"} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                Assigned table
+              </p>
+              <p className={cn("truncate font-medium", compact ? "text-sm" : "text-base")}>
+                {schemaName}
+              </p>
+            </div>
+          </div>
         ) : null}
         <div className="flex flex-wrap gap-1.5">
           {kindItems.map((item) => {

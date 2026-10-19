@@ -111,14 +111,6 @@ export function stringifyDefinition(value: unknown) {
   return JSON.stringify(value, null, 2)
 }
 
-export function formatJsonText(text: string) {
-  try {
-    return stringifyDefinition(JSON.parse(text) as unknown)
-  } catch {
-    return undefined
-  }
-}
-
 export function parseJsonObject(text: string): JsonObject | undefined {
   try {
     return asObject(JSON.parse(text) as unknown)

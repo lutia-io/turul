@@ -7,9 +7,8 @@ import {
   useState,
   type Ref,
 } from "react"
-import { FileJsonIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { PlusIcon, Trash2Icon } from "lucide-react"
 
-import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { MappingFields } from "@/components/mapping-fields"
 import { pipelineNodeVisuals } from "@/components/pipeline-flow/pipeline-flow-nodes"
 import { NodeTypePicker } from "@/components/node-type-picker"
@@ -34,11 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import {
-  parseJsonObject,
-  stringifyDefinition,
-  type JsonObject,
-} from "@/lib/json-definition"
+import type { JsonObject } from "@/lib/json-definition"
 import { useWorkspaceSchemas } from "@/lib/network-workspace"
 import {
   bulkDefinitionFromDraft,
@@ -263,18 +258,6 @@ export function NodeDefinitionEditor({
         (startingType ? defaultDefinition(startingType) : {})
     )
   )
-  const [definitionView, setDefinitionView] = useState<"config" | "json">(
-    "config"
-  )
-  const [jsonText, setJsonText] = useState(() =>
-    stringifyDefinition(
-      node?.definition ??
-        (startingType ? defaultDefinition(startingType) : {})
-    )
-  )
-  const [definitionTextError, setDefinitionTextError] = useState<string | null>(
-    null
-  )
   const isLoading = false
 
   const composed = type
@@ -302,55 +285,7 @@ export function NodeDefinitionEditor({
     const nextDrafts = draftsFromDefinition(next, defaultDefinition(next))
     setType(next)
     setPickingType(false)
-    setDefinitionView("config")
     setDrafts(nextDrafts)
-    setJsonText(
-      stringifyDefinition(
-        definitionFromDrafts(next, nextDrafts).definition ?? {}
-      )
-    )
-    setDefinitionTextError(null)
-  }
-
-  function showDefinitionJson() {
-    if (!type) {
-      return
-    }
-    if (definitionView === "json") {
-      setDefinitionTextError(null)
-      setDefinitionView("config")
-      return
-    }
-    const next = definitionFromDrafts(type, drafts)
-    setJsonText(stringifyDefinition(next.definition ?? {}))
-    setDefinitionTextError(next.error ?? null)
-    setDefinitionView("json")
-  }
-
-  function handleJsonChange(text: string) {
-    if (!type) {
-      return
-    }
-    setJsonText(text)
-    const parsed = parseJsonObject(text)
-    if (!parsed) {
-      setDefinitionTextError(
-        text.trim() ? "Invalid JSON" : "JSON must be an object"
-      )
-      return
-    }
-    const nextDrafts = draftsFromDefinition(type, parsed)
-    const next = definitionFromDrafts(type, nextDrafts)
-    setDefinitionTextError(next.error ?? null)
-    setDrafts(nextDrafts)
-  }
-
-  function handleJsonBlur() {
-    const parsed = parseJsonObject(jsonText)
-    if (!parsed) {
-      return
-    }
-    setJsonText(stringifyDefinition(parsed))
   }
 
   const templateGroups = useMemo(
@@ -395,10 +330,7 @@ export function NodeDefinitionEditor({
   )
 
   function handleDone() {
-    const invalid =
-      definitionView === "json"
-        ? null
-        : rootRef.current?.querySelector(":invalid")
+    const invalid = rootRef.current?.querySelector(":invalid")
     if (
       invalid instanceof HTMLInputElement ||
       invalid instanceof HTMLTextAreaElement ||
@@ -460,18 +392,6 @@ export function NodeDefinitionEditor({
           </p>
         </div>
         <div className="flex gap-2">
-          {!showTypePicker ? (
-            <Button
-              type="button"
-              variant={definitionView === "json" ? "secondary" : "outline"}
-              size="sm"
-              disabled={!type}
-              onClick={showDefinitionJson}
-            >
-              <FileJsonIcon />
-              {definitionView === "json" ? "Config" : "JSON"}
-            </Button>
-          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -491,7 +411,7 @@ export function NodeDefinitionEditor({
             <Button
               type="button"
               size="sm"
-              disabled={isLoading || !type || Boolean(definitionTextError)}
+              disabled={isLoading || !type || Boolean(jsonError)}
               onClick={handleDone}
             >
               Done
@@ -533,27 +453,12 @@ export function NodeDefinitionEditor({
                   disabled={isLoading}
                   onClick={() => {
                     setPickingType(true)
-                    setDefinitionView("config")
                   }}
                 >
                   Change
                 </Button>
               </div>
             ) : null}
-            {definitionView === "json" ? (
-              <div className="flex min-h-[28rem] flex-col overflow-hidden rounded-xl ring-1 ring-foreground/10">
-                <DefinitionJsonPane
-                  id={`${formId}-json`}
-                  title="JSON"
-                  description="Configuration stored on this node. Paste JSON to fill the form."
-                  value={jsonText}
-                  onChange={handleJsonChange}
-                  onBlur={handleJsonBlur}
-                  error={definitionTextError}
-                />
-              </div>
-            ) : null}
-            <div className={definitionView === "json" ? "hidden" : "contents"}>
           {type === "HTTP" ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1467,7 +1372,6 @@ export function NodeDefinitionEditor({
             </>
           ) : null}
               {jsonError ? <FieldError>{jsonError}</FieldError> : null}
-            </div>
           </FieldGroup>
         )}
       </div>

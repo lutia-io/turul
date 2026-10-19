@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { LayersIcon } from "lucide-react"
 
 import { DefinitionCard } from "@/components/definition-detail"
@@ -32,7 +32,6 @@ export function WorkflowRuleEditor({
   onCriteriaChange,
   onLevelsChange,
   onNodeSessionChange,
-  onJsonErrorChange,
 }: {
   trigger: TriggerDraft
   criteria: CriteriaGroupDraft
@@ -48,10 +47,8 @@ export function WorkflowRuleEditor({
   onCriteriaChange: (next: CriteriaGroupDraft) => void
   onLevelsChange: (next: PipelineLevelDraft[]) => void
   onNodeSessionChange?: (open: boolean) => void
-  onJsonErrorChange?: (error: string | null) => void
 }) {
   const builderRef = useRef<PipelineDefinitionBuilderHandle>(null)
-  const jsonId = useId()
   const [nodeOpen, setNodeOpen] = useState(false)
   const cardClass = compact ? "rounded-xl p-4 sm:p-4" : undefined
 
@@ -66,11 +63,9 @@ export function WorkflowRuleEditor({
       levels={levels}
       onChange={onLevelsChange}
       view="levels"
-      jsonInputId={jsonId}
       networkId={networkId}
       organizationId={organizationId ?? undefined}
       onNodeSessionChange={handleNodeSessionChange}
-      onJsonErrorChange={onJsonErrorChange}
       variant="workflow"
       compact={compact}
       framed={false}
@@ -93,6 +88,7 @@ export function WorkflowRuleEditor({
             <WorkflowTriggerBuilder
               value={trigger}
               fields={fields}
+              schemaName={schemaName}
               schemaField={schemaField}
               compact={compact}
               onChange={onTriggerChange}

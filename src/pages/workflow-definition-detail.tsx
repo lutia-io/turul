@@ -1,15 +1,12 @@
 import {
-  useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
 } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import {
   ClockIcon,
-  FileJsonIcon,
   TableIcon,
   FilterIcon,
   GalleryVerticalEndIcon,
@@ -35,8 +32,6 @@ import {
   DefinitionStatusPage,
   PublicationPills,
 } from "@/components/definition-detail"
-import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
-import { JsonDefinitionCard } from "@/components/json-definition-card"
 import { PipelineFlowCanvas } from "@/components/pipeline-flow"
 import {
   WorkflowViewMenu,
@@ -56,11 +51,6 @@ import {
 } from "@/components/workflow-rule"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
 import type { Schema, WorkflowDefinition } from "@/data/networks"
-import {
-  parseJsonObject,
-  stringifyDefinition,
-  type JsonObject,
-} from "@/lib/json-definition"
 import {
   useNetworkWorkspace,
   useWorkspaceOrganizations,
@@ -105,21 +95,6 @@ import {
 } from "@/store/workflow-slice"
 
 type DefinitionView = WorkflowDefinitionView
-
-function workflowDefinitionError(text: string) {
-  try {
-    const parsed = JSON.parse(text) as unknown
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return "JSON must be a workflow object"
-    }
-    if (!parseWorkflowDefinition(parsed as JsonObject)) {
-      return "JSON must include at least one level with a node"
-    }
-    return null
-  } catch {
-    return "Invalid JSON"
-  }
-}
 
 export default function WorkflowDefinitionDetail() {
   const { workflowDefinitionId } = useParams()
@@ -459,13 +434,7 @@ export default function WorkflowDefinitionDetail() {
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <DefinitionColumns aside={aside}>
-              {definitionView === "json" ? (
-                <JsonDefinitionCard
-                  definition={visibleWorkflow.definition}
-                  label="Workflow JSON"
-                  description="Trigger, criteria, and nodes stored on this workflow."
-                />
-              ) : definitionView === "preview" ? (
+              {definitionView === "preview" ? (
                 <WorkflowDefinitionPreview
                   trigger={triggerFromApi(parsed?.trigger)}
                   criteria={criteriaFromApi(parsed?.criteria)}
@@ -550,7 +519,6 @@ function WorkflowDefinitionEdit({
     : href("records")
   const [updateWorkflow, updateState] = useUpdateWorkflowDefinitionMutation()
   const parsed = parseWorkflowDefinition(workflow.definition)
-  const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
   const [name, setName] = useState(workflow.name)
   const [description, setDescription] = useState(workflow.description ?? "")
   const [active, setActive] = useState(workflow.active)
@@ -565,9 +533,6 @@ function WorkflowDefinitionEdit({
       ? workflowNodesFromApi(parsed?.nodes)
       : emptyPipelineLevels()
   )
-  const [jsonText, setJsonText] = useState("")
-  const [jsonError, setJsonError] = useState<string | null>(null)
-  const jsonSourceRef = useRef<"builder" | "json">("builder")
   const triggerFields = schemaFieldOptions(schema?.definition)
   const isLoading = updateState.isLoading
   const error = updateState.error
@@ -584,79 +549,14 @@ function WorkflowDefinitionEdit({
     }
   }, [criteria, levels, trigger, triggerFields])
 
-  const generatedJson = stringifyDefinition(
-    definition ?? { trigger: triggerToApi(trigger), criteria: {}, nodes: [] }
-  )
-
-  useEffect(() => {
-    if (jsonSourceRef.current === "json") {
-      return
-    }
-    setJsonText(generatedJson)
-    setJsonError(null)
-  }, [generatedJson])
-
-  function markBuilderSource() {
-    jsonSourceRef.current = "builder"
-  }
-
-  function applyWorkflowDefinition(body: WorkflowDefinitionBody) {
-    jsonSourceRef.current = "json"
-    setTrigger(triggerFromApi(body.trigger))
-    setCriteria(criteriaFromApi(body.criteria))
-    setLevels(workflowNodesFromApi(body.nodes))
-  }
-
-  function handleJsonChange(text: string) {
-    jsonSourceRef.current = "json"
-    setJsonText(text)
-    const parsedJson = parseJsonObject(text)
-    if (!parsedJson) {
-      setJsonError(workflowDefinitionError(text))
-      return
-    }
-    const body = parseWorkflowDefinition(parsedJson)
-    if (!body) {
-      setJsonError("JSON must include at least one level with a node")
-      return
-    }
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-  }
-
-  function handleJsonBlur() {
-    if (!jsonText.trim()) {
-      jsonSourceRef.current = "builder"
-      setJsonText(generatedJson)
-      setJsonError(null)
-      return
-    }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parseWorkflowDefinition(parsedJson) : undefined
-    if (!parsedJson || !body) {
-      setJsonError(workflowDefinitionError(jsonText))
-      return
-    }
-    jsonSourceRef.current = "json"
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-    setJsonText(stringifyDefinition(parsedJson))
-  }
-
   const canSubmit =
     Boolean(name.trim()) &&
     Boolean(definition) &&
-    (definition?.nodes.length ?? 0) > 0 &&
-    !jsonError
+    (definition?.nodes.length ?? 0) > 0
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!canSubmit || !definition) {
-      return
-    }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parseWorkflowDefinition(parsedJson) : definition
-    if (!body || body.nodes.length === 0) {
+    if (!canSubmit || !definition || definition.nodes.length === 0) {
       return
     }
     try {
@@ -665,7 +565,7 @@ function WorkflowDefinitionEdit({
         name: name.trim(),
         description: description.trim(),
         active,
-        definition: body,
+        definition,
         schemaId: workflow.schemaId,
       }).unwrap()
       onCancel()
@@ -729,17 +629,6 @@ function WorkflowDefinitionEdit({
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant={definitionView === "json" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() =>
-                setDefinitionView((view) => (view === "rule" ? "json" : "rule"))
-              }
-            >
-              <FileJsonIcon />
-              {definitionView === "json" ? "Rule" : "JSON"}
-            </Button>
-            <Button
-              type="button"
               variant="outline"
               size="sm"
               disabled={isLoading}
@@ -750,7 +639,7 @@ function WorkflowDefinitionEdit({
             <Button
               type="submit"
               size="sm"
-              disabled={isLoading || !canSubmit || Boolean(jsonError)}
+              disabled={isLoading || !canSubmit}
               aria-busy={isLoading}
               className={isLoading ? "disabled:opacity-100" : undefined}
             >
@@ -767,42 +656,18 @@ function WorkflowDefinitionEdit({
         </div>
 
         <DefinitionColumns>
-          {definitionView === "json" ? (
-            <div className="flex min-h-[32rem] flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10">
-              <DefinitionJsonPane
-                id={`${formId}-json`}
-                title="JSON"
-                description="Updates as you edit. Paste JSON to fill the builder."
-                value={jsonText}
-                onChange={handleJsonChange}
-                onBlur={handleJsonBlur}
-                error={jsonError}
-              />
-            </div>
-          ) : (
-            <WorkflowRuleEditor
-              trigger={trigger}
-              criteria={criteria}
-              levels={levels}
-              fields={triggerFields}
-              schemaName={schema?.name}
-              networkId={workflow.networkId}
-              organizationId={workflow.organizationId}
-              onTriggerChange={(next) => {
-                markBuilderSource()
-                setTrigger(next)
-              }}
-              onCriteriaChange={(next) => {
-                markBuilderSource()
-                setCriteria(next)
-              }}
-              onLevelsChange={(next) => {
-                markBuilderSource()
-                setLevels(next)
-              }}
-              onJsonErrorChange={setJsonError}
-            />
-          )}
+          <WorkflowRuleEditor
+            trigger={trigger}
+            criteria={criteria}
+            levels={levels}
+            fields={triggerFields}
+            schemaName={schema?.name}
+            networkId={workflow.networkId}
+            organizationId={workflow.organizationId}
+            onTriggerChange={setTrigger}
+            onCriteriaChange={setCriteria}
+            onLevelsChange={setLevels}
+          />
         </DefinitionColumns>
       </form>
     </DefinitionPage>

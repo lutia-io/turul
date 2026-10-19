@@ -2,7 +2,6 @@ import {
   CheckIcon,
   ChevronDownIcon,
   EyeIcon,
-  FileJsonIcon,
   LayersIcon,
   ListTreeIcon,
   WorkflowIcon,
@@ -17,8 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-export type PipelineView = "canvas" | "levels" | "json"
-export type WorkflowDefinitionView = "rule" | "canvas" | "preview" | "json"
+export type PipelineView = "canvas" | "levels"
+export type WorkflowDefinitionView = "rule" | "canvas" | "preview"
 
 const pipelineViews: {
   id: PipelineView
@@ -27,7 +26,6 @@ const pipelineViews: {
 }[] = [
   { id: "levels", label: "Levels", icon: LayersIcon },
   { id: "canvas", label: "Canvas", icon: WorkflowIcon },
-  { id: "json", label: "JSON", icon: FileJsonIcon },
 ]
 
 const workflowViews: {
@@ -38,7 +36,6 @@ const workflowViews: {
   { id: "rule", label: "Rule", icon: ListTreeIcon },
   { id: "canvas", label: "Canvas", icon: WorkflowIcon },
   { id: "preview", label: "Preview", icon: EyeIcon },
-  { id: "json", label: "JSON", icon: FileJsonIcon },
 ]
 
 function ViewMenu<T extends string>({

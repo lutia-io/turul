@@ -2,15 +2,13 @@ import {
   useEffect,
   useId,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
 } from "react"
 import { useNavigate } from "react-router"
-import { FileJsonIcon, Loader } from "lucide-react"
+import { Loader } from "lucide-react"
 
 import { EnabledField } from "@/components/checkbox-field"
-import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -37,11 +35,6 @@ import {
 } from "@/components/ui/select"
 import { WorkflowRuleEditor } from "@/components/workflow-rule-editor"
 import {
-  parseJsonObject,
-  stringifyDefinition,
-  type JsonObject,
-} from "@/lib/json-definition"
-import {
   emptyPipelineLevels,
   type PipelineLevelDraft,
 } from "@/lib/pipeline-definition"
@@ -52,15 +45,11 @@ import {
   useWorkspaceSchemas,
 } from "@/lib/network-workspace"
 import {
-  criteriaFromApi,
   criteriaToApi,
   emptyGroup,
   emptyTrigger,
-  parseWorkflowDefinition,
-  triggerFromApi,
   schemaFieldOptions,
   triggerToApi,
-  workflowNodesFromApi,
   workflowNodesToApi,
   type CriteriaGroupDraft,
   type TriggerDraft,
@@ -71,23 +60,6 @@ import { getHumaErrorMessage } from "@/store/api"
 import { useCreateWorkflowDefinitionMutation } from "@/store/workflow-slice"
 
 const entireNetworkValue = "__network__"
-
-type DefinitionView = "rule" | "json"
-
-function workflowDefinitionError(text: string) {
-  try {
-    const parsed = JSON.parse(text) as unknown
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return "JSON must be a workflow object"
-    }
-    if (!parseWorkflowDefinition(parsed as JsonObject)) {
-      return "JSON must include at least one level with a node"
-    }
-    return null
-  } catch {
-    return "Invalid JSON"
-  }
-}
 
 export function WorkflowDefinitionDialog({
   open,
@@ -125,10 +97,6 @@ export function WorkflowDefinitionDialog({
   const [trigger, setTrigger] = useState<TriggerDraft>(presetTrigger(field))
   const [criteria, setCriteria] = useState<CriteriaGroupDraft>(emptyGroup())
   const [levels, setLevels] = useState<PipelineLevelDraft[]>(emptyPipelineLevels)
-  const [definitionView, setDefinitionView] = useState<DefinitionView>("rule")
-  const [jsonText, setJsonText] = useState("")
-  const [jsonError, setJsonError] = useState<string | null>(null)
-  const jsonSourceRef = useRef<"builder" | "json">("builder")
 
   const { organizations: networkOrganizations } = useWorkspaceOrganizations({
     skip: !open || !selectedNetworkId,
@@ -164,9 +132,6 @@ export function WorkflowDefinitionDialog({
     setTrigger(presetTrigger(field))
     setCriteria(emptyGroup())
     setLevels(emptyPipelineLevels())
-    setDefinitionView("rule")
-    jsonSourceRef.current = "builder"
-    setJsonError(null)
   }, [open, organizationId, lockedSchemaId, field])
 
   useEffect(() => {
@@ -205,65 +170,6 @@ export function WorkflowDefinitionDialog({
     }
   }, [criteria, levels, trigger, triggerFields])
 
-  const generatedJson = stringifyDefinition(
-    definition ?? { trigger: triggerToApi(trigger), criteria: {}, nodes: [] }
-  )
-
-  useEffect(() => {
-    if (jsonSourceRef.current === "json") {
-      return
-    }
-    setJsonText(generatedJson)
-    setJsonError(null)
-  }, [generatedJson])
-
-  function markBuilderSource() {
-    jsonSourceRef.current = "builder"
-  }
-
-  function applyWorkflowDefinition(body: WorkflowDefinitionBody) {
-    jsonSourceRef.current = "json"
-    setTrigger(triggerFromApi(body.trigger))
-    setCriteria(criteriaFromApi(body.criteria))
-    setLevels(workflowNodesFromApi(body.nodes))
-  }
-
-  function handleJsonChange(text: string) {
-    jsonSourceRef.current = "json"
-    setJsonText(text)
-    const parsedJson = parseJsonObject(text)
-    if (!parsedJson) {
-      setJsonError(workflowDefinitionError(text))
-      return
-    }
-    const body = parseWorkflowDefinition(parsedJson)
-    if (!body) {
-      setJsonError("JSON must include at least one level with a node")
-      return
-    }
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-  }
-
-  function handleJsonBlur() {
-    if (!jsonText.trim()) {
-      jsonSourceRef.current = "builder"
-      setJsonText(generatedJson)
-      setJsonError(null)
-      return
-    }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parseWorkflowDefinition(parsedJson) : undefined
-    if (!parsedJson || !body) {
-      setJsonError(workflowDefinitionError(jsonText))
-      return
-    }
-    jsonSourceRef.current = "json"
-    setJsonError(null)
-    applyWorkflowDefinition(body)
-    setJsonText(stringifyDefinition(parsedJson))
-  }
-
   const showNetwork = networks.length > 0 && !lockNetwork
   const showOrganization = true
 
@@ -272,21 +178,15 @@ export function WorkflowDefinitionDialog({
     Boolean(selectedNetworkId) &&
     Boolean(schemaId) &&
     Boolean(definition) &&
-    (definition?.nodes.length ?? 0) > 0 &&
-    !jsonError
+    (definition?.nodes.length ?? 0) > 0
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!canSubmit || !definition) {
-      return
-    }
-    const parsedJson = parseJsonObject(jsonText)
-    const body = parsedJson ? parseWorkflowDefinition(parsedJson) : definition
-    if (!body || body.nodes.length === 0) {
+    if (!canSubmit || !definition || definition.nodes.length === 0) {
       return
     }
 
-    void submitDefinition(body)
+    void submitDefinition(definition)
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -325,27 +225,12 @@ export function WorkflowDefinitionDialog({
       >
         <>
             <DialogHeader className="shrink-0 border-b px-4 py-3 pr-12">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 space-y-1">
-                  <DialogTitle>Create a workflow definition</DialogTitle>
-                  <DialogDescription className="text-xs">
-                    Configure the rule on the left. The preview updates as you
-                    edit.
-                  </DialogDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant={definitionView === "json" ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={() =>
-                    setDefinitionView((view) =>
-                      view === "rule" ? "json" : "rule"
-                    )
-                  }
-                >
-                  <FileJsonIcon />
-                  {definitionView === "json" ? "Rule" : "JSON"}
-                </Button>
+              <div className="min-w-0 space-y-1">
+                <DialogTitle>Create a workflow definition</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Configure the rule on the left. The preview updates as you
+                  edit.
+                </DialogDescription>
               </div>
             </DialogHeader>
             <form
@@ -484,63 +369,42 @@ export function WorkflowDefinitionDialog({
                   ) : null}
                 </FieldGroup>
 
-                {definitionView === "json" ? (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/10">
-                    <DefinitionJsonPane
-                      id={`${formId}-json`}
-                      title="JSON"
-                      description="Updates as you edit. Paste JSON to fill the builder."
-                      value={jsonText}
-                      onChange={handleJsonChange}
-                      onBlur={handleJsonBlur}
-                      error={jsonError}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <WorkflowRuleEditor
-                      compact
-                      trigger={trigger}
-                      criteria={criteria}
-                      levels={levels}
-                      fields={triggerFields}
-                      schemaName={triggerSchema?.name}
-                      networkId={selectedNetworkId}
-                      organizationId={selectedOrganizationId || undefined}
-                      schemaField={
-                        lockedSchemaId ? (
-                          <Field className="gap-1">
-                            <FieldLabel>Table</FieldLabel>
-                            <p className="text-sm">
-                              {triggerSchema?.name ?? "Selected table"}
-                            </p>
-                          </Field>
-                        ) : (
-                          <SchemaSelect
-                            formId={formId}
-                            schemaId={schemaId}
-                            schemas={networkSchemas}
-                            isLoading={isLoading}
-                            onChange={setSchemaId}
-                          />
-                        )
-                      }
-                      onTriggerChange={(next) => {
-                        markBuilderSource()
-                        setTrigger(next)
-                      }}
-                      onCriteriaChange={(next) => {
-                        markBuilderSource()
-                        setCriteria(next)
-                      }}
-                      onLevelsChange={(next) => {
-                        markBuilderSource()
-                        setLevels(next)
-                      }}
-                      onJsonErrorChange={setJsonError}
-                    />
-                  </div>
-                )}
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <WorkflowRuleEditor
+                    compact
+                    trigger={trigger}
+                    criteria={criteria}
+                    levels={levels}
+                    fields={triggerFields}
+                    schemaName={triggerSchema?.name}
+                    networkId={selectedNetworkId}
+                    organizationId={selectedOrganizationId || undefined}
+                    schemaField={
+                      lockedSchemaId ? (
+                        <Field className="gap-1">
+                          <FieldLabel>Assigned table</FieldLabel>
+                          <p className="text-sm font-medium">
+                            {triggerSchema?.name ?? "Selected table"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            This workflow definition belongs to this table.
+                          </p>
+                        </Field>
+                      ) : (
+                        <SchemaSelect
+                          formId={formId}
+                          schemaId={schemaId}
+                          schemas={networkSchemas}
+                          isLoading={isLoading}
+                          onChange={setSchemaId}
+                        />
+                      )
+                    }
+                    onTriggerChange={setTrigger}
+                    onCriteriaChange={setCriteria}
+                    onLevelsChange={setLevels}
+                  />
+                </div>
               </div>
               <DialogFooter className="py-3 [[data-size=full]_&]:px-4">
                 <DialogClose
@@ -550,7 +414,7 @@ export function WorkflowDefinitionDialog({
                 </DialogClose>
                 <Button
                   type="submit"
-                  disabled={isLoading || !canSubmit || Boolean(jsonError)}
+                  disabled={isLoading || !canSubmit}
                   aria-busy={isLoading}
                   className={isLoading ? "disabled:opacity-100" : undefined}
                 >
@@ -595,40 +459,45 @@ function SchemaSelect({
   const chooseSchemaValue = "__choose_schema__"
   return (
     <Field className="gap-1">
-      <FieldLabel htmlFor={`${formId}-schema`}>Table</FieldLabel>
+      <FieldLabel htmlFor={`${formId}-schema`}>Assigned table</FieldLabel>
       {schemas.length > 0 ? (
-        <Select
-          value={schemaId || chooseSchemaValue}
-          disabled={isLoading}
-          required
-          modal={false}
-          items={[
-            { value: chooseSchemaValue, label: "Choose a table" },
-            ...schemas.map((schema) => ({
-              value: schema.id,
-              label: schema.name,
-            })),
-          ]}
-          onValueChange={(value) => {
-            if (!value || value === chooseSchemaValue) {
-              onChange("")
-              return
-            }
-            onChange(value)
-          }}
-        >
-          <SelectTrigger id={`${formId}-schema`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={chooseSchemaValue}>Choose a table</SelectItem>
-            {schemas.map((schema) => (
-              <SelectItem key={schema.id} value={schema.id}>
-                {schema.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <>
+          <Select
+            value={schemaId || chooseSchemaValue}
+            disabled={isLoading}
+            required
+            modal={false}
+            items={[
+              { value: chooseSchemaValue, label: "Choose a table" },
+              ...schemas.map((schema) => ({
+                value: schema.id,
+                label: schema.name,
+              })),
+            ]}
+            onValueChange={(value) => {
+              if (!value || value === chooseSchemaValue) {
+                onChange("")
+                return
+              }
+              onChange(value)
+            }}
+          >
+            <SelectTrigger id={`${formId}-schema`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={chooseSchemaValue}>Choose a table</SelectItem>
+              {schemas.map((schema) => (
+                <SelectItem key={schema.id} value={schema.id}>
+                  {schema.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            This workflow definition belongs to the selected table.
+          </p>
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">
           Add a table on the records page before adding a workflow.

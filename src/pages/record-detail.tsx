@@ -5,14 +5,12 @@ import {
   CheckIcon,
   CopyIcon,
   FileIcon,
-  FileJsonIcon,
   PencilIcon,
   TableIcon,
   UsersIcon,
 } from "lucide-react"
 
 import { FilePreviewDialog, FileThumbnail } from "@/components/file-preview"
-import { JsonDefinitionCard } from "@/components/json-definition-card"
 import { useCreateEntity } from "@/components/create-entity"
 import {
   columnLabel,
@@ -65,8 +63,6 @@ import { selectIsAuthenticated } from "@/store/auth-slice"
 import { useGetFileQuery } from "@/store/file-slice"
 import { useGetRecordQuery } from "@/store/record-slice"
 
-type DataView = "fields" | "json"
-
 export default function RecordDetail() {
   const { recordId } = useParams()
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
@@ -117,7 +113,6 @@ export default function RecordDetail() {
     ? recordDisplayTitle(record.data, properties, schema?.name ?? "Record")
     : "Record"
   const [previewFileId, setPreviewFileId] = useState<string>()
-  const [dataView, setDataView] = useState<DataView>("fields")
   const previewQuery = useGetFileQuery(previewFileId ?? "", {
     skip: !isAuthenticated || !previewFileId,
   })
@@ -151,8 +146,6 @@ export default function RecordDetail() {
   }
 
   const recordsHref = `${href("records")}${schema ? `?schema=${schema.id}` : ""}`
-  const showFieldGrid =
-    schema && valueProperties.length > 0 && dataView === "fields"
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-8 overflow-x-hidden bg-muted/40 p-4 sm:p-6 lg:p-8">
@@ -174,19 +167,6 @@ export default function RecordDetail() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {schema && properties.length > 0 ? (
-            <Button
-              type="button"
-              variant={dataView === "json" ? "secondary" : "outline"}
-              size="sm"
-              onClick={() =>
-                setDataView((view) => (view === "fields" ? "json" : "fields"))
-              }
-            >
-              <FileJsonIcon />
-              {dataView === "json" ? "Columns" : "JSON"}
-            </Button>
-          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -199,8 +179,8 @@ export default function RecordDetail() {
       </div>
 
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        {showFieldGrid ? (
-          <section className="min-w-0 rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
+        <section className="min-w-0 rounded-2xl bg-card p-6 shadow-xs ring-1 ring-foreground/10 sm:p-8">
+          {valueProperties.length > 0 ? (
             <dl className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
               {valueProperties.map((property) => (
                 <FieldItem
@@ -215,14 +195,12 @@ export default function RecordDetail() {
                 />
               ))}
             </dl>
-          </section>
-        ) : (
-          <JsonDefinitionCard
-            definition={record.data}
-            label="JSONB data"
-            description="Values stored on this record."
-          />
-        )}
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              This record has no field values to show.
+            </p>
+          )}
+        </section>
 
         <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-6">
           <section className="rounded-2xl bg-card p-5 shadow-xs ring-1 ring-foreground/10">

@@ -1,12 +1,5 @@
 import { useEffect, useId, useState, type FormEvent } from "react"
-import {
-  ChevronDownIcon,
-  FileJsonIcon,
-  PencilIcon,
-  Trash2Icon,
-} from "lucide-react"
-
-import { DefinitionJsonPane } from "@/components/definition-dialog-layout"
+import { ChevronDownIcon, PencilIcon, Trash2Icon } from "lucide-react"
 
 import { useCreateEntity } from "@/components/create-entity"
 import { WorkflowsSubmenu } from "@/components/table-workflows-menu"
@@ -30,7 +23,6 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import type { Schema } from "@/data/networks"
-import { parseJsonObject, stringifyDefinition } from "@/lib/json-definition"
 import { useNetworkWorkspace } from "@/lib/network-workspace"
 import { useSchemaWorkflows } from "@/lib/schema-workflows"
 import { getHumaErrorMessage } from "@/store/api"
@@ -51,12 +43,15 @@ export function TableSheetMenu({
   onDeleted: (schemaId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [jsonOpen, setJsonOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const { network, organizationId } = useNetworkWorkspace()
   const { openCreateWorkflow } = useCreateEntity()
   const { canRead, canCreate } = useSchemaWorkflows()
   const showWorkflows = canRead || canCreate
+
+  if (!canEdit && !canDelete && !showWorkflows) {
+    return null
+  }
 
   return (
     <>
@@ -74,11 +69,9 @@ export function TableSheetMenu({
               Edit table
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem onClick={() => setJsonOpen(true)}>
-            <FileJsonIcon />
-            JSON
-          </DropdownMenuItem>
-          {showWorkflows || canDelete ? <DropdownMenuSeparator /> : null}
+          {canEdit && (showWorkflows || canDelete) ? (
+            <DropdownMenuSeparator />
+          ) : null}
           {showWorkflows ? (
             <WorkflowsSubmenu
               schemaId={schema.id}
@@ -118,12 +111,6 @@ export function TableSheetMenu({
           )}
         </DialogContent>
       </Dialog>
-      <SchemaJsonDialog
-        schema={schema}
-        canEdit={canEdit}
-        open={jsonOpen}
-        onOpenChange={setJsonOpen}
-      />
       <DeleteTableDialog
         schema={schema}
         open={deleting}
@@ -200,124 +187,6 @@ function EditTableForm({
         >
           {isLoading ? <Spinner label="Saving" /> : "Save"}
         </Button>
-      </DialogFooter>
-    </>
-  )
-}
-
-function SchemaJsonDialog({
-  schema,
-  canEdit,
-  open,
-  onOpenChange,
-}: {
-  schema: Schema
-  canEdit: boolean
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        {open ? (
-          <SchemaJsonForm
-            schema={schema}
-            canEdit={canEdit}
-            onClose={() => onOpenChange(false)}
-          />
-        ) : (
-          <DialogHeader>
-            <DialogTitle>{schema.name} JSON</DialogTitle>
-          </DialogHeader>
-        )}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function SchemaJsonForm({
-  schema,
-  canEdit,
-  onClose,
-}: {
-  schema: Schema
-  canEdit: boolean
-  onClose: () => void
-}) {
-  const formId = useId()
-  const [text, setText] = useState(() => stringifyDefinition(schema.definition))
-  const [jsonError, setJsonError] = useState<string | null>(null)
-  const [updateSchema, { isLoading, error }] = useUpdateSchemaMutation()
-
-  function handleChange(value: string) {
-    setText(value)
-    if (!value.trim()) {
-      setJsonError("JSON must be an object")
-      return
-    }
-    if (!parseJsonObject(value)) {
-      setJsonError("Invalid JSON")
-      return
-    }
-    setJsonError(null)
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const definition = parseJsonObject(text)
-    if (!definition) {
-      setJsonError(text.trim() ? "Invalid JSON" : "JSON must be an object")
-      return
-    }
-    try {
-      await updateSchema({ id: schema.id, definition }).unwrap()
-      onClose()
-    } catch {
-      // The mutation error is shown under the editor.
-    }
-  }
-
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{schema.name} JSON</DialogTitle>
-        <DialogDescription>
-          {canEdit
-            ? "Column definition stored on this table. Copy it, or paste JSON to replace it."
-            : "Column definition stored on this table."}
-        </DialogDescription>
-      </DialogHeader>
-      <form id={formId} onSubmit={handleSubmit}>
-        <div className="flex min-h-80 flex-col overflow-hidden rounded-xl ring-1 ring-foreground/10">
-          <DefinitionJsonPane
-            id={`${formId}-json`}
-            title="JSONB definition"
-            description="Stored as JSONB on the definition column."
-            value={text}
-            onChange={canEdit ? handleChange : undefined}
-            readOnly={!canEdit}
-            error={jsonError}
-          />
-        </div>
-        {error ? (
-          <FieldError className="mt-3">
-            {getHumaErrorMessage(error, "Couldn't save this definition")}
-          </FieldError>
-        ) : null}
-      </form>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          {canEdit ? "Cancel" : "Close"}
-        </Button>
-        {canEdit ? (
-          <Button
-            type="submit"
-            form={formId}
-            disabled={isLoading || Boolean(jsonError)}
-          >
-            {isLoading ? <Spinner label="Saving" /> : "Save"}
-          </Button>
-        ) : null}
       </DialogFooter>
     </>
   )

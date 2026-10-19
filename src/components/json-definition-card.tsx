@@ -1,13 +1,7 @@
-import { useState } from "react"
-import { CheckIcon, CopyIcon } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
 import { getBadgeColor, statusBadgeConfig } from "@/lib/badge"
 import {
   enabledStatus,
-  stringifyDefinition,
   type DefinitionStep,
-  type JsonObject,
   type JsonSchemaProperty,
 } from "@/lib/json-definition"
 import { cn } from "@/lib/utils"
@@ -41,54 +35,6 @@ export function DefinitionFlags({
         </span>
       ) : null}
     </div>
-  )
-}
-
-export function JsonDefinitionCard({
-  definition,
-  label = "JSONB definition",
-  description = "Stored as JSONB on the definition column.",
-  className,
-}: {
-  definition: JsonObject
-  label?: string
-  description?: string
-  className?: string
-}) {
-  const json = stringifyDefinition(definition)
-  const [copied, setCopied] = useState(false)
-
-  async function copyDefinition() {
-    try {
-      await navigator.clipboard.writeText(json)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  return (
-    <section
-      className={cn(
-        "flex min-w-0 flex-col overflow-hidden rounded-2xl bg-card shadow-xs ring-1 ring-foreground/10",
-        className
-      )}
-    >
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
-        <div>
-          <h2 className="text-sm font-medium">{label}</h2>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={copyDefinition}>
-          {copied ? <CheckIcon /> : <CopyIcon />}
-          {copied ? "Copied" : "Copy"}
-        </Button>
-      </div>
-      <pre className="max-h-[32rem] min-h-0 flex-1 overflow-auto bg-muted/30 p-4 font-mono text-[13px] leading-relaxed sm:p-5">
-        {json}
-      </pre>
-    </section>
   )
 }
 
