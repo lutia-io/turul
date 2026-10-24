@@ -5,6 +5,8 @@ import { pipelineNodeVisuals } from "@/components/pipeline-flow/pipeline-flow-no
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
+  nodeCategories,
+  nodeTypeCategories,
   nodeTypeDescriptions,
   nodeTypeLabels,
   nodeTypes,
@@ -37,10 +39,20 @@ export function NodeTypePicker({
       return (
         nodeTypeLabels[type].toLowerCase().includes(needle) ||
         nodeTypeDescriptions[type].toLowerCase().includes(needle) ||
+        nodeTypeCategories[type].toLowerCase().includes(needle) ||
         type.toLowerCase().includes(needle)
       )
     })
   }, [query])
+
+  const grouped = useMemo(() => {
+    return nodeCategories
+      .map((category) => ({
+        category,
+        types: filtered.filter((type) => nodeTypeCategories[type] === category),
+      }))
+      .filter((group) => group.types.length > 0)
+  }, [filtered])
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -78,45 +90,54 @@ export function NodeTypePicker({
           </Button>
         ) : null}
       </div>
-      {filtered.length > 0 ? (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {filtered.map((type) => {
-            const visual = pipelineNodeVisuals[type]
-            const Icon = visual.icon
-            const selected = selectedType === type
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => onSelect(type)}
-                className={cn(
-                  "flex min-w-0 items-start rounded-xl border bg-background text-left shadow-xs transition-colors outline-none hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                  compact ? "gap-2 p-3" : "gap-3 p-4",
-                  selected
-                    ? "border-primary/40 ring-1 ring-primary/20"
-                    : "border-foreground/10"
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex shrink-0 items-center justify-center rounded-md",
-                    visual.wrap,
-                    compact ? "size-7" : "size-9"
-                  )}
-                >
-                  <Icon className="size-3.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {nodeTypeLabels[type]}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                    {nodeTypeDescriptions[type]}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
+      {grouped.length > 0 ? (
+        <div className="flex flex-col gap-4">
+          {grouped.map((group) => (
+            <div key={group.category} className="flex flex-col gap-2">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                {group.category}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {group.types.map((type) => {
+                  const visual = pipelineNodeVisuals[type]
+                  const Icon = visual.icon
+                  const selected = selectedType === type
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => onSelect(type)}
+                      className={cn(
+                        "flex min-w-0 items-start rounded-xl border bg-background text-left shadow-xs transition-colors outline-none hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                        compact ? "gap-2 p-3" : "gap-3 p-4",
+                        selected
+                          ? "border-primary/40 ring-1 ring-primary/20"
+                          : "border-foreground/10"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "flex shrink-0 items-center justify-center rounded-md",
+                          visual.wrap,
+                          compact ? "size-7" : "size-9"
+                        )}
+                      >
+                        <Icon className="size-3.5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {nodeTypeLabels[type]}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {nodeTypeDescriptions[type]}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="rounded-xl border border-dashed px-3 py-8 text-center text-sm text-muted-foreground">

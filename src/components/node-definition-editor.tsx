@@ -72,6 +72,8 @@ import {
   recordFilterOps,
   recordOperationLabels,
   recordOperations,
+  triggerWorkflowDefinitionFromDraft,
+  triggerWorkflowDraftFromDefinition,
   type BulkDefinitionDraft,
   type FileDefinitionDraft,
   type HttpDefinitionDraft,
@@ -80,11 +82,14 @@ import {
   type NodeType,
   type PipelineTemplateContext,
   type RecordDefinitionDraft,
+  type TriggerWorkflowDefinitionDraft,
 } from "@/lib/node-definition"
+import { useListWorkflowDefinitionsQuery } from "@/store/workflow-slice"
 import { utilityTemplateGroups } from "@/lib/template-mock"
 import type { PipelineNodeConfig } from "@/lib/pipeline-definition"
 
 const CHOOSE_SCHEMA = "__choose_schema__"
+const CHOOSE_WORKFLOW = "__choose_workflow__"
 
 type NodeDrafts = {
   http: HttpDefinitionDraft
@@ -94,6 +99,7 @@ type NodeDrafts = {
   file: FileDefinitionDraft
   record: RecordDefinitionDraft
   bulk: BulkDefinitionDraft
+  triggerWorkflow: TriggerWorkflowDefinitionDraft
 }
 
 function draftsFromDefinition(
@@ -115,6 +121,7 @@ function draftsFromDefinition(
     file: fileDraftFromDefinition(definition),
     record: recordDraftFromDefinition(definition),
     bulk: bulkDraftFromDefinition(definition),
+    triggerWorkflow: triggerWorkflowDraftFromDefinition(definition),
   }
 }
 
@@ -139,6 +146,8 @@ function definitionFromDrafts(
       return { definition: recordDefinitionFromDraft(drafts.record) }
     case "BULK":
       return bulkDefinitionFromDraft(drafts.bulk)
+    case "TRIGGER_WORKFLOW":
+      return triggerWorkflowDefinitionFromDraft(drafts.triggerWorkflow)
   }
 }
 
@@ -196,7 +205,25 @@ function pipelineTemplateGroups(
         }
       : undefined
 
-  return [input, ...(previous ? [previous] : []), ...utilityTemplateGroups()]
+  const triggerRecord: TemplateVariableGroup = {
+    label: "Trigger record",
+    submenu: true,
+    variables: [
+      { label: "Record ID", token: "{{ .Record.id }}" },
+      {
+        label: "Record field",
+        token: "{{ .Record.data. }}",
+        caretOffset: "{{ .Record.data. }}".lastIndexOf(".") + 1,
+      },
+    ],
+  }
+
+  return [
+    input,
+    triggerRecord,
+    ...(previous ? [previous] : []),
+    ...utilityTemplateGroups(),
+  ]
 }
 
 function itemFieldToken(alias: string) {
@@ -246,6 +273,37 @@ export function NodeDefinitionEditor({
     networkScopeOnly: !organizationId,
     skip: !networkId,
   })
+  const workflowDefinitionsQuery = useListWorkflowDefinitionsQuery(
+    {
+      networkId: networkId || "",
+      organizationId: organizationId || undefined,
+      pageSize: 100,
+    },
+    { skip: !networkId }
+  )
+  const workflowDefinitionItems = useMemo(() => {
+    const items = workflowDefinitionsQuery.data?.items ?? []
+    return items.map((item) => {
+      const slug = item.slug?.trim() ?? ""
+      return {
+        id: item.id,
+        value: slug || item.id,
+        label: item.name?.trim()
+          ? `${item.name}${slug ? ` (${slug})` : ""}`
+          : slug || item.id,
+      }
+    })
+  }, [workflowDefinitionsQuery.data?.items])
+  const selectedTriggerWorkflow = useMemo(() => {
+    const current = drafts.triggerWorkflow.workflow.trim()
+    if (!current) {
+      return CHOOSE_WORKFLOW
+    }
+    const match = workflowDefinitionItems.find(
+      (item) => item.value === current || item.id === current
+    )
+    return match?.value ?? CHOOSE_WORKFLOW
+  }, [drafts.triggerWorkflow.workflow, workflowDefinitionItems])
   const editing = Boolean(node)
   const startingType: NodeType | null =
     node && isNodeType(node.type) ? node.type : (initialType ?? null)
@@ -581,7 +639,9 @@ export function NodeDefinitionEditor({
                 disabled={isLoading}
               />
               <FieldDescription>
-                Builds one object. Values can use {"{{ .Input }}"} and
+                Builds one object. Use this to reshape data or pass earlier
+                level fields forward (only the previous level is visible by
+                default). Values can use {"{{ .Input }}"}, {"{{ .Record }}"}, and
                 arithmetic such as {"{{ mul .Input.salePrice 2 }}"}.
               </FieldDescription>
             </Field>
@@ -601,13 +661,13 @@ export function NodeDefinitionEditor({
                       }))
                     }
                     groups={templateGroups}
-                    placeholder="{{ .Input.0.records }}"
+                    placeholder="{{ .Input.0.items }}"
                     required
                     disabled={isLoading}
                   />
                   <FieldDescription>
-                    A list, usually {"{{ .Input.0.records }}"} from a record
-                    list step.
+                    A list, usually {"{{ .Input.0.items }}"} from a record list
+                    or map-list step.
                   </FieldDescription>
                 </Field>
                 <Field>
@@ -1032,6 +1092,81 @@ export function NodeDefinitionEditor({
                   />
                 </Field>
               ) : null}
+            </>
+          ) : null}
+          {type === "TRIGGER_WORKFLOW" ? (
+            <>
+              <Field>
+                <FieldLabel htmlFor={`${formId}-trigger-workflow`}>
+                  Workflow
+                </FieldLabel>
+                <Select
+                  value={selectedTriggerWorkflow}
+                  disabled={isLoading || workflowDefinitionsQuery.isLoading}
+                  modal={false}
+                  items={[
+                    { value: CHOOSE_WORKFLOW, label: "Choose a workflow" },
+                    ...workflowDefinitionItems.map((item) => ({
+                      value: item.value,
+                      label: item.label,
+                    })),
+                  ]}
+                  onValueChange={(value) => {
+                    if (!value || value === CHOOSE_WORKFLOW) {
+                      return
+                    }
+                    setDrafts((current) => ({
+                      ...current,
+                      triggerWorkflow: {
+                        ...current.triggerWorkflow,
+                        workflow: value,
+                      },
+                    }))
+                  }}
+                >
+                  <SelectTrigger id={`${formId}-trigger-workflow`}>
+                    <SelectValue placeholder="Choose a workflow" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CHOOSE_WORKFLOW}>
+                      Choose a workflow
+                    </SelectItem>
+                    {workflowDefinitionItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  {workflowDefinitionItems.length === 0 &&
+                  !workflowDefinitionsQuery.isLoading
+                    ? "No workflow definitions available in this workspace yet."
+                    : 'Output is { "id": "...", "input": { ... } }.'}
+                </FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel>Input</FieldLabel>
+                <MappingFields
+                  entries={drafts.triggerWorkflow.input}
+                  onChange={(input) =>
+                    setDrafts((current) => ({
+                      ...current,
+                      triggerWorkflow: {
+                        ...current.triggerWorkflow,
+                        input,
+                      },
+                    }))
+                  }
+                  groups={templateGroups}
+                  disabled={isLoading}
+                />
+                <FieldDescription>
+                  Mapped fields become the child workflow&apos;s{" "}
+                  {"{{ .Input }}"}. Trigger data is also available as{" "}
+                  {"{{ .Record }}"} here.
+                </FieldDescription>
+              </Field>
             </>
           ) : null}
           {type === "BULK" ? (

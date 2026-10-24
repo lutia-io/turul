@@ -119,6 +119,11 @@ export const pipelineNodeVisuals: Record<NodeType, NodeVisual> = {
     color: "teal",
     wrap: "bg-teal-500/10 text-teal-800 dark:text-teal-300",
   },
+  TRIGGER_WORKFLOW: {
+    icon: WorkflowIcon,
+    color: "purple",
+    wrap: "bg-indigo-500/10 text-indigo-800 dark:text-indigo-300",
+  },
 }
 
 export function visualForNodeType(type: string): NodeVisual {

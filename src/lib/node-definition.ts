@@ -8,29 +8,59 @@ export const nodeTypes = [
   "FILE",
   "RECORD",
   "BULK",
+  "TRIGGER_WORKFLOW",
 ] as const
 
 export type NodeType = (typeof nodeTypes)[number]
 
+export type NodeCategory =
+  | "Transform"
+  | "Integration"
+  | "Data"
+  | "Files"
+  | "Workflows"
+
 export const nodeTypeLabels: Record<NodeType, string> = {
-  NOOP: "No-op",
+  NOOP: "Debug",
   HTTP: "HTTP",
-  MAPPER: "Mapper",
-  LIST_MAPPER: "List mapper",
+  MAPPER: "Set fields",
+  LIST_MAPPER: "Map list",
   FILE: "File",
-  RECORD: "Record API",
+  RECORD: "Record",
   BULK: "Bulk records",
+  TRIGGER_WORKFLOW: "Trigger workflow",
 }
 
 export const nodeTypeDescriptions: Record<NodeType, string> = {
-  NOOP: "Return a fixed message without calling anything.",
+  NOOP: "Echo a message without side effects. Useful for testing templates.",
   HTTP: "Call an HTTP API with method, URL, headers, and body.",
-  MAPPER: "Build one object from mapped fields and templates.",
+  MAPPER:
+    "Build one object from mapped fields and templates. Use to reshape data or pass fields across levels.",
   LIST_MAPPER: "Map each item in a list into a new shape.",
   FILE: "Read or write a file in the workspace.",
-  RECORD: "List, get, create, or update a single record.",
-  BULK: "Create or upsert many records from a list.",
+  RECORD: "List, get, create, update, or upsert a record.",
+  BULK: "Create or upsert many records from one or more lists.",
+  TRIGGER_WORKFLOW: "Enqueue another workflow by id or slug with a mapped input.",
 }
+
+export const nodeTypeCategories: Record<NodeType, NodeCategory> = {
+  NOOP: "Transform",
+  MAPPER: "Transform",
+  LIST_MAPPER: "Transform",
+  HTTP: "Integration",
+  FILE: "Files",
+  RECORD: "Data",
+  BULK: "Data",
+  TRIGGER_WORKFLOW: "Workflows",
+}
+
+export const nodeCategories: NodeCategory[] = [
+  "Transform",
+  "Integration",
+  "Data",
+  "Files",
+  "Workflows",
+]
 
 export const executableNodeTypes = new Set<NodeType>(nodeTypes)
 
@@ -91,8 +121,24 @@ export function pipelineOutputFields(node: {
   if (node.type === "NOOP") {
     return [{ label: "Message", path: "message" }]
   }
-  if (node.type === "FILE" && definition.operation === "WRITE") {
-    return [{ label: "File ID", path: "fileId" }]
+  if (node.type === "HTTP") {
+    return [
+      { label: "Status", path: "status" },
+      { label: "Headers", path: "headers" },
+      { label: "Body", path: "body" },
+    ]
+  }
+  if (node.type === "FILE") {
+    const fields: PipelineOutputField[] = [
+      { label: "File ID", path: "fileId" },
+      { label: "Filename", path: "filename" },
+      { label: "Content type", path: "contentType" },
+      { label: "Size", path: "sizeBytes" },
+    ]
+    if (definition.operation === "READ") {
+      fields.push({ label: "Content", path: "content" })
+    }
+    return fields
   }
   if (node.type === "BULK") {
     return [
@@ -106,8 +152,29 @@ export function pipelineOutputFields(node: {
   if (node.type === "LIST_MAPPER") {
     return [{ label: "Items", path: "items" }]
   }
-  if (node.type === "RECORD" && definition.operation === "LIST") {
-    return [{ label: "Records", path: "records" }]
+  if (node.type === "RECORD") {
+    if (definition.operation === "LIST") {
+      return [
+        { label: "Items", path: "items" },
+        { label: "Total", path: "total" },
+      ]
+    }
+    if (definition.operation === "GET") {
+      return [{ label: "Record", path: "record" }]
+    }
+    if (
+      definition.operation === "CREATE" ||
+      definition.operation === "UPDATE" ||
+      definition.operation === "UPSERT"
+    ) {
+      return [{ label: "ID", path: "id" }]
+    }
+  }
+  if (node.type === "TRIGGER_WORKFLOW") {
+    return [
+      { label: "Run ID", path: "id" },
+      { label: "Input", path: "input" },
+    ]
   }
   return []
 }
@@ -257,7 +324,7 @@ export function defaultDefinition(type: NodeType): JsonObject {
       return { mapping: {} }
     case "LIST_MAPPER":
       return {
-        from: "{{ .Input.0.records }}",
+        from: "{{ .Input.0.items }}",
         as: "item",
         mapping: {},
       }
@@ -282,6 +349,8 @@ export function defaultDefinition(type: NodeType): JsonObject {
           },
         ],
       }
+    case "TRIGGER_WORKFLOW":
+      return { workflow: "", input: {} }
   }
 }
 
@@ -359,7 +428,7 @@ export function nodeConfigSummary(type: string, definition: JsonObject) {
       typeof definition.operation === "string" &&
       isRecordOperation(definition.operation)
         ? recordOperationLabels[definition.operation]
-        : "Record API"
+        : "Record"
     return operation
   }
   if (type === "BULK") {
@@ -373,6 +442,16 @@ export function nodeConfigSummary(type: string, definition: JsonObject) {
       : 0
     const types = records === 1 ? "1 record type" : `${records} record types`
     return `${operation} · ${types}`
+  }
+  if (type === "TRIGGER_WORKFLOW") {
+    const workflow =
+      typeof definition.workflow === "string" ? definition.workflow.trim() : ""
+    const input = asObject(definition.input)
+    const count = input ? Object.keys(input).length : 0
+    if (workflow && count > 0) {
+      return `${workflow} · ${count} input field${count === 1 ? "" : "s"}`
+    }
+    return workflow || "Enqueue a workflow"
   }
   return nodeTypeLabel(type)
 }
@@ -731,4 +810,34 @@ export function bulkDefinitionFromDraft(draft: BulkDefinitionDraft): {
     records.push(item)
   }
   return { definition: { operation: draft.operation, records } }
+}
+
+export type TriggerWorkflowDefinitionDraft = {
+  workflow: string
+  input: MappingEntry[]
+}
+
+export function triggerWorkflowDraftFromDefinition(
+  definition: JsonObject
+): TriggerWorkflowDefinitionDraft {
+  return {
+    workflow:
+      typeof definition.workflow === "string" ? definition.workflow : "",
+    input: mappingEntriesFromObject(asObject(definition.input)),
+  }
+}
+
+export function triggerWorkflowDefinitionFromDraft(
+  draft: TriggerWorkflowDefinitionDraft
+): { definition?: JsonObject; error?: string } {
+  const workflow = draft.workflow.trim()
+  if (!workflow) {
+    return { error: "Workflow id or slug is required" }
+  }
+  return {
+    definition: {
+      workflow,
+      input: mappingObjectFromEntries(draft.input),
+    },
+  }
 }

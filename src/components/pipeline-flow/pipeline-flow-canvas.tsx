@@ -72,6 +72,7 @@ const minimapFill: Record<string, string> = {
   FILE: "#f97316",
   RECORD: "#06b6d4",
   BULK: "#14b8a6",
+  TRIGGER_WORKFLOW: "#6366f1",
 }
 
 function paletteTarget(levels: PipelineLevelDraft[]): CreatePipelineNodeTarget {
