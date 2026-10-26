@@ -29,10 +29,6 @@ export function SpreadsheetCellEditor({
   const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null)
   const cancelledRef = useRef(false)
   const committedRef = useRef(false)
-  const onCommitRef = useRef(onCommit)
-  const onCancelRef = useRef(onCancel)
-  onCommitRef.current = onCommit
-  onCancelRef.current = onCancel
 
   const [draft, setDraft] = useState(() => {
     if (initialDraft !== undefined) {
@@ -46,10 +42,6 @@ export function SpreadsheetCellEditor({
     }
     return String(value)
   })
-  const draftRef = useRef(draft)
-  draftRef.current = draft
-  const propertyRef = useRef(property)
-  propertyRef.current = property
 
   useEffect(() => {
     const node = inputRef.current
@@ -66,20 +58,6 @@ export function SpreadsheetCellEditor({
       }
     }
   }, [initialDraft])
-
-  useEffect(() => {
-    return () => {
-      if (cancelledRef.current || committedRef.current) {
-        return
-      }
-      const next = coercePasteValue(draftRef.current, propertyRef.current)
-      if (next === undefined) {
-        onCancelRef.current()
-        return
-      }
-      onCommitRef.current(next === null ? null : next)
-    }
-  }, [])
 
   function commit() {
     if (cancelledRef.current || committedRef.current) {

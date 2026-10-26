@@ -87,10 +87,35 @@ export type DataTableSpreadsheetProps = {
     cell: SpreadsheetCellRef,
     event: ReactPointerEvent
   ) => void
+  onSelectionDrag: (cell: SpreadsheetCellRef) => void
+  onSelectionGestureEnd?: (detail: {
+    cell: SpreadsheetCellRef
+    moved: boolean
+  }) => void
   onCellDoubleClick: (cell: SpreadsheetCellRef) => void
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void
   renderEditor?: (cell: SpreadsheetCellRef) => ReactNode
   gridRef?: RefObject<HTMLDivElement | null>
+}
+
+function cellRefFromPoint(x: number, y: number): SpreadsheetCellRef | null {
+  const target = document.elementFromPoint(x, y)
+  if (!(target instanceof Element)) {
+    return null
+  }
+  const node = target.closest<HTMLElement>("[data-spreadsheet-cell]")
+  const key = node?.dataset.spreadsheetCell
+  if (!key) {
+    return null
+  }
+  const separator = key.indexOf(":")
+  if (separator <= 0) {
+    return null
+  }
+  return {
+    rowId: key.slice(0, separator),
+    columnId: key.slice(separator + 1),
+  }
 }
 
 export const managedTableFeatures = tableFeatures({
@@ -734,13 +759,22 @@ export function DataTableView<TData extends Record<string, unknown>>({
   const visibleColumns = table.getVisibleLeafColumns()
   const showSkeleton = isLoading && rows.length === 0
   const scrollRef = useRef<HTMLDivElement>(null)
+  const dragPointerIdRef = useRef<number | null>(null)
+  const lastDragCellRef = useRef<string | null>(null)
+  const dragStartRef = useRef<{
+    cell: SpreadsheetCellRef
+    x: number
+    y: number
+  } | null>(null)
+  const dragMovedRef = useRef(false)
+  const [isDraggingSelection, setIsDraggingSelection] = useState(false)
   const showRowIndex = Boolean(spreadsheet)
   const selectable = new Set(spreadsheet?.selectableColumnIds ?? [])
   const dataColSpan =
     visibleColumns.length + (showRowIndex ? 1 : 0)
 
   useEffect(() => {
-    if (!spreadsheet?.activeCell || spreadsheet.editing) {
+    if (!spreadsheet?.activeCell || spreadsheet.editing || isDraggingSelection) {
       return
     }
     const root = scrollRef.current
@@ -751,7 +785,56 @@ export function DataTableView<TData extends Record<string, unknown>>({
       `[data-spreadsheet-cell="${spreadsheet.activeCell.rowId}:${spreadsheet.activeCell.columnId}"]`
     )
     node?.scrollIntoView({ block: "nearest", inline: "nearest" })
-  }, [spreadsheet?.activeCell, spreadsheet?.editing])
+  }, [
+    isDraggingSelection,
+    spreadsheet?.activeCell,
+    spreadsheet?.editing,
+  ])
+
+  function endSelectionDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragPointerIdRef.current !== event.pointerId) {
+      return
+    }
+    const start = dragStartRef.current
+    const moved = dragMovedRef.current
+    dragPointerIdRef.current = null
+    lastDragCellRef.current = null
+    dragStartRef.current = null
+    dragMovedRef.current = false
+    setIsDraggingSelection(false)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    if (start && spreadsheet?.onSelectionGestureEnd) {
+      spreadsheet.onSelectionGestureEnd({ cell: start.cell, moved })
+    }
+    scrollRef.current?.focus({ preventScroll: true })
+  }
+
+  function moveSelectionDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragPointerIdRef.current !== event.pointerId || !spreadsheet) {
+      return
+    }
+    const start = dragStartRef.current
+    if (start && !dragMovedRef.current) {
+      const dx = event.clientX - start.x
+      const dy = event.clientY - start.y
+      if (dx * dx + dy * dy > 9) {
+        dragMovedRef.current = true
+      }
+    }
+    const cell = cellRefFromPoint(event.clientX, event.clientY)
+    if (!cell) {
+      return
+    }
+    const key = `${cell.rowId}:${cell.columnId}`
+    if (lastDragCellRef.current === key) {
+      return
+    }
+    lastDragCellRef.current = key
+    dragMovedRef.current = true
+    spreadsheet.onSelectionDrag(cell)
+  }
 
   return (
     <LoadingFrame
@@ -770,11 +853,17 @@ export function DataTableView<TData extends Record<string, unknown>>({
             spreadsheet.gridRef.current = node
           }
         }}
-        className="h-full min-h-0 overflow-auto outline-none"
+        className={cn(
+          "h-full min-h-0 overflow-auto outline-none",
+          isDraggingSelection && "select-none"
+        )}
         tabIndex={spreadsheet ? 0 : undefined}
         role={spreadsheet ? "grid" : undefined}
         aria-label={spreadsheet ? "Records spreadsheet" : undefined}
         onKeyDown={spreadsheet?.onKeyDown}
+        onPointerMove={spreadsheet ? moveSelectionDrag : undefined}
+        onPointerUp={spreadsheet ? endSelectionDrag : undefined}
+        onPointerCancel={spreadsheet ? endSelectionDrag : undefined}
       >
         <Table
           className="w-full"
@@ -882,6 +971,14 @@ export function DataTableView<TData extends Record<string, unknown>>({
                         onPointerDown={
                           spreadsheet && canSelect
                             ? (event) => {
+                                if (event.button !== 0) {
+                                  return
+                                }
+                                if (
+                                  sameSpreadsheetCell(spreadsheet.editing, ref)
+                                ) {
+                                  return
+                                }
                                 if (
                                   event.target instanceof Element &&
                                   event.target.closest(
@@ -891,6 +988,18 @@ export function DataTableView<TData extends Record<string, unknown>>({
                                   return
                                 }
                                 spreadsheet.onCellPointerDown(ref, event)
+                                dragPointerIdRef.current = event.pointerId
+                                lastDragCellRef.current = `${ref.rowId}:${ref.columnId}`
+                                dragMovedRef.current = false
+                                dragStartRef.current = {
+                                  cell: ref,
+                                  x: event.clientX,
+                                  y: event.clientY,
+                                }
+                                setIsDraggingSelection(true)
+                                scrollRef.current?.setPointerCapture(
+                                  event.pointerId
+                                )
                               }
                             : undefined
                         }

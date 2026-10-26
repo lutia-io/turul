@@ -298,8 +298,9 @@ export default function RecordsPage() {
     ? canOrg("record", "create")
     : Boolean(authorization?.network?.member)
   const canEditRecords = isOrgUser
-    ? canOrg("record", "update")
-    : Boolean(authorization?.network?.member)
+    ? canOrg("record", "update") || canOrg("record", "create")
+    : canNetwork("record", "update") ||
+      Boolean(authorization?.network?.member)
 
   const sheetTabs =
     schemas.length > 0 || canCreateTable ? (
@@ -515,6 +516,7 @@ function SchemaRecordsDataTable({
     Record<string, JsonObject>
   >({})
   const gridRef = useRef<HTMLDivElement | null>(null)
+  const editOnReleaseRef = useRef(false)
   const [updateRecord] = useUpdateRecordMutation()
 
   useEffect(() => {
@@ -872,6 +874,13 @@ function SchemaRecordsDataTable({
     [selectionAnchor]
   )
 
+  const extendSelectionTo = useCallback((cell: SpreadsheetCellRef) => {
+    setEditing(null)
+    setEditDraftSeed(undefined)
+    setActiveCell(cell)
+    setSelectionFocus(cell)
+  }, [])
+
   const beginEdit = useCallback(
     (cell: SpreadsheetCellRef, seed?: string) => {
       if (!canEditRecords) {
@@ -1110,15 +1119,37 @@ function SchemaRecordsDataTable({
 
   const onCellPointerDown = useCallback(
     (cell: SpreadsheetCellRef, event: ReactPointerEvent) => {
-      event.preventDefault()
-      gridRef.current?.focus()
+      editOnReleaseRef.current =
+        !event.shiftKey && sameSpreadsheetCell(activeCell, cell) && !editing
+      gridRef.current?.focus({ preventScroll: true })
       selectCell(cell, event.shiftKey)
     },
-    [selectCell]
+    [activeCell, editing, selectCell]
+  )
+
+  const onSelectionDrag = useCallback(
+    (cell: SpreadsheetCellRef) => {
+      editOnReleaseRef.current = false
+      extendSelectionTo(cell)
+    },
+    [extendSelectionTo]
+  )
+
+  const onSelectionGestureEnd = useCallback(
+    ({ cell, moved }: { cell: SpreadsheetCellRef; moved: boolean }) => {
+      const shouldEdit = editOnReleaseRef.current && !moved
+      editOnReleaseRef.current = false
+      if (shouldEdit) {
+        beginEdit(cell)
+      }
+      gridRef.current?.focus({ preventScroll: true })
+    },
+    [beginEdit]
   )
 
   const onCellDoubleClick = useCallback(
     (cell: SpreadsheetCellRef) => {
+      editOnReleaseRef.current = false
       beginEdit(cell)
     },
     [beginEdit]
@@ -1303,6 +1334,8 @@ function SchemaRecordsDataTable({
               rowIndexOffset: pagination.pageIndex * pagination.pageSize,
               isCellSelected,
               onCellPointerDown,
+              onSelectionDrag,
+              onSelectionGestureEnd,
               onCellDoubleClick,
               onKeyDown: onSpreadsheetKeyDown,
               gridRef,
