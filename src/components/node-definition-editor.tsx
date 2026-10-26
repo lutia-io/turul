@@ -294,16 +294,6 @@ export function NodeDefinitionEditor({
       }
     })
   }, [workflowDefinitionsQuery.data?.items])
-  const selectedTriggerWorkflow = useMemo(() => {
-    const current = drafts.triggerWorkflow.workflow.trim()
-    if (!current) {
-      return CHOOSE_WORKFLOW
-    }
-    const match = workflowDefinitionItems.find(
-      (item) => item.value === current || item.id === current
-    )
-    return match?.value ?? CHOOSE_WORKFLOW
-  }, [drafts.triggerWorkflow.workflow, workflowDefinitionItems])
   const editing = Boolean(node)
   const startingType: NodeType | null =
     node && isNodeType(node.type) ? node.type : (initialType ?? null)
@@ -316,6 +306,16 @@ export function NodeDefinitionEditor({
         (startingType ? defaultDefinition(startingType) : {})
     )
   )
+  const selectedTriggerWorkflow = useMemo(() => {
+    const current = drafts.triggerWorkflow.workflow.trim()
+    if (!current) {
+      return CHOOSE_WORKFLOW
+    }
+    const match = workflowDefinitionItems.find(
+      (item) => item.value === current || item.id === current
+    )
+    return match?.value ?? CHOOSE_WORKFLOW
+  }, [drafts.triggerWorkflow.workflow, workflowDefinitionItems])
   const isLoading = false
 
   const composed = type
