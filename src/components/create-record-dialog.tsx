@@ -787,6 +787,12 @@ function RecordPropertyField({
   const label = columnLabel(property)
   const required = inputRequired(property, editing)
   const hint = editing ? undefined : defaultHint(property)
+  const description =
+    property.description &&
+    property.description !== label &&
+    property.description !== property.name
+      ? property.description
+      : undefined
 
   if (isUserArrayProperty(property) || isUserProperty(property)) {
     return (
@@ -794,7 +800,7 @@ function RecordPropertyField({
         id={id}
         label={label}
         required={required}
-        description={property.description}
+        description={description}
         hint={hint}
         organizationUsers={organizationUsers}
         value={value}
@@ -811,7 +817,7 @@ function RecordPropertyField({
         id={id}
         label={label}
         required={required}
-        description={property.description}
+        description={description}
         networkId={networkId}
         organizationId={organizationId}
         value={value}
@@ -843,7 +849,7 @@ function RecordPropertyField({
           disabled={disabled}
           onChange={onChange}
         />
-        <FieldHint description={property.description} hint={hint} />
+        <FieldHint description={description} hint={hint} />
       </Field>
     )
   }
@@ -868,7 +874,7 @@ function RecordPropertyField({
             </NativeSelectOption>
           ))}
         </NativeSelect>
-        <FieldHint hint={hint} />
+        <FieldHint description={description} hint={hint} />
       </Field>
     )
   }
@@ -890,7 +896,7 @@ function RecordPropertyField({
           <NativeSelectOption value="true">Yes</NativeSelectOption>
           <NativeSelectOption value="false">No</NativeSelectOption>
         </NativeSelect>
-        <FieldHint hint={hint} />
+        <FieldHint description={description} hint={hint} />
       </Field>
     )
   }
@@ -903,7 +909,7 @@ function RecordPropertyField({
         value={value}
         required={required}
         disabled={disabled}
-        description={property.description}
+        description={description}
         onChange={onChange}
       />
     )
@@ -921,7 +927,7 @@ function RecordPropertyField({
         id={id}
         label={label}
         required={required}
-        description={property.description}
+        description={description}
         hint={hint}
         itemsType={
           property.itemsType === "number" || property.itemsType === "boolean"
@@ -948,7 +954,7 @@ function RecordPropertyField({
           placeholder={property.type === "array" ? "[ ]" : "{ }"}
         />
         <FieldHint
-          description={property.description}
+          description={description}
           hint={hint}
           fallback={`JSON ${property.type}.`}
         />
@@ -982,7 +988,7 @@ function RecordPropertyField({
             }
           />
         </div>
-        <FieldHint description={property.description} hint={hint} />
+        <FieldHint description={description} hint={hint} />
       </Field>
     )
   }
@@ -1028,7 +1034,7 @@ function RecordPropertyField({
             : undefined
         }
       />
-      <FieldHint description={property.description} hint={hint} />
+      <FieldHint description={description} hint={hint} />
     </Field>
   )
 }

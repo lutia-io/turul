@@ -46,6 +46,7 @@ export const listItemTypeLabels: Record<ListItemType, string> = {
 
 export type ColumnDraft = {
   title: string
+  description: string
   kind: FieldKind
   required: boolean
   enumValues: string[]
@@ -61,6 +62,7 @@ export type ColumnImpact = {
 export function emptyColumnDraft(): ColumnDraft {
   return {
     title: "",
+    description: "",
     kind: "text",
     required: false,
     enumValues: [],
@@ -140,8 +142,14 @@ export function draftFromProperty(property: JsonSchemaProperty): ColumnDraft {
   const itemType =
     property.itemsType === "integer" ? "number" : property.itemsType
   const itemsType = listItemTypes.find((item) => item === itemType)
+  const title = property.title?.trim() || propertyLabel(property.name)
+  const description = property.description?.trim() ?? ""
   return {
-    title: property.title?.trim() || propertyLabel(property.name),
+    title,
+    description:
+      description && description !== title && description !== property.name
+        ? description
+        : "",
     kind: kindFromProperty(property),
     required: property.required,
     enumValues: [...(property.enumValues ?? [])],
@@ -293,21 +301,16 @@ function propertySpec(
 ): JsonObject {
   const shape = shapeForKind(draft.kind)
   const title = draft.title.trim() || key
-  const previousDescription =
-    typeof previous?.description === "string" ? previous.description : ""
-  const previousTitle =
-    typeof previous?.title === "string" ? previous.title : ""
-  const description =
-    previousDescription &&
-    previousDescription !== previousTitle &&
-    previousDescription !== key
-      ? previousDescription
-      : title
+  const description = draft.description.trim()
   const spec: JsonObject = {
     ...(previous ?? {}),
     type: shape.type,
     title,
-    description,
+  }
+  if (description) {
+    spec.description = description
+  } else {
+    delete spec.description
   }
 
   if (shape.format) {

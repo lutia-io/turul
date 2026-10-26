@@ -54,6 +54,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Popover,
   PopoverContent,
@@ -790,6 +791,16 @@ function ColumnFields({
             ? "Workflows and stored values use this key. It does not change."
             : "Saved once from the display name. Renaming later does not change it."}
         </FieldDescription>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor={`${formId}-description`}>Description</FieldLabel>
+        <Textarea
+          id={`${formId}-description`}
+          value={draft.description}
+          onChange={(event) => onChange({ description: event.target.value })}
+          placeholder="Shown under this field when adding or editing a record"
+          className="min-h-16"
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor={`${formId}-kind`}>Type</FieldLabel>
