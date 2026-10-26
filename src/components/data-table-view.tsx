@@ -1,4 +1,13 @@
-import { useState, type CSSProperties, type ReactNode } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type RefObject,
+} from "react"
 import {
   columnPinningFeature,
   columnResizingFeature,
@@ -60,7 +69,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  sameSpreadsheetCell,
+  type SpreadsheetCellRef,
+} from "@/lib/spreadsheet-table"
 import { cn } from "@/lib/utils"
+
+export type DataTableSpreadsheetProps = {
+  activeCell: SpreadsheetCellRef | null
+  selectionAnchor: SpreadsheetCellRef | null
+  selectionFocus: SpreadsheetCellRef | null
+  editing: SpreadsheetCellRef | null
+  selectableColumnIds: string[]
+  rowIndexOffset?: number
+  isCellSelected: (cell: SpreadsheetCellRef) => boolean
+  onCellPointerDown: (
+    cell: SpreadsheetCellRef,
+    event: ReactPointerEvent
+  ) => void
+  onCellDoubleClick: (cell: SpreadsheetCellRef) => void
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void
+  renderEditor?: (cell: SpreadsheetCellRef) => ReactNode
+  gridRef?: RefObject<HTMLDivElement | null>
+}
 
 export const managedTableFeatures = tableFeatures({
   rowSortingFeature,
@@ -617,6 +648,10 @@ export function DataTableViewOptions<TData extends Record<string, unknown>>({
 function columnLabel<TData extends Record<string, unknown>>(
   column: Column<typeof managedTableFeatures, TData, unknown>
 ) {
+  const meta = column.columnDef.meta as { label?: string } | undefined
+  if (meta?.label) {
+    return meta.label
+  }
   const header = column.columnDef.header
   if (typeof header === "string" && header.length > 0) {
     return header
@@ -685,32 +720,81 @@ export function DataTableView<TData extends Record<string, unknown>>({
   empty,
   isLoading,
   isRefreshing,
+  spreadsheet,
+  embedded,
 }: {
   table: ManagedTable<TData>
   empty: string
   isLoading?: boolean
   isRefreshing?: boolean
+  spreadsheet?: DataTableSpreadsheetProps
+  embedded?: boolean
 }) {
   const rows = table.getRowModel().rows
   const visibleColumns = table.getVisibleLeafColumns()
   const showSkeleton = isLoading && rows.length === 0
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const showRowIndex = Boolean(spreadsheet)
+  const selectable = new Set(spreadsheet?.selectableColumnIds ?? [])
+  const dataColSpan =
+    visibleColumns.length + (showRowIndex ? 1 : 0)
+
+  useEffect(() => {
+    if (!spreadsheet?.activeCell || spreadsheet.editing) {
+      return
+    }
+    const root = scrollRef.current
+    if (!root) {
+      return
+    }
+    const node = root.querySelector<HTMLElement>(
+      `[data-spreadsheet-cell="${spreadsheet.activeCell.rowId}:${spreadsheet.activeCell.columnId}"]`
+    )
+    node?.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }, [spreadsheet?.activeCell, spreadsheet?.editing])
 
   return (
     <LoadingFrame
       isLoading={isRefreshing && !showSkeleton}
-      className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border bg-background shadow-xs"
+      className={cn(
+        "min-h-0 min-w-0 flex-1 overflow-hidden bg-background",
+        embedded
+          ? "rounded-none border-0 shadow-none"
+          : "rounded-xl border shadow-xs"
+      )}
     >
-      <div className="h-full min-h-0 overflow-auto">
+      <div
+        ref={(node) => {
+          scrollRef.current = node
+          if (spreadsheet?.gridRef) {
+            spreadsheet.gridRef.current = node
+          }
+        }}
+        className="h-full min-h-0 overflow-auto outline-none"
+        tabIndex={spreadsheet ? 0 : undefined}
+        role={spreadsheet ? "grid" : undefined}
+        aria-label={spreadsheet ? "Records spreadsheet" : undefined}
+        onKeyDown={spreadsheet?.onKeyDown}
+      >
         <Table
           className="w-full"
           style={{
             tableLayout: "fixed",
-            minWidth: table.getTotalSize(),
+            minWidth:
+              table.getTotalSize() + (showRowIndex ? 44 : 0),
           }}
         >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                {showRowIndex ? (
+                  <TableHead
+                    className="sticky left-0 z-30 w-11 min-w-11 border-r border-border bg-muted/95 px-1 text-center"
+                    style={{ width: 44, minWidth: 44, maxWidth: 44 }}
+                  >
+                    <span className="sr-only">Row</span>
+                  </TableHead>
+                ) : null}
                 {headerGroup.headers.map((header) => {
                   const pinned = header.column.getIsPinned()
                   return (
@@ -746,21 +830,81 @@ export function DataTableView<TData extends Record<string, unknown>>({
           </TableHeader>
           <TableBody>
             {rows.length > 0 ? (
-              rows.map((row) => (
-                <TableRow key={row.id}>
+              rows.map((row, rowIndex) => (
+                <TableRow
+                  key={row.id}
+                  className={spreadsheet ? "hover:bg-transparent" : undefined}
+                >
+                  {showRowIndex ? (
+                    <TableCell
+                      className="sticky left-0 z-20 w-11 min-w-11 border-r border-border bg-muted/40 px-1 text-center text-[11px] tabular-nums text-muted-foreground"
+                      style={{ width: 44, minWidth: 44, maxWidth: 44 }}
+                    >
+                      {(spreadsheet?.rowIndexOffset ?? 0) + rowIndex + 1}
+                    </TableCell>
+                  ) : null}
                   {row.getVisibleCells().map((cell) => {
                     const pinned = cell.column.getIsPinned()
+                    const ref: SpreadsheetCellRef = {
+                      rowId: row.id,
+                      columnId: cell.column.id,
+                    }
+                    const canSelect = selectable.has(cell.column.id)
+                    const active =
+                      spreadsheet &&
+                      sameSpreadsheetCell(spreadsheet.activeCell, ref)
+                    const selected =
+                      spreadsheet && spreadsheet.isCellSelected(ref)
+                    const editing =
+                      spreadsheet &&
+                      sameSpreadsheetCell(spreadsheet.editing, ref)
+
                     return (
                       <TableCell
                         key={cell.id}
+                        data-spreadsheet-cell={
+                          canSelect
+                            ? `${ref.rowId}:${ref.columnId}`
+                            : undefined
+                        }
                         className={cn(
-                          "overflow-hidden",
+                          "overflow-hidden border-r border-border last:border-r-0",
                           pinned && "z-10 bg-background",
-                          pinnedEdgeClass(table, cell.column.id)
+                          pinnedEdgeClass(table, cell.column.id),
+                          canSelect && "cursor-cell select-none",
+                          selected && !editing && "bg-primary/10",
+                          active &&
+                            !editing &&
+                            "relative z-10 ring-2 ring-primary ring-inset",
+                          editing && "p-0.5"
                         )}
                         style={pinnedStyle(cell.column)}
+                        onPointerDown={
+                          spreadsheet && canSelect
+                            ? (event) => {
+                                if (
+                                  event.target instanceof Element &&
+                                  event.target.closest(
+                                    "a,button,input,select,textarea,[role='menu'],[data-slot='dropdown-menu-trigger']"
+                                  )
+                                ) {
+                                  return
+                                }
+                                spreadsheet.onCellPointerDown(ref, event)
+                              }
+                            : undefined
+                        }
+                        onDoubleClick={
+                          spreadsheet && canSelect
+                            ? () => spreadsheet.onCellDoubleClick(ref)
+                            : undefined
+                        }
                       >
-                        <table.FlexRender cell={cell} />
+                        {editing && spreadsheet?.renderEditor
+                          ? spreadsheet.renderEditor(ref)
+                          : (
+                              <table.FlexRender cell={cell} />
+                            )}
                       </TableCell>
                     )
                   })}
@@ -769,6 +913,11 @@ export function DataTableView<TData extends Record<string, unknown>>({
             ) : showSkeleton ? (
               Array.from({ length: 5 }).map((_, rowIndex) => (
                 <TableRow key={rowIndex} className="hover:bg-transparent">
+                  {showRowIndex ? (
+                    <TableCell className="w-11 border-r">
+                      <Skeleton className="mx-auto h-3 w-4" />
+                    </TableCell>
+                  ) : null}
                   {visibleColumns.map((column) => (
                     <TableCell key={column.id}>
                       <Skeleton className="h-4 w-full max-w-32" />
@@ -779,7 +928,7 @@ export function DataTableView<TData extends Record<string, unknown>>({
             ) : (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={Math.max(visibleColumns.length, 1)}
+                  colSpan={Math.max(dataColSpan, 1)}
                   className="h-24 text-center text-muted-foreground"
                 >
                   {empty}

@@ -106,20 +106,32 @@ type RelatedTable = {
 export function AddColumnButton({
   table,
   tables,
+  variant = "icon",
 }: {
   table: TableRef
   tables: RelatedTable[]
+  variant?: "icon" | "toolbar"
 }) {
   const [open, setOpen] = useState(false)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        aria-label="Add column"
-        className="inline-flex size-5 items-center justify-center rounded-md text-muted-foreground/50 outline-none hover:bg-muted hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        <PlusIcon className="size-3" />
-      </PopoverTrigger>
+      {variant === "toolbar" ? (
+        <PopoverTrigger
+          aria-label="Add column"
+          render={<Button variant="outline" size="sm" className="gap-1.5" />}
+        >
+          <PlusIcon className="size-3.5" />
+          Add column
+        </PopoverTrigger>
+      ) : (
+        <PopoverTrigger
+          aria-label="Add column"
+          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          <PlusIcon className="size-3.5" />
+        </PopoverTrigger>
+      )}
       <PopoverContent align="end" className="w-80 p-0">
         <ColumnForm
           table={table}

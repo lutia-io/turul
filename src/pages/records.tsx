@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react"
 import { Link, useSearchParams } from "react-router"
 import {
   PencilIcon,
@@ -23,6 +31,7 @@ import {
   DataTablePagination,
   DataTableRowActions,
   DataTableView,
+  DataTableViewOptions,
   managedTableFeatures,
   emptyFilterValue,
   numberFilterChipValue,
@@ -41,6 +50,7 @@ import {
   SchemaSheetTabs,
   type RecordUser,
 } from "@/components/schema-records-table"
+import { SpreadsheetCellEditor } from "@/components/spreadsheet-cell-editor"
 import {
   AddColumnButton,
   ColumnHeaderMenu,
@@ -62,7 +72,9 @@ import {
   isUriProperty,
   isUserArrayProperty,
   isUserProperty,
+  type JsonObject,
   type JsonSchemaProperty,
+  type JsonValue,
 } from "@/lib/json-definition"
 import {
   networkWorkspacePath,
@@ -73,12 +85,25 @@ import {
   workspaceRecordFromApi,
 } from "@/lib/network-workspace"
 import { useAuthorization } from "@/lib/authorization"
+import {
+  clipboardValueForProperty,
+  coercePasteValue,
+  encodeTsv,
+  isCellInSelection,
+  isSimpleSpreadsheetProperty,
+  moveCellRef,
+  parseTsv,
+  sameSpreadsheetCell,
+  selectionBounds,
+  type SpreadsheetCellRef,
+} from "@/lib/spreadsheet-table"
 import { cn } from "@/lib/utils"
 import { getHumaErrorMessage } from "@/store/api"
 import { useAppSelector } from "@/store/hooks"
 import { selectIsAuthenticated } from "@/store/auth-slice"
 import {
   useListRecordsQuery,
+  useUpdateRecordMutation,
   type ListRecordsParams,
   type RecordFieldFilter,
 } from "@/store/record-slice"
@@ -272,11 +297,59 @@ export default function RecordsPage() {
   const canCreateRecord = isOrgUser
     ? canOrg("record", "create")
     : Boolean(authorization?.network?.member)
+  const canEditRecords = isOrgUser
+    ? canOrg("record", "update")
+    : Boolean(authorization?.network?.member)
+
+  const sheetTabs =
+    schemas.length > 0 || canCreateTable ? (
+      <SchemaSheetTabs
+        schemas={schemas}
+        activeId={activeSchema?.id}
+        onSelect={(schemaId) => setWorkbook({ schemaId })}
+        renderMenu={(schema) => {
+          const canEdit = canNetwork("schema", "update") && !schema.internal
+          const canDelete = canNetwork("schema", "delete") && !schema.internal
+          return (
+            <TableSheetMenu
+              schema={schema}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              onDeleted={(schemaId) => {
+                if (activeSchema?.id !== schemaId) {
+                  return
+                }
+                const remaining = schemas.filter((item) => item.id !== schemaId)
+                const nextParams = new URLSearchParams(params)
+                if (remaining[0]) {
+                  nextParams.set("schema", remaining[0].id)
+                } else {
+                  nextParams.delete("schema")
+                }
+                setParams(nextParams, { replace: true })
+              }}
+            />
+          )
+        }}
+        trailing={
+          canCreateTable ? (
+            <button
+              type="button"
+              onClick={() => setAddTableOpen(true)}
+              className="mb-0.5 inline-flex shrink-0 items-center gap-1 rounded-md border border-dashed px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <PlusIcon className="size-3.5" />
+              Add table
+            </button>
+          ) : null
+        }
+      />
+    ) : null
 
   return (
     <DataTablePage
       title="Records"
-      description="Each table is one kind of record. Hover a related record, URL, or file for a preview, then click to open it."
+      description="Tables are sheets in this workbook. Move with arrow keys, edit simple cells in place, and use the sheet tabs to switch tables."
       action={
         canCreateRecord ? (
           <Button
@@ -307,91 +380,53 @@ export default function RecordsPage() {
         </div>
       ) : null}
 
-      {schemas.length > 0 || canCreateTable ? (
-        <SchemaSheetTabs
-          schemas={schemas}
-          activeId={activeSchema?.id}
-          onSelect={(schemaId) => setWorkbook({ schemaId })}
-          renderMenu={(schema) => {
-            const canEdit = canNetwork("schema", "update") && !schema.internal
-            const canDelete = canNetwork("schema", "delete") && !schema.internal
-            return (
-              <TableSheetMenu
-                schema={schema}
-                canEdit={canEdit}
-                canDelete={canDelete}
-                onDeleted={(schemaId) => {
-                  if (activeSchema?.id !== schemaId) {
-                    return
-                  }
-                  const remaining = schemas.filter(
-                    (item) => item.id !== schemaId
-                  )
-                  const nextParams = new URLSearchParams(params)
-                  if (remaining[0]) {
-                    nextParams.set("schema", remaining[0].id)
-                  } else {
-                    nextParams.delete("schema")
-                  }
-                  setParams(nextParams, { replace: true })
-                }}
-              />
-            )
-          }}
-          trailing={
-            canCreateTable ? (
-              <button
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-xs">
+        {sheetTabs ? (
+          <div className="flex shrink-0 items-end gap-2 border-b bg-muted/30 px-2">
+            {sheetTabs}
+          </div>
+        ) : null}
+        {schemaListSettling ? (
+          <Skeleton className="m-3 flex-1 rounded-lg" aria-busy="true" />
+        ) : activeSchema && activeNetwork ? (
+          <SchemaRecordsDataTable
+            key={activeSchema.id}
+            schema={activeSchema}
+            network={activeNetwork}
+            organizationId={organizationId}
+            filesById={filesById}
+            isAuthenticated={isAuthenticated}
+            canEditColumns={
+              canNetwork("schema", "update") && !activeSchema.internal
+            }
+            canEditRecords={canEditRecords}
+            onEdit={openEditRecord}
+            onRefreshRelated={() => {
+              void refetchFiles()
+              void refetchNetworks()
+            }}
+            isRelatedRefreshing={isFilesFetching || isNetworksFetching}
+          />
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+            <span className="inline-flex items-center">
+              <TableIcon className="mr-2 size-4" />
+              No tables yet.
+            </span>
+            {canCreateTable ? (
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setAddTableOpen(true)}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               >
-                <PlusIcon className="size-3.5" />
+                <PlusIcon />
                 Add table
-              </button>
-            ) : null
-          }
-        />
-      ) : null}
-
-      {schemaListSettling ? (
-        <Skeleton className="flex-1 rounded-xl" aria-busy="true" />
-      ) : activeSchema && activeNetwork ? (
-        <SchemaRecordsDataTable
-          key={activeSchema.id}
-          schema={activeSchema}
-          network={activeNetwork}
-          organizationId={organizationId}
-          filesById={filesById}
-          isAuthenticated={isAuthenticated}
-          canEditColumns={
-            canNetwork("schema", "update") && !activeSchema.internal
-          }
-          onEdit={openEditRecord}
-          onRefreshRelated={() => {
-            void refetchFiles()
-            void refetchNetworks()
-          }}
-          isRelatedRefreshing={isFilesFetching || isNetworksFetching}
-        />
-      ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border bg-background text-sm text-muted-foreground">
-          <span className="inline-flex items-center">
-            <TableIcon className="mr-2 size-4" />
-            No tables yet.
-          </span>
-          {canCreateTable ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setAddTableOpen(true)}
-            >
-              <PlusIcon />
-              Add table
-            </Button>
-          ) : null}
-        </div>
-      )}
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </div>
       <AddTableDialog
         open={addTableOpen}
         onOpenChange={setAddTableOpen}
@@ -410,6 +445,7 @@ function SchemaRecordsDataTable({
   filesById,
   isAuthenticated,
   canEditColumns,
+  canEditRecords,
   onEdit,
   onRefreshRelated,
   isRelatedRefreshing,
@@ -420,6 +456,7 @@ function SchemaRecordsDataTable({
   filesById: Map<string, StoredFile>
   isAuthenticated: boolean
   canEditColumns: boolean
+  canEditRecords: boolean
   onEdit: (recordId: string) => void
   onRefreshRelated: () => void
   isRelatedRefreshing: boolean
@@ -427,6 +464,17 @@ function SchemaRecordsDataTable({
   const properties = useMemo(
     () => getJsonSchemaProperties(schema.definition),
     [schema.definition]
+  )
+  const propertiesByName = useMemo(() => {
+    const map = new Map<string, JsonSchemaProperty>()
+    for (const property of properties) {
+      map.set(property.name, property)
+    }
+    return map
+  }, [properties])
+  const selectableColumnIds = useMemo(
+    () => properties.map((property) => property.name),
+    [properties]
   )
   const { organizationUsers } = useWorkspaceOrganizationUsers()
   const usersById = useMemo(() => {
@@ -456,6 +504,18 @@ function SchemaRecordsDataTable({
     start: [],
     end: ["actions"],
   })
+  const [activeCell, setActiveCell] = useState<SpreadsheetCellRef | null>(null)
+  const [selectionAnchor, setSelectionAnchor] =
+    useState<SpreadsheetCellRef | null>(null)
+  const [selectionFocus, setSelectionFocus] =
+    useState<SpreadsheetCellRef | null>(null)
+  const [editing, setEditing] = useState<SpreadsheetCellRef | null>(null)
+  const [editDraftSeed, setEditDraftSeed] = useState<string | undefined>()
+  const [optimisticData, setOptimisticData] = useState<
+    Record<string, JsonObject>
+  >({})
+  const gridRef = useRef<HTMLDivElement | null>(null)
+  const [updateRecord] = useUpdateRecordMutation()
 
   useEffect(() => {
     setPagination((current) => ({ ...current, pageIndex: 0 }))
@@ -500,13 +560,53 @@ function SchemaRecordsDataTable({
     dataRef.current = data
   }
   const list = data ?? dataRef.current
-  const rows = useMemo(
-    () => list?.items.map(workspaceRecordFromApi) ?? EMPTY_RECORDS,
-    [list]
-  )
+  const rows = useMemo(() => {
+    const items = list?.items.map(workspaceRecordFromApi) ?? EMPTY_RECORDS
+    if (Object.keys(optimisticData).length === 0) {
+      return items
+    }
+    return items.map((record) => {
+      const nextData = optimisticData[record.id]
+      if (!nextData) {
+        return record
+      }
+      return { ...record, data: nextData }
+    })
+  }, [list, optimisticData])
+  const rowIds = useMemo(() => rows.map((record) => record.id), [rows])
   const total = list?.total ?? 0
   const filtersActive =
     query.trim().length > 0 || Object.keys(columnFilters.fields).length > 0
+
+  useEffect(() => {
+    setActiveCell(null)
+    setSelectionAnchor(null)
+    setSelectionFocus(null)
+    setEditing(null)
+    setEditDraftSeed(undefined)
+    setOptimisticData({})
+  }, [schema.id])
+
+  useEffect(() => {
+    setOptimisticData((current) => {
+      if (Object.keys(current).length === 0) {
+        return current
+      }
+      const next = { ...current }
+      let changed = false
+      for (const record of list?.items.map(workspaceRecordFromApi) ?? []) {
+        const optimistic = next[record.id]
+        if (!optimistic) {
+          continue
+        }
+        if (JSON.stringify(optimistic) === JSON.stringify(record.data)) {
+          delete next[record.id]
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [list])
 
   const hrefFor = useCallback(
     (record: StoredRecord) => {
@@ -588,6 +688,7 @@ function SchemaRecordsDataTable({
         ...properties.map((property) =>
           helper.accessor((record) => record.data[property.name], {
             id: property.name,
+            meta: { label: columnLabel(property) },
             header: ({ column }) => (
               <ColumnHeaderMenu
                 table={tableRef}
@@ -622,6 +723,7 @@ function SchemaRecordsDataTable({
                 relatedHref={hrefForRelated}
                 userHref={hrefForUser}
                 onPreviewFile={setPreviewFileId}
+                spreadsheet
               />
             ),
             size:
@@ -645,6 +747,7 @@ function SchemaRecordsDataTable({
           size: 52,
           minSize: 52,
           maxSize: 52,
+          meta: { label: "Actions" },
           header: () =>
             canEditColumns ? (
               <AddColumnButton table={tableRef} tables={relatedTables} />
@@ -747,24 +850,438 @@ function SchemaRecordsDataTable({
     return chips
   }, [columnFilters, properties, setFieldFilter])
 
+  const visibleSelectableColumnIds = useMemo(() => {
+    const visible = new Set(
+      table.getVisibleLeafColumns().map((column) => column.id)
+    )
+    return selectableColumnIds.filter((id) => visible.has(id))
+  }, [selectableColumnIds, table, columnVisibility])
+
+  const selectCell = useCallback(
+    (cell: SpreadsheetCellRef, extend: boolean) => {
+      setEditing(null)
+      setEditDraftSeed(undefined)
+      setActiveCell(cell)
+      if (extend && selectionAnchor) {
+        setSelectionFocus(cell)
+      } else {
+        setSelectionAnchor(cell)
+        setSelectionFocus(cell)
+      }
+    },
+    [selectionAnchor]
+  )
+
+  const beginEdit = useCallback(
+    (cell: SpreadsheetCellRef, seed?: string) => {
+      if (!canEditRecords) {
+        return
+      }
+      const property = propertiesByName.get(cell.columnId)
+      if (!property || !isSimpleSpreadsheetProperty(property)) {
+        onEdit(cell.rowId)
+        return
+      }
+      setActiveCell(cell)
+      setSelectionAnchor(cell)
+      setSelectionFocus(cell)
+      setEditDraftSeed(seed)
+      setEditing(cell)
+    },
+    [canEditRecords, onEdit, propertiesByName]
+  )
+
+  const commitCellValue = useCallback(
+    async (cell: SpreadsheetCellRef, nextValue: JsonValue | null) => {
+      const record = rows.find((item) => item.id === cell.rowId)
+      const property = propertiesByName.get(cell.columnId)
+      if (!record || !property) {
+        setEditing(null)
+        setEditDraftSeed(undefined)
+        return
+      }
+      const previous = record.data[property.name]
+      const normalizedPrevious =
+        previous === undefined || previous === "" ? null : previous
+      const normalizedNext = nextValue === "" ? null : nextValue
+      if (
+        JSON.stringify(normalizedPrevious) === JSON.stringify(normalizedNext)
+      ) {
+        setEditing(null)
+        setEditDraftSeed(undefined)
+        return
+      }
+      const nextData: JsonObject = { ...record.data }
+      if (normalizedNext === null) {
+        delete nextData[property.name]
+      } else {
+        nextData[property.name] = normalizedNext
+      }
+      setOptimisticData((current) => ({
+        ...current,
+        [record.id]: nextData,
+      }))
+      setEditing(null)
+      setEditDraftSeed(undefined)
+      try {
+        await updateRecord({ id: record.id, data: nextData }).unwrap()
+      } catch {
+        setOptimisticData((current) => {
+          const next = { ...current }
+          delete next[record.id]
+          return next
+        })
+      }
+    },
+    [propertiesByName, rows, updateRecord]
+  )
+
+  const isCellSelected = useCallback(
+    (cell: SpreadsheetCellRef) =>
+      isCellInSelection(
+        cell,
+        selectionAnchor,
+        selectionFocus,
+        rowIds,
+        visibleSelectableColumnIds
+      ),
+    [rowIds, selectionAnchor, selectionFocus, visibleSelectableColumnIds]
+  )
+
+  const copySelection = useCallback(async () => {
+    if (!selectionAnchor || !selectionFocus) {
+      return
+    }
+    const bounds = selectionBounds(
+      selectionAnchor,
+      selectionFocus,
+      rowIds,
+      visibleSelectableColumnIds
+    )
+    if (!bounds) {
+      return
+    }
+    const matrix: string[][] = []
+    for (let rowIndex = bounds.rowStart; rowIndex <= bounds.rowEnd; rowIndex++) {
+      const record = rows[rowIndex]
+      if (!record) {
+        continue
+      }
+      const line: string[] = []
+      for (
+        let colIndex = bounds.colStart;
+        colIndex <= bounds.colEnd;
+        colIndex++
+      ) {
+        const columnId = visibleSelectableColumnIds[colIndex]
+        const property = columnId
+          ? propertiesByName.get(columnId)
+          : undefined
+        if (!columnId || !property) {
+          line.push("")
+          continue
+        }
+        line.push(
+          clipboardValueForProperty(record.data[property.name], property)
+        )
+      }
+      matrix.push(line)
+    }
+    try {
+      await navigator.clipboard.writeText(encodeTsv(matrix))
+    } catch {
+      // Clipboard may be unavailable in some environments.
+    }
+  }, [
+    propertiesByName,
+    rowIds,
+    rows,
+    selectionAnchor,
+    selectionFocus,
+    visibleSelectableColumnIds,
+  ])
+
+  const pasteSelection = useCallback(
+    async (text: string) => {
+      if (!canEditRecords || !activeCell) {
+        return
+      }
+      const matrix = parseTsv(text)
+      if (matrix.length === 0) {
+        return
+      }
+      const startRow = rowIds.indexOf(activeCell.rowId)
+      const startCol = visibleSelectableColumnIds.indexOf(activeCell.columnId)
+      if (startRow < 0 || startCol < 0) {
+        return
+      }
+
+      const updates = new Map<string, JsonObject>()
+      for (let rowOffset = 0; rowOffset < matrix.length; rowOffset++) {
+        const record = rows[startRow + rowOffset]
+        if (!record) {
+          break
+        }
+        const line = matrix[rowOffset] ?? []
+        let nextData = updates.get(record.id) ?? { ...record.data }
+        let changed = false
+        for (let colOffset = 0; colOffset < line.length; colOffset++) {
+          const columnId = visibleSelectableColumnIds[startCol + colOffset]
+          const property = columnId
+            ? propertiesByName.get(columnId)
+            : undefined
+          if (!property || !isSimpleSpreadsheetProperty(property)) {
+            continue
+          }
+          const coerced = coercePasteValue(line[colOffset] ?? "", property)
+          if (coerced === undefined) {
+            continue
+          }
+          if (coerced === null) {
+            if (property.name in nextData) {
+              delete nextData[property.name]
+              changed = true
+            }
+          } else if (
+            JSON.stringify(nextData[property.name]) !== JSON.stringify(coerced)
+          ) {
+            nextData = { ...nextData, [property.name]: coerced }
+            changed = true
+          }
+        }
+        if (changed) {
+          updates.set(record.id, nextData)
+        }
+      }
+
+      if (updates.size === 0) {
+        return
+      }
+
+      setOptimisticData((current) => {
+        const next = { ...current }
+        for (const [id, data] of updates) {
+          next[id] = data
+        }
+        return next
+      })
+
+      const endRow = Math.min(
+        rows.length - 1,
+        startRow + matrix.length - 1
+      )
+      const endCol = Math.min(
+        visibleSelectableColumnIds.length - 1,
+        startCol + Math.max(...matrix.map((line) => line.length), 1) - 1
+      )
+      const focus: SpreadsheetCellRef = {
+        rowId: rowIds[endRow] ?? activeCell.rowId,
+        columnId:
+          visibleSelectableColumnIds[endCol] ?? activeCell.columnId,
+      }
+      setSelectionAnchor(activeCell)
+      setSelectionFocus(focus)
+      setActiveCell(activeCell)
+
+      await Promise.all(
+        [...updates.entries()].map(async ([id, data]) => {
+          try {
+            await updateRecord({ id, data }).unwrap()
+          } catch {
+            setOptimisticData((current) => {
+              const next = { ...current }
+              delete next[id]
+              return next
+            })
+          }
+        })
+      )
+    },
+    [
+      activeCell,
+      canEditRecords,
+      propertiesByName,
+      rowIds,
+      rows,
+      updateRecord,
+      visibleSelectableColumnIds,
+    ]
+  )
+
+  const onCellPointerDown = useCallback(
+    (cell: SpreadsheetCellRef, event: ReactPointerEvent) => {
+      event.preventDefault()
+      gridRef.current?.focus()
+      selectCell(cell, event.shiftKey)
+    },
+    [selectCell]
+  )
+
+  const onCellDoubleClick = useCallback(
+    (cell: SpreadsheetCellRef) => {
+      beginEdit(cell)
+    },
+    [beginEdit]
+  )
+
+  const onSpreadsheetKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (editing) {
+        return
+      }
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest("input,textarea,select,[contenteditable=true]")
+      ) {
+        return
+      }
+
+      const meta = event.metaKey || event.ctrlKey
+      if (meta && event.key.toLowerCase() === "c") {
+        event.preventDefault()
+        void copySelection()
+        return
+      }
+      if (meta && event.key.toLowerCase() === "v") {
+        if (!canEditRecords) {
+          return
+        }
+        event.preventDefault()
+        void navigator.clipboard.readText().then((text) => {
+          void pasteSelection(text)
+        })
+        return
+      }
+
+      if (!activeCell || rowIds.length === 0 || visibleSelectableColumnIds.length === 0) {
+        if (event.key.length === 1 && !meta && !event.altKey && rows[0]) {
+          const first: SpreadsheetCellRef = {
+            rowId: rows[0].id,
+            columnId: visibleSelectableColumnIds[0] ?? "",
+          }
+          if (first.columnId) {
+            beginEdit(first, event.key)
+            event.preventDefault()
+          }
+        }
+        return
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setEditing(null)
+        setEditDraftSeed(undefined)
+        setSelectionAnchor(activeCell)
+        setSelectionFocus(activeCell)
+        return
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault()
+        beginEdit(activeCell)
+        return
+      }
+
+      if (event.key === "F2") {
+        event.preventDefault()
+        beginEdit(activeCell)
+        return
+      }
+
+      if (event.key === "Tab") {
+        event.preventDefault()
+        const next = moveCellRef(
+          activeCell,
+          rowIds,
+          visibleSelectableColumnIds,
+          0,
+          event.shiftKey ? -1 : 1
+        )
+        selectCell(next, false)
+        return
+      }
+
+      const arrowDelta: Record<string, { row: number; col: number }> = {
+        ArrowUp: { row: -1, col: 0 },
+        ArrowDown: { row: 1, col: 0 },
+        ArrowLeft: { row: 0, col: -1 },
+        ArrowRight: { row: 0, col: 1 },
+      }
+      const delta = arrowDelta[event.key]
+      if (delta) {
+        event.preventDefault()
+        const next = moveCellRef(
+          activeCell,
+          rowIds,
+          visibleSelectableColumnIds,
+          delta.row,
+          delta.col
+        )
+        selectCell(next, event.shiftKey)
+        return
+      }
+
+      if (
+        event.key.length === 1 &&
+        !meta &&
+        !event.altKey &&
+        !event.ctrlKey &&
+        event.key !== " "
+      ) {
+        const property = propertiesByName.get(activeCell.columnId)
+        if (property && isSimpleSpreadsheetProperty(property) && canEditRecords) {
+          event.preventDefault()
+          beginEdit(activeCell, event.key)
+        }
+      }
+    },
+    [
+      activeCell,
+      beginEdit,
+      canEditRecords,
+      copySelection,
+      editing,
+      pasteSelection,
+      propertiesByName,
+      rowIds,
+      rows,
+      selectCell,
+      visibleSelectableColumnIds,
+    ]
+  )
+
   const previewFile = previewFileId ? filesById.get(previewFileId) : undefined
 
   return (
-    <>
-      <DataTableToolbar
-        query={query}
-        onQueryChange={setQuery}
-        searchPlaceholder="Search records..."
-        searchClassName="sm:max-w-3xl"
-        chips={<DataTableActiveFilters filters={activeFilters} />}
-        onRefresh={() => {
-          void refetch()
-          onRefreshRelated()
-        }}
-        isRefreshing={isFetching || isRelatedRefreshing}
-      />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="shrink-0 border-b px-3 py-2">
+        <DataTableToolbar
+          query={query}
+          onQueryChange={setQuery}
+          searchPlaceholder="Search records..."
+          searchClassName="sm:max-w-3xl"
+          chips={<DataTableActiveFilters filters={activeFilters} />}
+          trailing={
+            <div className="flex items-center gap-2">
+              {canEditColumns ? (
+                <AddColumnButton
+                  table={tableRef}
+                  tables={relatedTables}
+                  variant="toolbar"
+                />
+              ) : null}
+              <DataTableViewOptions table={table} />
+            </div>
+          }
+          onRefresh={() => {
+            void refetch()
+            onRefreshRelated()
+          }}
+          isRefreshing={isFetching || isRelatedRefreshing}
+        />
+      </div>
       {isError ? (
-        <p className="text-sm text-destructive">
+        <p className="px-3 py-2 text-sm text-destructive">
           {getHumaErrorMessage(error, "Failed to load records")}
         </p>
       ) : (
@@ -773,20 +1290,61 @@ function SchemaRecordsDataTable({
             table={table}
             isLoading={isLoading}
             isRefreshing={isFetching}
+            embedded
             empty={
               filtersActive ? "No records match this view." : "No records yet."
             }
+            spreadsheet={{
+              activeCell,
+              selectionAnchor,
+              selectionFocus,
+              editing,
+              selectableColumnIds: visibleSelectableColumnIds,
+              rowIndexOffset: pagination.pageIndex * pagination.pageSize,
+              isCellSelected,
+              onCellPointerDown,
+              onCellDoubleClick,
+              onKeyDown: onSpreadsheetKeyDown,
+              gridRef,
+              renderEditor: (cell) => {
+                const record = rows.find((item) => item.id === cell.rowId)
+                const property = propertiesByName.get(cell.columnId)
+                if (!record || !property) {
+                  return null
+                }
+                return (
+                  <SpreadsheetCellEditor
+                    property={property}
+                    value={record.data[property.name]}
+                    initialDraft={
+                      sameSpreadsheetCell(editing, cell)
+                        ? editDraftSeed
+                        : undefined
+                    }
+                    onCommit={(next) => {
+                      void commitCellValue(cell, next)
+                    }}
+                    onCancel={() => {
+                      setEditing(null)
+                      setEditDraftSeed(undefined)
+                    }}
+                  />
+                )
+              },
+            }}
           />
-          <DataTablePagination
-            table={table}
-            summary={dataTablePageSummary({
-              isLoading,
-              pageIndex: pagination.pageIndex,
-              pageSize: pagination.pageSize,
-              total,
-              singular: "record",
-            })}
-          />
+          <div className="shrink-0 border-t px-3 py-2">
+            <DataTablePagination
+              table={table}
+              summary={dataTablePageSummary({
+                isLoading,
+                pageIndex: pagination.pageIndex,
+                pageSize: pagination.pageSize,
+                total,
+                singular: "record",
+              })}
+            />
+          </div>
         </>
       )}
       <FilePreviewDialog
@@ -799,7 +1357,7 @@ function SchemaRecordsDataTable({
         }}
         href={previewFileId ? fileHref(previewFileId) : undefined}
       />
-    </>
+    </div>
   )
 }
 

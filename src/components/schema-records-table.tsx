@@ -63,6 +63,7 @@ export function RecordCell({
   relatedHref,
   userHref,
   onPreviewFile,
+  spreadsheet = false,
 }: {
   record: StoredRecord
   property: JsonSchemaProperty
@@ -74,6 +75,7 @@ export function RecordCell({
   relatedHref?: (recordId: string) => string
   userHref?: (userId: string) => string
   onPreviewFile: (fileId: string) => void
+  spreadsheet?: boolean
 }) {
   const value = record.data[property.name]
 
@@ -100,6 +102,9 @@ export function RecordCell({
       (item): item is string => typeof item === "string" && item.length > 0
     )
     if (ids.length === 0) {
+      if (spreadsheet) {
+        return <span className="text-muted-foreground">—</span>
+      }
       return (
         <Link to={href} className="block text-muted-foreground">
           —
@@ -164,16 +169,8 @@ export function RecordCell({
       ? enumTone(value)
       : undefined
 
-  return (
-    <Link
-      to={href}
-      className={cn(
-        "block max-w-[18rem] min-w-[6rem] truncate",
-        property.type === "number"
-          ? "text-right font-medium tabular-nums"
-          : null
-      )}
-    >
+  const content = (
+    <>
       {property.enumValues && typeof value === "string" && text ? (
         <span
           className={cn(
@@ -188,6 +185,25 @@ export function RecordCell({
       ) : (
         <span className="text-muted-foreground">—</span>
       )}
+    </>
+  )
+
+  const valueClass = cn(
+    "block max-w-[18rem] min-w-[6rem] truncate",
+    property.type === "number" || property.type === "integer"
+      ? "text-right font-medium tabular-nums"
+      : null,
+    property.type === "boolean" && value === true && "font-medium",
+    property.type === "boolean" && value === false && "text-muted-foreground"
+  )
+
+  if (spreadsheet) {
+    return <span className={valueClass}>{content}</span>
+  }
+
+  return (
+    <Link to={href} className={valueClass}>
+      {content}
     </Link>
   )
 }
@@ -746,8 +762,8 @@ export function SchemaSheetTabs({
   renderMenu?: (schema: Schema) => ReactNode
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-1">
-      <div className="flex min-w-0 gap-1 overflow-x-auto">
+    <div className="flex min-w-0 items-end gap-1">
+      <div className="flex min-w-0 items-end gap-0.5 overflow-x-auto pt-1">
         {schemas.map((schema) => {
           const tone = getBadgeColor(schema.color)
           const active = schema.id === activeId
@@ -757,17 +773,17 @@ export function SchemaSheetTabs({
             <div
               key={schema.id}
               className={cn(
-                "inline-flex shrink-0 items-center rounded-full border text-sm transition-colors",
+                "inline-flex shrink-0 items-center border border-b-0 text-sm transition-colors",
                 active
-                  ? "border-foreground/15 bg-background font-medium shadow-xs"
-                  : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  ? "-mb-px rounded-t-md border-border bg-background font-medium text-foreground"
+                  : "rounded-t-md border-transparent bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
               <button
                 type="button"
                 onClick={() => onSelect(schema.id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 py-1 pl-3",
+                  "inline-flex items-center gap-1.5 py-1.5 pl-3",
                   menu ? "pr-1" : "pr-3"
                 )}
               >

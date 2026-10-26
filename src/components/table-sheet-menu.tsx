@@ -58,7 +58,7 @@ export function TableSheetMenu({
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`${schema.name} actions`}
-          className="mr-1 inline-flex size-5 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="mr-1 inline-flex size-5 items-center justify-center rounded-sm text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <ChevronDownIcon className="size-3.5" />
         </DropdownMenuTrigger>
